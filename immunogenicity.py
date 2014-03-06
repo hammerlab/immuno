@@ -3,34 +3,27 @@
  Copyright (c) 2014. Mount Sinai School of Medicine
  
 """
-from pipeline import PipelineElement
-import iedb
 from sklearn import ensemble
 
+from pipeline import PipelineElement
+from epitopes import iedb
+
 class ImmunogenicityRFModel(PipelineElement):
-  def __init__(self, name, n_trees= 50, filename = 'tcell_compact.csv',
+  def __init__(self, name, n_trees= 50, 
                  assay_group = 'cytotoxicity',
                  # 'drop' | 'keep' | 'positive' | 'negative'
-                 noisy_labels = 'majority',
                  human = True,
-                 hla_type1 = True,
-                 exclude_hla_a2 = False,
-                 only_hla_a2 = False,
+                 hla_type = 1,
                  max_ngram = 1, 
-                 normalize_row = True, 
                  reduced_alphabet = None):
     self.name = name
-    self._X, self._Y, self._feature_transformer = iedb.load_dataset(filename = filename,
-                 assay_group=assay_group,
-                 # 'drop' | 'keep' | 'positive' | 'negative'
-                 noisy_labels = noisy_labels, 
-                 human = human, 
-                 hla_type1 = hla_type1,
-                 exclude_hla_a2 = exclude_hla_a2, 
-                 only_hla_a2 = only_hla_a2, 
-                 max_ngram = max_ngram, 
-                 normalize_row = normalize_row, 
-                 reduced_alphabet = reduced_alphabet)
+    self._X, self._Y, self._feature_transformer = iedb.load_tcell(
+        assay_group=assay_group,
+        noisy_labels = noisy_labels, 
+        human = human, 
+        mhc_class = mhc_class,
+        max_ngram = max_ngram, 
+        reduced_alphabet = reduced_alphabet)
     self._model = ensemble.RandomForestClassifier(n_trees)
     self._model.fit(self._X, self._Y)
 

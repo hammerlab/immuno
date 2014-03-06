@@ -3,15 +3,17 @@
  Copyright (c) 2014. Mount Sinai School of Medicine
  
 """
-from pipeline import ImmunoPipeline
 import argparse
+
+import pandas as pd
+from epitopes import reduced_alphabet 
+
+from pipeline import ImmunoPipeline
 from immunogenicity import ImmunogenicityRFModel
 from binding import IEDBMHCBinding
 from cleavage import ProteasomalCleavage
-import reduced_alphabet
 from Bio import SeqIO
 from maf_to_epitopes import get_eptiopes_from_maf
-import pandas as pd
 
 def get_epitopes_from_fasta(fasta_files):
   epitopes = []
