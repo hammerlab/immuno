@@ -34,3 +34,12 @@ nosetests.xml
 .mr.developer.cfg
 .project
 .pydevproject
+
+# Genomics files
+*.bam
+*.sam
+*.vcf
+*.fa
+*.fasta
+*.fasta.gz
+*.vcf.gz

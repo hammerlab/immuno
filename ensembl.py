@@ -32,7 +32,7 @@ class Ensembl():
     if cdna_path:
       self._cdna_dict = SeqIO.index(cdna_path, "fasta")
     if protein_path:
-      self._protein_dict = SeqIO.parse(protein_path, "fasta")
+      self._protein_dict = SeqIO.index(protein_path, "fasta")
     exon = pd.read_csv('exon.txt', sep='\t',  names = 
                                            [ "exon_id",
                                             "seq_region_id",

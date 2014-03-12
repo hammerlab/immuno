@@ -69,7 +69,6 @@ class Variant2Epitope():
 
   def parse_aa_sift(self, sift_string):
     # ENSP00000427553:T109R
-    print sift_string
     protein_transcript_id, variation = sift_string.split(":")
     aa_orig = variation[0]
     aa_variant = variation[-1]

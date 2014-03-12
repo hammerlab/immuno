@@ -1,3 +1,5 @@
+import re
+
 class SnpEffFields():
 
   SNPEFF_INFO_FIELD_KEY = "EFF"
