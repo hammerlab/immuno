@@ -21,15 +21,14 @@ class ImmunogenicityRFModel(PipelineElement):
     def __init__(self, name, n_trees= 50, 
                 assay_group = 'cytotoxicity',
                  # 'drop' | 'keep' | 'positive' | 'negative'
-                human = True,
-                hla_type = 1,
-                ngram = 1, 
+                max_ngram = 2,
                 reduced_alphabet = None):
         self.name = name
-        self._X, self._Y, self._feature_transformer = iedb.load_tcell_dataset(
+        self._X, self._Y, self._feature_transformer = iedb.load_tcell_ngrams(
             assay_group=assay_group,
-            human = human, 
-            ngram = ngram, 
+            human = True, 
+            max_ngram = max_ngram,
+            return_transformer = True, 
             reduced_alphabet = reduced_alphabet)
         self._model = ensemble.RandomForestClassifier(n_trees)
         self._model.fit(self._X, self._Y)
@@ -38,5 +37,5 @@ class ImmunogenicityRFModel(PipelineElement):
         pass
 
     def _apply(self, data):
-        transformed_data = self._feature_transformer.transform(data.peptide).todense()
+        transformed_data = self._feature_transformer(data.peptide).todense()
         return [x[1] for x in self._model.predict_proba(transformed_data)]
