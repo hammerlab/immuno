@@ -11,20 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.     import argparse
-from copy import deepcopy  
+from copy import deepcopy
 
 import pandas as pd
-import numpy as np  
+import numpy as np
 
 from ensembl import Ensembl
 from snpeff_effect import SnpEffEffect
-  
+
 
 
 class Variant2Epitope(object):
-    def __init__(self, 
-                 protein_path = 'Homo_sapiens.GRCh37.74.pep.all.fa', 
-                 cdna_file = 'Homo_sapiens.GRCh37.74.cdna.all.fa', 
+    def __init__(self,
+                 protein_path = 'Homo_sapiens.GRCh37.74.pep.all.fa',
+                 cdna_file = 'Homo_sapiens.GRCh37.74.cdna.all.fa',
                  cds_path = 'Homo_sapiens.GRCh37.74.cds.all.fa'):
         if cdna_file:
           self._ensembl = Ensembl(cdna_path = cdna_file, cds_path=cds_path, protein_path=protein_path)
@@ -75,10 +75,14 @@ class Variant2Epitope(object):
           variant = dict(variant)
           info = variant['info']
           del variant['info']
-          for effect in Variant2Epitope.parse_effects(info):  
+          for effect in Variant2Epitope.parse_effects(info):
             variant = deepcopy(variant)
-            variant['Transcript'] = effect.transcript_id   
-            epitope = self.generate_epitope_from_transcript(effect.transcript_id, variant['pos'], variant['ref'], variant['alt'], window=window)
+            variant['Transcript'] = effect.transcript_id
+            epitope = self.generate_epitope_from_transcript(
+                effect.transcript_id, variant['pos'],
+                variant['ref'],
+                variant['alt'],
+                window=window)
             if epitope:
               variant['Epitope'] = epitope
               results.append(variant)
@@ -103,22 +107,40 @@ class Variant2Epitope(object):
         return (protein_transcript_id, aa_orig, aa_variant, aa_change_pos)
 
 
-    def generate_epitopes_from_protein_transcript(self, transcript_id, pos, ref, variant, window=10):
-        (transcript_start, transcript_end, transcript) = self._ensembl.get_protein(transcript_id)
+    def generate_epitopes_from_protein_transcript(
+            self,
+            transcript_id,
+            pos,
+            ref,
+            variant,
+            window=10):
+        (transcript_start, transcript_end, transcript) = \
+            self._ensembl.get_protein(transcript_id)
         if transcript:
-            return self.get_flanking_epitope(self._insert_mutation(transcript.seq, pos, ref, variant), pos, window=window)
+            return self.get_flanking_epitope(
+                self._insert_mutation(transcript.seq, pos, ref, variant),
+                pos, window=window)
         return None
 
     def get_flanking_epitope(self, sequence, pos, window=10):
         flanked = sequence[pos-window:pos+window].toseq()
         return flanked
 
-    def generate_epitope_from_transcript(self, transcript_id, pos, ref, variant, window=10):
-        (transcript_start, transcript_end, transcript) = self._ensembl.get_cdna(transcript_id)
+    def generate_epitope_from_transcript(
+            self,
+            transcript_id,
+            pos,
+            ref,
+            variant,
+            window=10):
+        (transcript_start, transcript_end, transcript) = \
+            self._ensembl.get_cdna(transcript_id)
         if transcript:
           idx = self._ensembl.get_transcript_index_from_pos(pos, transcript_id)
           if idx:
-              mutated_sequence = self._insert_mutation(transcript.seq, idx, ref, variant)
+              mutated_sequence = self._insert_mutation(
+                    transcript.seq, idx, ref, variant)
               polymer = mutated_sequence.toseq().translate().tomutable()
-              return str(self.get_flanking_epitope(polymer, idx/3, window=window))
+              epitope = self.get_flanking_epitope(polymer, idx/3, window=window)
+              return str(epitope)
         return None

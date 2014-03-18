@@ -45,15 +45,23 @@ DEFAULT_ALLELE = 'HLA-A*02:01'
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", action="append", default=[], help="input file name (i.e. FASTA, MAF, VCF)")
-    #parser.add_argument("--string", action="append", default=[],
-    #    help="amino acid string")
+    parser.add_argument("--input", action="append", default=[],
+        help="input file name (i.e. FASTA, MAF, VCF)")
+    parser.add_argument("--string", action="append", default=[],
+        help="amino acid string")
     parser.add_argument("--allele_file",
         help="file with one allele per line")
     parser.add_argument("--alleles", help="comma separated list of allele")
     parser.add_argument("--output", help="output file for dataframes", required=True)
 
     args = parser.parse_args()
+
+    if args.string:
+        assert False, "Amino acid strings not yet implemented"
+    else:
+        assert len(args.input) > 0, \
+            "Either amino acid string or input file required"
+
     if args.input[0].endswith(".vcf"):
       converter = Variant2Epitope()
       converter.generate_epitopes_from_snpeff(args.input[0])
@@ -63,13 +71,14 @@ if __name__ == '__main__':
     elif args.input[0].endswith(".fasta") or args.input[0].endswith(".fa"):
         epitope_data = get_epitopes_from_fasta(args.input)
     elif args.input[0].endswith(".dbnsfp"):
-      converter = Variant2Epitope()
-      epitope_data = converter.generate_epitopes_from_annotations(args.input[0])
+        converter = Variant2Epitope()
+        epitope_data = \
+            converter.generate_epitopes_from_annotations(args.input[0])
 
     if args.allele_file:
         alleles = [l.strip() for l in open(args.allele_file)]
     elif args.alleles:
-        alleles = [l.strip() for l in args.alleles.split(",")
+        alleles = [l.strip() for l in args.alleles.split(",")]
     else:
         alleles = [DEFAULT_ALLELE]
 
