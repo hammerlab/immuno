@@ -16,8 +16,8 @@ import argparse
 
 import pandas as pd
 from Bio import SeqIO
+from epitopes import reduced_alphabet
 
-from epitopes import reduced_alphabet    
 from pipeline import ImmunoPipeline
 from immunogenicity import ImmunogenicityRFModel
 from binding import IEDBMHCBinding
@@ -31,14 +31,10 @@ def get_epitopes_from_fasta(fasta_files):
         epitopes += [pd.DataFrame({'peptide': pd.Series(list(set([e.seq for e in epitope_data])))})]
     return pd.concat(epitopes)
 
-def create_pipeline():
-    pipeline = ImmunoPipeline()
-    return pipeline    
-
 def add_scoring(pipeline, alleles):
     pipeline.add_scorer(IEDBMHCBinding(name='mhc', alleles=alleles))
-    pipeline.add_scorer(ImmunogenicityRFModel(name='default RF'))
-    pipeline.add_scorer(ImmunogenicityRFModel(name = 'murphy10 RF', reduced_alphabet = reduced_alphabet.murphy10))
+    #pipeline.add_scorer(ImmunogenicityRFModel(name='default RF'))
+    #pipeline.add_scorer(ImmunogenicityRFModel(name = 'murphy10 RF', reduced_alphabet = reduced_alphabet.murphy10))
 
     return pipeline 
 
@@ -53,7 +49,9 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     if args.input[0].endswith(".vcf"):
-      pass
+      converter = Variant2Epitope()
+      converter.generate_epitopes_from_snpeff(args.input[0])
+      epitope_data = converter.generate_epitopes_from_snpeff(args.input[0])
     elif args.input[0].endswith(".maf"):
         epitope_data = get_eptiopes_from_maf(args.input)
     elif args.input[0].endswith(".fasta") or args.input[0].endswith(".fa"):

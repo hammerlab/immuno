@@ -104,14 +104,14 @@ class Ensembl():
   def get_transcript_index_from_pos(self, pos, transcript_id):
     exons = self.get_exons_from_transcript(transcript_id).sort(columns=['seq_region_end_exon'])
     transcript_idx = 0
-    for exon in exons:
-      if pos > exon['seq_region_end_exon']:
-        transcript_idx += exon['seq_region_end_exon'] - exon['seq_region_start_exon']
-      elif pos < exon['seq_region_end_exon'] and pos > exon['seq_region_start_exon']:
-        return transcript_idx + (pos - exon['seq_region_start_exon'])
+    for (idx, row) in exons.iterrows():
+      if pos > row['seq_region_end_exon']:
+        transcript_idx += row['seq_region_end_exon'] - row['seq_region_start_exon']
+      elif pos < row['seq_region_end_exon'] and pos > row['seq_region_start_exon']:
+        return transcript_idx + (pos - row['seq_region_start_exon'])
       else:
         ## error some
-        return -1
+        return None
 
   def _parse_description(self, description):
     description_parts = description.split()
