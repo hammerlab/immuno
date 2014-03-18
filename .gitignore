@@ -43,3 +43,6 @@ nosetests.xml
 *.fasta
 *.fasta.gz
 *.vcf.gz
+
+# machine learning models might be too big
+*.pickle

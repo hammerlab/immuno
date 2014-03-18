@@ -26,13 +26,11 @@ class ImmunoPipeline():
   def score(self, data):
     for element in self._scorers:
       data = element.apply(data)
-
     return data
 
   def generate(self):
     for element in self._generators:
       data = self._generators(self._epitopes, self._alleles)
-
     return data
 
 

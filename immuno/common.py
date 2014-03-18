@@ -10,10 +10,11 @@
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
-# limitations under the License.  
+# limitations under the License.
 
 import logging
 
-logging.basicConfig(format="[%(levelname)s %(filename)s:%(lineno)d %(funcName)s] %(message)s",
-                    level=logging.DEBUG)
+logging.basicConfig(
+    format="[%(levelname)s %(filename)s:%(lineno)d %(funcName)s] %(message)s",
+    level=logging.DEBUG)
 

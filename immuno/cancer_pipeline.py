@@ -10,9 +10,9 @@
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
-# limitations under the License.    
+# limitations under the License.
 
-import argparse    
+import argparse
 
 import pandas as pd
 from Bio import SeqIO
@@ -22,7 +22,7 @@ from pipeline import ImmunoPipeline
 from immunogenicity import ImmunogenicityRFModel
 from binding import IEDBMHCBinding
 from maf_to_epitopes import get_eptiopes_from_maf
-from epitope_generation import Variant2Epitope  
+from epitope_generation import Variant2Epitope
 
 def get_epitopes_from_fasta(fasta_files):
     epitopes = []
@@ -32,19 +32,25 @@ def get_epitopes_from_fasta(fasta_files):
     return pd.concat(epitopes)
 
 def add_scoring(pipeline, alleles):
-    pipeline.add_scorer(IEDBMHCBinding(name='mhc', alleles=alleles))
-    #pipeline.add_scorer(ImmunogenicityRFModel(name='default RF'))
-    #pipeline.add_scorer(ImmunogenicityRFModel(name = 'murphy10 RF', reduced_alphabet = reduced_alphabet.murphy10))
+    mhc = IEDBMHCBinding(name = 'mhc', alleles=alleles)
+    pipeline.add_scorer(mhc)
 
-    return pipeline 
+    immunogenicity = ImmunogenicityRFModel(name = 'immunogenicity')
+    pipeline.add(immunogenicity)
 
-DEFAULT_ALLELE = 'HLA-A*02:01'    
+    return pipeline
+
+DEFAULT_ALLELE = 'HLA-A*02:01'
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", action="append", default=[], help="input file to process")
-    parser.add_argument("--allele_file", help="list of alleles")
+    parser.add_argument("--input", action="append", default=[], help="input file name (i.e. FASTA, MAF, VCF)")
+    #parser.add_argument("--string", action="append", default=[],
+    #    help="amino acid string")
+    parser.add_argument("--allele_file",
+        help="file with one allele per line")
+    parser.add_argument("--alleles", help="comma separated list of allele")
     parser.add_argument("--output", help="output file for dataframes", required=True)
 
     args = parser.parse_args()
@@ -61,9 +67,11 @@ if __name__ == '__main__':
       epitope_data = converter.generate_epitopes_from_annotations(args.input[0])
 
     if args.allele_file:
-      alleles = [l.strip() for l in open(args.allele_file)]
+        alleles = [l.strip() for l in open(args.allele_file)]
+    elif args.alleles:
+        alleles = [l.strip() for l in args.alleles.split(",")
     else:
-      alleles = [DEFAULT_ALLELE]
+        alleles = [DEFAULT_ALLELE]
 
     pipeline = ImmunoPipeline()
     add_scoring(pipeline, alleles)
