@@ -22,7 +22,7 @@ from pipeline import ImmunoPipeline
 from immunogenicity import ImmunogenicityRFModel
 from binding import IEDBMHCBinding
 from maf_to_epitopes import get_eptiopes_from_maf
-from epitope_generation import Variant2Epitope
+from epitope_generation import generate_epitopes_from_snpeff, generate_epitopes_from_vcf
 
 def get_epitopes_from_fasta(fasta_files):
     epitope_dataframes = []
@@ -44,7 +44,6 @@ def add_scoring(pipeline, alleles):
 
 DEFAULT_ALLELE = 'HLA-A*02:01'
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # must supply either an input file or an amino acid string
@@ -63,27 +62,22 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.string:
-        assert False, "Amino acid strings not yet implemented"
+        epitope_data = pd.DataFrame.from_dict({'Epitope' : args.string})
+    elif len(args.input) > 0:
+        input_filename = args.input[0]
+        if input_filename.endswith("eff.vcf"):
+            epitope_data = generate_epitopes_from_snpeff(input_filename)
+        if input_filename.endswith(".vcf"):
+            epitope_data = generate_epitopes_from_vcf(input_filename)
+        elif input_filename.endswith(".maf"):
+            epitope_data = get_eptiopes_from_maf(args.input)
+        elif input_filename.endswith(".fasta") or input_filename.endswith(".fa"):
+            epitope_data = get_epitopes_from_fasta(args.input)
+        else:
+            assert False, "Unrecognized file type %s" % input_filename
     else:
-        assert len(args.input) > 0, \
+        assert False, \
             "Either amino acid string or input file required"
-
-    input_filename = args.input[0]
-
-    if input_filename.endswith(".vcf"):
-        converter = Variant2Epitope()
-        converter.generate_epitopes_from_snpeff(args.input[0])
-        epitope_data = converter.generate_epitopes_from_snpeff(args.input[0])
-    elif input_filename.endswith(".maf"):
-        epitope_data = get_eptiopes_from_maf(args.input)
-    elif input_filename.endswith(".fasta") or args.input[0].endswith(".fa"):
-        epitope_data = get_epitopes_from_fasta(args.input)
-    elif input_filename.endswith(".dbnsfp"):
-        converter = Variant2Epitope()
-        epitope_data = \
-            converter.generate_epitopes_from_annotations(args.input[0])
-    else:
-        assert False, "Unrecognized file type %s" % args.input[0]
 
     if args.allele_file:
         alleles = [l.strip() for l in open(args.allele_file)]
