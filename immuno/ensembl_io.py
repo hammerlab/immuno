@@ -49,11 +49,11 @@ def download_transcript_metadata(output_file = 'gene_exon_transcript.tsv', filte
     ensure_dir(DATA_DIR)
     full_path = join(DATA_DIR, output_file)
     if not exists(full_path):
-        GENE_DATA_PATH = fetch_data('gene.txt', "ftp://ftp.org/pub/release-74/mysql/homo_sapiens_core_74_37/gene.txt.gz")
-        SEQ_REGION_DATA_PATH = fetch_data('seq_region.txt', "ftp://ftp.org/pub/release-74/mysql/homo_sapiens_core_74_37/seq_region.txt.gz")
-        EXON_DATA_PATH = fetch_data('exon.txt', "ftp://ftp.org/pub/release-74/mysql/homo_sapiens_core_74_37/exon.txt.gz")
-        TRANSCRIPT_DATA_PATH = fetch_data('transcript.txt', "ftp://ftp.org/pub/release-74/mysql/homo_sapiens_core_74_37/transcript.txt.gz")
-        EXON_TRANSCRIPT_DATA_PATH = fetch_data('exon_transcript.txt', "ftp://ftp.org/pub/release-74/mysql/homo_sapiens_core_74_37/exon_transcript.txt.gz")
+        GENE_DATA_PATH = fetch_data('gene.txt', "ftp://ftp.ensembl.org/pub/release-74/mysql/homo_sapiens_core_74_37/gene.txt.gz")
+        SEQ_REGION_DATA_PATH = fetch_data('seq_region.txt', "ftp://ftp.ensembl.org/pub/release-74/mysql/homo_sapiens_core_74_37/seq_region.txt.gz")
+        EXON_DATA_PATH = fetch_data('exon.txt', "ftp://ftp.ensembl.org/pub/release-74/mysql/homo_sapiens_core_74_37/exon.txt.gz")
+        TRANSCRIPT_DATA_PATH = fetch_data('transcript.txt', "ftp://ftp.ensembl.org/pub/release-74/mysql/homo_sapiens_core_74_37/transcript.txt.gz")
+        EXON_TRANSCRIPT_DATA_PATH = fetch_data('exon_transcript.txt', "ftp://ftp.ensembl.org/pub/release-74/mysql/homo_sapiens_core_74_37/exon_transcript.txt.gz")
 
 
         seqregion = pd.read_csv(SEQ_REGION_DATA_PATH, sep='\t', names = SEQ_REGION_HEADER, index_col=False)
