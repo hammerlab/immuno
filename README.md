@@ -1,21 +1,23 @@
 ## Immunotherapy Pipeline
 
 
-### Todo
-
-
-- Check peptides against all self-peptides - save index instead of indexing every run
-- Add proteasomal cleavage model (NetChop or SMM method (smm matrices are available but only seem appropriate for 6mers))
-
-
 ### Usage
 
+#### From peptide string
 ```sh
-./get_data.sh
+python cancer_pipeline.py --string EDLTVKIGDFGLATEKSRWSGSHQFEQLS
+```
 
-python cancer_pipeline.py --input <.maf, .dbnsfp, .fasta> --output <output_file> 
+#### From input file string
+```sh
+python cancer_pipeline.py --input <.maf, .vcf, .eff.vcf, .fasta> --output <output_file> 
 
 ```
+
+If  VCF file is input, it will be annotated w/ gene information and Ensembl transcripts, otherwise input an annotated SnpEFF vcf file.
+
+If no output_file is specific the results will print to stdout
+
 
 ### Adding a new scorer
 
