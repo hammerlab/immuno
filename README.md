@@ -8,7 +8,7 @@
 python cancer_pipeline.py --string EDLTVKIGDFGLATEKSRWSGSHQFEQLS
 ```
 
-#### From input file string
+#### From input file
 ```sh
 python cancer_pipeline.py --input <.maf, .vcf, .eff.vcf, .fasta> --output <output_file> 
 
