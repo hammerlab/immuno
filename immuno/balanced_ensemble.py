@@ -69,8 +69,7 @@ class BalancedEnsembleClassifier(ClassifierMixin):
 
         n_models = 2 * int(ceil(float(n_total) / n_sub)) + 1
 
-        #print "Subsampling class sizes from (%d, %d) to %d" % \
-        #    (n_true, n_false, n_sub)
+
         for i in xrange(n_models):
 
             # subsample the true and false datasets

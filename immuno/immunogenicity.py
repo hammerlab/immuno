@@ -32,13 +32,14 @@ def train():
         assay_group = 'cytotoxicity',
         human = True,
         mhc_class = 1,
-        max_ngram = 3,
-        reduced_alphabet = reduced_alphabet.hp2,
+        max_ngram = 2,
+        reduced_alphabet = reduced_alphabet.sdm12,
         min_count = None,
         return_transformer = True)
     ensemble = BalancedEnsembleClassifier()
     ensemble.fit(X, Y)
     return vectorizer, ensemble
+
 
 def train_cached(
         model_filename = 'immunogenicity_classifier.pickle',
@@ -88,9 +89,4 @@ class ImmunogenicityRFModel(PipelineElement):
             X = self.vectorizer.transform(df.peptide)
         else:
             X = df.peptide
-        res = self.classifier.decision_function(X)
-        print res
-        print self.classifier.predict(X)
-        print self.classifier.predict_proba(X)
-        print self.classifier._predict_counts(X)
-        return res
+        return self.classifier.decision_function(X)
