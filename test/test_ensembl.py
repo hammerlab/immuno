@@ -70,5 +70,42 @@ def test_get_transcript_from_pos():
     transcripts_ids = ensembl.annotate_transcripts(vcf)
     assert( "ENST00000453024" in set(transcripts_ids['stable_id_transcript']))
 
-# def test_get_gene_from_pos():
-#     pass
+def test_get_all_transcript_from_pos():
+    variant = {
+        'chr' : '3',
+        'pos' : 41275636,
+        'ref' : 'G',
+        'alt' : 'A'
+    }
+    vcf = pd.DataFrame.from_records([variant])
+    transcripts_ids = ensembl.annotate_transcripts(vcf)
+    transcript_ids = set(transcripts_ids['stable_id_transcript'])
+    assert( "ENST00000405570" in transcript_ids)
+    assert( "ENST00000396183" in transcript_ids)
+    assert( "ENST00000349496" in transcript_ids)
+    assert( "ENST00000453024" in transcript_ids)
+    assert( "ENST00000396185" in transcript_ids)
+
+def test_interval_search():
+    intervals = [ (7,13), (17,19), (21, 24), (35, 45), (45, 47), (60, 70)]
+    idx = ensembl.get_idx_from_interval(7, intervals)
+    print idx
+    assert( idx == 0)
+    idx = ensembl.get_idx_from_interval(13, intervals)
+    print idx
+    assert(idx is None)
+    idx = ensembl.get_idx_from_interval(12, intervals)
+    print idx
+    assert(idx == 5)
+
+    idx = ensembl.get_idx_from_interval(17, intervals)
+    print idx
+    assert(idx == 6)
+
+    idx = ensembl.get_idx_from_interval(18, intervals)
+    print idx
+    assert(idx == 7)
+
+    idx = ensembl.get_idx_from_interval(23, intervals)
+    print idx
+    assert(idx == 10)

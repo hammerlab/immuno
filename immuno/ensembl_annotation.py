@@ -108,13 +108,16 @@ def get_transcript_index_from_pos(pos, transcript_id):
     """
     exons = get_exons_from_transcript(transcript_id)
     exons = exons.sort(columns=['seq_region_start_exon', 'seq_region_end_exon'])
+    return get_idx_from_interval(pos, zip(exons['seq_region_start_exon'], exons['seq_region_end_exon']))
 
-    transcript_idx = 0
-    for (idx, row) in exons.iterrows():
-        if pos > row['seq_region_end_exon']:
-            transcript_idx += row['seq_region_end_exon'] - row['seq_region_start_exon']
-        elif pos < row['seq_region_end_exon'] and pos >= row['seq_region_start_exon']:
-            return transcript_idx + (pos - row['seq_region_start_exon'])
+def get_idx_from_interval(pos, intervals):
+    idx = 0
+    for (start, end) in intervals:
+        if pos > end:
+            idx += (end - start)
+        elif pos < end and pos >= start:
+            return idx + (pos - start)
         else:
             ## error some
             return None
+

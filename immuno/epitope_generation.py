@@ -56,9 +56,9 @@ def generate_epitopes_from_vcf(input_file):
             return generate_epitope_from_transcript(transcript_id, pos, ref, alt)
         else:
             return None
-
     epitopes = transcripts_df.apply(epitope_from_annotation, axis=1)
-    transcripts_df['Epitope'] = pd.Series(epitopes, index=transcripts_df)
+    transcripts_df['Epitope'] = pd.Series(epitopes)
+    print transcripts_df.head()
     return transcripts_df
 
 
@@ -83,7 +83,7 @@ def generate_epitopes_from_protein_transcript(transcript_id, pos, ref, variant):
     transcript = _ensembl.get_protein(transcript_id)
     if transcript:
         try:
-            return mutate.mutate_protein_from_transcript(transcript.seq, pos, ref, variant)
+            return str(mutate.mutate(transcript.seq, pos, ref, variant))
         except:
             return None
     return None
@@ -91,12 +91,13 @@ def generate_epitopes_from_protein_transcript(transcript_id, pos, ref, variant):
 def generate_epitope_from_transcript(transcript_id, pos, ref, variant):
     transcript = _ensembl.get_cdna(transcript_id)
     if transcript:
-      idx = ensembl_annotation.get_transcript_index_from_pos(pos, transcript_id)
-      if idx:
-        try:
-            return mutate.mutate_protein_from_transcript(transcript.seq, pos, ref, variant)
-        except:
-            return None
+        idx = ensembl_annotation.get_transcript_index_from_pos(pos, transcript_id)
+        if idx:
+            try:
+                mutated = mutate.mutate_protein_from_transcript(transcript.seq, idx, ref, variant)
+                return str(mutated)
+            except AssertionError, error:
+                return None
     return None
 
 def parse_effects(info_field):
