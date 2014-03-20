@@ -26,14 +26,21 @@ from epitopes import \
 from pipeline import PipelineElement
 from balanced_ensemble import BalancedEnsembleClassifier
 
-def train():
-    logging.info("Training immunogenicity classifier")
-    X, Y, vectorizer = iedb.load_tcell_ngrams(
+def train(
         assay_group = 'cytotoxicity',
-        human = True,
         mhc_class = 1,
         max_ngram = 2,
-        reduced_alphabet = reduced_alphabet.sdm12,
+        alphabet = 'sdm12'):
+    params_str = "assay='%s', mhc=%s, ngram=%s, alphabet=%s" % \
+        (assay_group, mhc_class, max_ngram, alphabet)
+    logging.info("Training immunogenicity classifier (%s)" % params_str)
+    alphabet_dict = getattr(reduced_alphabet, alphabet)
+    X, Y, vectorizer = iedb.load_tcell_ngrams(
+        assay_group = assay_group,
+        human = True,
+        mhc_class = mhc_class,
+        max_ngram = max_ngram,
+        reduced_alphabet = alphabet_dict,
         min_count = None,
         return_transformer = True)
     ensemble = BalancedEnsembleClassifier()
@@ -42,13 +49,26 @@ def train():
 
 
 def train_cached(
-        model_filename = 'immunogenicity_classifier.pickle',
-        vectorizer_filename = 'immunogenicity_vectorizer.pickle'):
+        assay_group = 'cytotoxicity',
+        mhc_class = 1,
+        max_ngram = 2,
+        alphabet = 'sdm12',
+        suffix = '.pickle'):
     """
     Trains and caches both a feature transforming vectorizer
     which turns peptide strings into fixed-length vectors
     and a classifier which maps vectors to immunogenicity labels
     """
+
+    model_base_filename = \
+        "immunogenicity_classifier_assay_%s_mhc_%s_ngram_%s_alphabet_%s" % \
+        (assay_group, mhc_class, max_ngram, alphabet)
+    model_filename = model_base_filename + suffix
+
+    vectorizer_base_filename = \
+        "immunogenicity_vectorizer_assay_%s_mhc_%s_ngram_%s_alphabet_%s" % \
+        (assay_group, mhc_class, max_ngram, alphabet)
+    vectorizer_filename = vectorizer_base_filename + suffix
 
     if exists(model_filename) and exists(vectorizer_filename):
         logging.debug("Loading cached immunogenicity classifier and vectorizer")
