@@ -44,25 +44,31 @@ def vcf2dataframe(vcffile):
     df['chr'] = df.chr.map(liftover)
     return df
 
-def generate_epitopes_from_vcf(input_file):
+def _tile_peptide(full_peptide, tile_length):
+    return [full_peptide[i:i+tile_length] for i in xrange(n + 1 - tile_length)]
+
+def generate_peptides_from_vcf(input_file, length=31):
     vcf_df = vcf2dataframe(input_file)
     transcripts_df = ensembl_annotation.annotate_transcripts(vcf_df)
-    def epitope_from_annotation(row):
+    def peptides_from_annotation(row):
         transcript_id = row['stable_id_transcript']
         pos = row['pos']
         ref = row['ref']
         alt = row['alt']
+        peptides = []
         if transcript_id:
-            return generate_epitope_from_transcript(transcript_id, pos, ref, alt)
-        else:
-            return None
-    epitopes = transcripts_df.apply(epitope_from_annotation, axis=1)
-    transcripts_df['Epitope'] = pd.Series(epitopes)
+            peptides = generate_peptide_from_transcript(transcript_id, pos, ref, alt, length)
+        for peptides in peptides:
+            row = deepcopy(row)
+            row['Epitope'] = peptides
+        return row
+    peptides = transcripts_df.apply(peptides_from_annotation, axis=1, reduce=False)
+    transcripts_df.merge(peptides)
     print transcripts_df.head()
     return transcripts_df
 
 
-def generate_epitopes_from_snpeff(snpeff_annotated_file, window=7):
+def generate_peptides_from_snpeff(snpeff_annotated_file, window=7):
     data = vcf2dataframe(snpeff_annotated_file)
     results = []
     for idx, variant in data.iterrows():
@@ -79,7 +85,7 @@ def generate_epitopes_from_snpeff(snpeff_annotated_file, window=7):
 
     return pd.DataFrame.from_records(results)
 
-def generate_epitopes_from_protein_transcript(transcript_id, pos, ref, variant):
+def generate_peptide_from_protein_transcript(transcript_id, pos, ref, variant):
     transcript = _ensembl.get_protein(transcript_id)
     if transcript:
         try:
@@ -88,13 +94,13 @@ def generate_epitopes_from_protein_transcript(transcript_id, pos, ref, variant):
             return None
     return None
 
-def generate_epitope_from_transcript(transcript_id, pos, ref, variant):
+def generate_peptide_from_transcript(transcript_id, pos, ref, variant, length=31):
     transcript = _ensembl.get_cdna(transcript_id)
     if transcript:
         idx = ensembl_annotation.get_transcript_index_from_pos(pos, transcript_id)
         if idx:
             try:
-                mutated = mutate.mutate_protein_from_transcript(transcript.seq, idx, ref, variant)
+                mutated = mutate.mutate_protein_from_transcript(transcript.seq, idx, ref, variant, max_length = 500, min_padding = length)
                 return str(mutated)
             except AssertionError, error:
                 return None
