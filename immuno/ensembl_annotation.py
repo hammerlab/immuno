@@ -10,7 +10,7 @@
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
-# limitations under the License.    
+# limitations under the License.
 
 import pandas as pd
 
@@ -21,7 +21,7 @@ TRANSCRIPT_META_DATA_FILE = download_transcript_metadata()
 EXON_DATA = pd.read_csv(TRANSCRIPT_META_DATA_FILE, sep='\t')
 
 # Subset columns for transcript data only
-TRANSCRIPT_DATA = EXON_DATA[['name', 'stable_id_gene', 'description_gene', 'seq_region_start_gene', 'seq_region_end_gene', 'stable_id_transcript', 
+TRANSCRIPT_DATA = EXON_DATA[['name', 'stable_id_gene', 'description_gene', 'seq_region_start_gene', 'seq_region_end_gene', 'stable_id_transcript',
                 'seq_region_start_transcript', 'seq_region_end_transcript']].drop_duplicates()
 
 # Subset columns for gene data only
@@ -90,7 +90,8 @@ def get_exons_from_transcript(transcript_id):
     returns Pandas dataframe containing only those exons
     """
     exons = EXON_DATA[EXON_DATA['stable_id_transcript'] == transcript_id]
-    return exons[['stable_id_exon', 'seq_region_start_exon', 'seq_region_end_exon']]
+    fields = ['stable_id_exon', 'seq_region_start_exon', 'seq_region_end_exon']
+    return exons[fields]
 
 def get_transcript_index_from_pos(pos, transcript_id):
     """ gets the index into to the transcript from genomic position
@@ -103,9 +104,11 @@ def get_transcript_index_from_pos(pos, transcript_id):
     position : int, genomic position in the contig
     transcript_id : transcript id, of the from EST#####
 
-    returns 
+    returns
     """
-    exons = get_exons_from_transcript(transcript_id).sort(columns=['seq_region_start_exon', 'seq_region_end_exon'])
+    exons = get_exons_from_transcript(transcript_id)
+    exons = exons.sort(columns=['seq_region_start_exon', 'seq_region_end_exon'])
+
     transcript_idx = 0
     for (idx, row) in exons.iterrows():
         if pos > row['seq_region_end_exon']:

@@ -10,7 +10,7 @@
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
-# limitations under the License. 
+# limitations under the License.
 
 from os.path import join, exists
 from os import environ
@@ -25,11 +25,11 @@ STANDARD_CONTIGS = set(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11',
                        '19', '20', '21', '22', 'X', 'Y', 'M'])
 
 
-GENE_HEADER = [ 'gene_id', 'biotype', 'analysis_id', 
-        'seq_region_id', 'seq_region_start', 'seq_region_end', 
-        'seq_region_strand', 'display_xref_id', 
-        'source', 'status', 'description', 'is_current', 
-        'canonical_transcript_id', 'stable_id', 
+GENE_HEADER = [ 'gene_id', 'biotype', 'analysis_id',
+        'seq_region_id', 'seq_region_start', 'seq_region_end',
+        'seq_region_strand', 'display_xref_id',
+        'source', 'status', 'description', 'is_current',
+        'canonical_transcript_id', 'stable_id',
         'version', 'created_date', 'modified_date']
 
 SEQ_REGION_HEADER = ['seq_region_id', 'name', 'coord_system_id']
@@ -55,7 +55,6 @@ def download_transcript_metadata(output_file = 'gene_exon_transcript.tsv', filte
         TRANSCRIPT_DATA_PATH = fetch_data('transcript.txt', "ftp://ftp.ensembl.org/pub/release-74/mysql/homo_sapiens_core_74_37/transcript.txt.gz")
         EXON_TRANSCRIPT_DATA_PATH = fetch_data('exon_transcript.txt', "ftp://ftp.ensembl.org/pub/release-74/mysql/homo_sapiens_core_74_37/exon_transcript.txt.gz")
 
-
         seqregion = pd.read_csv(SEQ_REGION_DATA_PATH, sep='\t', names = SEQ_REGION_HEADER, index_col=False)
         if filter_contigs:
             seqregion = seqregion[ seqregion['name'].map(lambda x: x in filter_contigs)]
@@ -71,7 +70,7 @@ def download_transcript_metadata(output_file = 'gene_exon_transcript.tsv', filte
         exon_w_exon_transcript = pd.merge(exon, exon_transcript, on='exon_id', suffixes=('_exon', '_et'))
 
         exon_w_transcript = pd.merge(exon_w_exon_transcript, gene_transcript, on='transcript_id', suffixes=('_exon', '_transcript'))
-        exon_data = exon_w_transcript[['name', 'stable_id_gene', 'description_gene', 'seq_region_start_gene', 'seq_region_end_gene', 'stable_id_transcript', 
+        exon_data = exon_w_transcript[['name', 'stable_id_gene', 'description_gene', 'seq_region_start_gene', 'seq_region_end_gene', 'stable_id_transcript',
                         'seq_region_start_transcript', 'seq_region_end_transcript', 'stable_id_exon', 'seq_region_start_exon', 'seq_region_end_exon']]
 
         exon_data.to_csv(full_path, index=False, sep='\t')
@@ -81,7 +80,7 @@ def download_transcript_metadata(output_file = 'gene_exon_transcript.tsv', filte
 def download_protein_transcripts():
     path = fetch_data('Homo_sapiens.GRCh37.74.pep.all.fa.gz', 'ftp://ftp.ensembl.org/pub/release-74/fasta/homo_sapiens/pep/Homo_sapiens.GRCh37.74.pep.all.fa.gz')
     return path
-    
+
 def download_cdna_transcripts():
     path = fetch_data('Homo_sapiens.GRCh37.74.cdna.all.fa.gz', 'ftp://ftp.ensembl.org/pub/release-74/fasta/homo_sapiens/cdna/Homo_sapiens.GRCh37.74.cdna.all.fa.gz')
     return path

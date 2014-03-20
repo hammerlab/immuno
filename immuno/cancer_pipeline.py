@@ -15,6 +15,7 @@
 from __future__ import print_function
 import argparse
 
+import numpy as np
 import pandas as pd
 from Bio import SeqIO
 
@@ -50,19 +51,29 @@ if __name__ == '__main__':
     input_group = parser.add_mutually_exclusive_group(required=True)
     input_group.add_argument("--input", action="append", default=[],
         help="input file name (i.e. FASTA, MAF, VCF)")
-    input_group.add_argument("--string", action="append", default=[],
+    input_group.add_argument("--string", default = None,
         help="amino acid string")
+    parser.add_argument("--peptide_length", default=31,
+        help="length of vaccine peptides (may contain multiple epitopes)")
     parser.add_argument("--allele_file",
         help="file with one allele per line")
     parser.add_argument("--alleles",
-        help="comma separated list of allele")
+        help="comma separated list of allele (default HLA-A*02:01)")
     parser.add_argument("--output",
         help="output file for dataframes", required=False)
 
     args = parser.parse_args()
 
     if args.string:
-        epitope_data = pd.DataFrame.from_dict({'Epitope' : args.string})
+        full_peptide = args.string.upper().strip()
+        n = len(full_peptide)
+        peptide_length = min(args.peptide_length, n)
+        peptides = []
+        for i in xrange(n + 1 - peptide_length):
+            substr = full_peptide[i:i+peptide_length]
+            peptides.append(substr)
+        epitope_data = pd.DataFrame({'Epitope': peptides})
+
     elif len(args.input) > 0:
         input_filename = args.input[0]
         if input_filename.endswith("eff.vcf"):
@@ -71,7 +82,8 @@ if __name__ == '__main__':
             epitope_data = generate_epitopes_from_vcf(input_filename)
         elif input_filename.endswith(".maf"):
             epitope_data = get_eptiopes_from_maf(args.input)
-        elif input_filename.endswith(".fasta") or input_filename.endswith(".fa"):
+        elif input_filename.endswith(".fasta") \
+                or input_filename.endswith(".fa"):
             epitope_data = get_epitopes_from_fasta(args.input)
         else:
             assert False, "Unrecognized file type %s" % input_filename
@@ -90,8 +102,7 @@ if __name__ == '__main__':
     add_scoring(pipeline, alleles)
     scored_data = pipeline.score(epitope_data)
 
-
     if args.output:
         scored_data.to_csv(args.output, index=False)
     else:
-        print(scored_data)
+        print(scored_data.to_string())
