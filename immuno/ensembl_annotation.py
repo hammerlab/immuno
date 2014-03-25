@@ -114,8 +114,8 @@ def get_idx_from_interval(pos, intervals):
     idx = 0
     for (start, end) in intervals:
         if pos > end:
-            idx += (end - start)
-        elif pos < end and pos >= start:
+            idx += (end - start) + 1
+        elif pos <= end and pos >= start:
             return idx + (pos - start)
         else:
             ## error some

@@ -48,6 +48,21 @@ def test_load_exon_from_transcript():
     exons = ensembl.get_exons_from_transcript(transcript_id)
     assert(exons.shape[0] == 17)
 
+    transcript_id = "ENST00000405570"
+    exons = ensembl.get_exons_from_transcript(transcript_id)
+    assert(exons.shape[0] == 16)
+
+def test_load_exon_from_transcript_lengt():
+
+    transcript_id = 'ENST00000405570'
+
+    transcript = ref_data.get_cdna(transcript_id)
+
+    exons = ensembl.get_exons_from_transcript(transcript_id)
+    exons['length'] = exons['seq_region_end_exon'] - exons['seq_region_start_exon'] + 1
+
+    assert(exons['length'].sum() == len(transcript.seq))
+
 def test_get_gene_from_pos():
     variant = {
         'chr' : '3',
@@ -86,26 +101,51 @@ def test_get_all_transcript_from_pos():
     assert( "ENST00000453024" in transcript_ids)
     assert( "ENST00000396185" in transcript_ids)
 
+def test_get_transcript_index_from_pos():
+    variant = {
+        'chr' : '3',
+        'pos' : 41275636,
+        'ref' : 'G',
+        'alt' : 'A'
+    }
+    transcript_id = 'ENST00000405570'
+
+    idx = ensembl.get_transcript_index_from_pos(41275636, transcript_id)
+    assert(idx == 1686)
+
+    transcript = ref_data.get_cdna(transcript_id)
+    assert(transcript.seq[idx] == variant['ref'])
+
 def test_interval_search():
-    intervals = [ (7,13), (17,19), (21, 24), (35, 45), (45, 47), (60, 70)]
+    intervals = [ (7,13), (17,19), (21, 24), (35, 45), (47, 50), (60, 70)]
     idx = ensembl.get_idx_from_interval(7, intervals)
     print idx
-    assert( idx == 0)
+    assert(idx == 0)
+
     idx = ensembl.get_idx_from_interval(13, intervals)
     print idx
+    assert(idx == 6)
+
+    idx = ensembl.get_idx_from_interval(14, intervals)
+    print idx
     assert(idx is None)
+
     idx = ensembl.get_idx_from_interval(12, intervals)
     print idx
     assert(idx == 5)
 
     idx = ensembl.get_idx_from_interval(17, intervals)
     print idx
-    assert(idx == 6)
+    assert(idx == 7)
 
     idx = ensembl.get_idx_from_interval(18, intervals)
     print idx
-    assert(idx == 7)
+    assert(idx == 8)
 
     idx = ensembl.get_idx_from_interval(23, intervals)
     print idx
-    assert(idx == 10)
+    assert(idx == 12)
+
+    idx = ensembl.get_idx_from_interval(51, intervals)
+    print idx
+    assert(idx is None)
