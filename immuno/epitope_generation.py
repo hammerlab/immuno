@@ -35,6 +35,14 @@ def liftover(chr):
     return chr
 
 def vcf2dataframe(vcffile):
+    """ Transforms a VCF file to a Pandas Dataframe
+
+        Parameters
+        ----------
+        vcffile : VCF File
+
+        Returns Dataframe with 'chr', 'pos', 'id', 'ref', 'alt','qual', 'filter', 'info'
+    """
     with open(vcffile) as fd:
         lines_to_skip = 0
         while next(fd).startswith('#'):
@@ -44,25 +52,39 @@ def vcf2dataframe(vcffile):
     df['chr'] = df.chr.map(liftover)
     return df
 
-def generate_epitopes_from_vcf(input_file):
+def _tile_peptide(full_peptide, tile_length):
+    n = len(full_peptide)
+    return [full_peptide[i:i+tile_length] for i in xrange(n + 1 - tile_length)]
+
+def generate_peptides_from_vcf(input_file, length=31):
     vcf_df = vcf2dataframe(input_file)
     transcripts_df = ensembl_annotation.annotate_transcripts(vcf_df)
-    def epitope_from_annotation(row):
+
+    def peptides_from_annotation(group):
+        row = group.irow(0)
         transcript_id = row['stable_id_transcript']
         pos = row['pos']
         ref = row['ref']
         alt = row['alt']
+        rows = []
         if transcript_id:
-            return generate_epitope_from_transcript(transcript_id, pos, ref, alt)
-        else:
-            return None
-    epitopes = transcripts_df.apply(epitope_from_annotation, axis=1)
-    transcripts_df['Epitope'] = pd.Series(epitopes)
-    print transcripts_df.head()
+            full_peptide = generate_peptide_from_transcript(transcript_id, pos, ref, alt, min_padding = length)
+        if full_peptide:
+            peptides = _tile_peptide(full_peptide, length)
+            for peptide in peptides:
+                row = deepcopy(row)
+                row['Epitope'] = peptide
+                rows.append(row)
+        new_df = pd.DataFrame.from_records(rows)
+        return new_df
+    variants = transcripts_df.groupby(['chr','pos', 'ref', 'alt'], group_keys=False)
+    peptides = variants.apply(peptides_from_annotation)
+    transcripts_df = transcripts_df.merge(peptides)
+    transcripts_df.to_csv('run.log', index=False)
     return transcripts_df
 
 
-def generate_epitopes_from_snpeff(snpeff_annotated_file, window=7):
+def generate_peptides_from_snpeff(snpeff_annotated_file, window=7):
     data = vcf2dataframe(snpeff_annotated_file)
     results = []
     for idx, variant in data.iterrows():
@@ -72,29 +94,29 @@ def generate_epitopes_from_snpeff(snpeff_annotated_file, window=7):
       for effect in parse_effects(info):
         variant = deepcopy(variant)
         variant['Transcript'] = effect.transcript_id   
-        epitope = generate_epitope_from_transcript(effect.transcript_id, variant['pos'], variant['ref'], variant['alt'])
+        epitope = generate_peptide_from_transcript(effect.transcript_id, variant['pos'], variant['ref'], variant['alt'])
         if epitope:
           variant['Epitope'] = epitope
           results.append(variant)
 
     return pd.DataFrame.from_records(results)
 
-def generate_epitopes_from_protein_transcript(transcript_id, pos, ref, variant):
+def generate_peptide_from_protein_transcript(transcript_id, pos, ref, alt):
     transcript = _ensembl.get_protein(transcript_id)
     if transcript:
         try:
-            return str(mutate.mutate(transcript.seq, pos, ref, variant))
+            return str(mutate.mutate(transcript.seq, pos, ref, alt))
         except:
             return None
     return None
 
-def generate_epitope_from_transcript(transcript_id, pos, ref, variant):
+def generate_peptide_from_transcript(transcript_id, pos, ref, alt, max_length = 500, min_padding=31):
     transcript = _ensembl.get_cdna(transcript_id)
     if transcript:
         idx = ensembl_annotation.get_transcript_index_from_pos(pos, transcript_id)
         if idx:
             try:
-                mutated = mutate.mutate_protein_from_transcript(transcript.seq, idx, ref, variant)
+                mutated = mutate.mutate_protein_from_transcript(transcript.seq, idx, ref, alt, max_length = max_length, min_padding = min_padding)
                 return str(mutated)
             except AssertionError, error:
                 return None

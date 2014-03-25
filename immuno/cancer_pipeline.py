@@ -15,7 +15,6 @@
 from __future__ import print_function
 import argparse
 
-import numpy as np
 import pandas as pd
 from Bio import SeqIO
 
@@ -23,7 +22,7 @@ from pipeline import ImmunoPipeline
 from immunogenicity import ImmunogenicityRFModel
 from binding import IEDBMHCBinding
 from maf_to_epitopes import get_eptiopes_from_maf
-from epitope_generation import generate_epitopes_from_snpeff, generate_epitopes_from_vcf
+from epitope_generation import generate_peptides_from_snpeff, generate_peptides_from_vcf
 
 def get_epitopes_from_fasta(fasta_files):
     epitope_dataframes = []
@@ -77,9 +76,9 @@ if __name__ == '__main__':
     elif len(args.input) > 0:
         input_filename = args.input[0]
         if input_filename.endswith("eff.vcf"):
-            epitope_data = generate_epitopes_from_snpeff(input_filename)
+            epitope_data = generate_peptides_from_snpeff(input_filename)
         if input_filename.endswith(".vcf"):
-            epitope_data = generate_epitopes_from_vcf(input_filename)
+            epitope_data = generate_peptides_from_vcf(input_filename, args.peptide_length)
         elif input_filename.endswith(".maf"):
             epitope_data = get_eptiopes_from_maf(args.input)
         elif input_filename.endswith(".fasta") \
