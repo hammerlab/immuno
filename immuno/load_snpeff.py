@@ -1,8 +1,22 @@
+# Copyright (c) 2014. Mount Sinai School of Medicine
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from copy import deepcopy
 
 from load_vcf import vcf_to_dataframe
 from snpeff_effect import SnpEffEffect
-
+from transcript_variant import peptide_from_transcript_variant
 
 def _parse_effects(info_field):
     info_fields = info_field.split(";")
@@ -21,7 +35,7 @@ def peptides_from_snpeff(snpeff_annotated_file, window=7):
       for effect in _parse_effects(info):
         variant = deepcopy(variant)
         variant['Transcript'] = effect.transcript_id
-        peptide = peptide_from_transcript(
+        peptide = peptide_from_transcript_variant(
             effect.transcript_id,
             variant['pos'],
             variant['ref'],

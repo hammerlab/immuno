@@ -22,10 +22,10 @@ from common import peptide_substrings
 from pipeline import ImmunoPipeline
 from immunogenicity import ImmunogenicityRFModel
 from binding import IEDBMHCBinding
-from maf_to_epitopes import get_eptiopes_from_maf
-from epitope_generation import (
-    peptides_from_snpeff, peptides_from_vcf
-)
+
+from load_maf import peptides_from_maf
+from load_vcf import peptides_from_vcf
+from load_snpeff import peptides_from_snpeff
 
 def peptides_from_fasta(fasta_files, peptide_length):
     epitope_dataframes = []

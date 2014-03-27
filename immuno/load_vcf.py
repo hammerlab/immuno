@@ -1,3 +1,17 @@
+# Copyright (c) 2014. Mount Sinai School of Medicine
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from copy import deepcopy
 
 import pandas as pd
@@ -6,9 +20,9 @@ import numpy as np
 import epitopes.mutate as mutate
 
 from common import peptide_substrings
+from transcript_variant import peptide_from_transcript_variant
 import ensembl_annotation
 
-_ensembl = EnsemblReferenceData()
 
 def _shorten_chromosome_name(chr):
     if chr.startswith('chr'):
@@ -51,7 +65,7 @@ def vcf_to_dataframe(vcf_filename):
     df['chr'] = df.chr.map(_shorten_chromosome_name)
     return df
 
-def peptides_from_vcf(input_file, length=31):
+def peptides_from_vcf(input_file, length=31, log_filename = 'run.log'):
     vcf_df = _vcf_to_dataframe(input_file)
     transcripts_df = ensembl_annotation.annotate_transcripts(vcf_df)
 
@@ -64,7 +78,7 @@ def peptides_from_vcf(input_file, length=31):
         rows = []
         if transcript_id:
             full_peptide = \
-                peptide_from_transcript(
+                peptide_from_transcript_variant(
                     transcript_id, pos, ref, alt, min_padding = length)
         if full_peptide:
             peptides = peptide_substrings(full_peptide, length)
@@ -78,5 +92,6 @@ def peptides_from_vcf(input_file, length=31):
     variants = transcripts_df.groupby(cols, group_keys=False)
     peptides = variants.apply(peptides_from_annotation)
     transcripts_df = transcripts_df.merge(peptides)
-    transcripts_df.to_csv('run.log', index=False)
+    if log_filename:
+        transcripts_df.to_csv(log_filename, index=False)
     return transcripts_df
