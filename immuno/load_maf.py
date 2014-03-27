@@ -84,52 +84,51 @@ def extract(maf_df, refseq_map, epitope_max_length):
         ref_seq = refseq_map.get(row['Refseq_prot_Id'])
         if ref_seq is None:
             continue
-    # TODO: Make this work for deletions, multi-residue indels, &c
-    match = SINGLE_AMINO_ACID_SUBSTITUTION.match(row['Protein_Change'])
-    if match is None:
-      continue
+        # TODO: Make this work for deletions, multi-residue indels, &c
+        match = SINGLE_AMINO_ACID_SUBSTITUTION.match(row['Protein_Change'])
+        if match is None:
+            continue
 
-    (wild_type, str_position, mutation) = match.groups()
-    position = int(str_position) - 1
+        (wild_type, str_position, mutation) = match.groups()
+        position = int(str_position) - 1
 
-    if wild_type == mutation:
-      continue
+        if wild_type == mutation:
+            continue
 
-    if len(ref_seq.seq) <= position:
-        logging.warning(
-            "Mismatch in protein %s: ref is %d long, but mutation at pos %d",
-            row['Refseq_prot_Id'],
-            len(ref_seq.seq),
-            position)
-      continue
+        if len(ref_seq.seq) <= position:
+            logging.warning(
+                "Mismatch in protein %s: ref is %d long, but mutation at %d",
+                row['Refseq_prot_Id'],
+                len(ref_seq.seq),
+                position)
+            continue
 
-    if ref_seq.seq[position] != wild_type:
-        logging.warning(
-            "Mismatch in protein %s at pos %d: ref is %s but expected %s",
-            row['Refseq_prot_Id'],
-            position,
-            ref_seq.seq[position],
-            wild_type)
-      continue
+        if ref_seq.seq[position] != wild_type:
+            logging.warning(
+                "Mismatch in protein %s at pos %d: ref is %s but expected %s",
+                row['Refseq_prot_Id'],
+                position,
+                ref_seq.seq[position],
+                wild_type)
+            continue
 
-    # Make mutation
-    full_peptide = ref_seq.seq.tomutable()
-    full_peptide[position] = mutation
-    start = max(0, position - half_max)
-    stop = min(len(full_peptide), position + half_max + 1)
-    trimmed_peptide = full_epitope[start:stop]
-    position_in_epitope = position - max(0, position - half_max)
-    assert(trimmed_epitope[position_in_peptide] == full_peptide[position])
-    result['Peptide'].append(trimmed_epitope)
-    result['Mutation Position'].append(position_in_epitope)
-    result['Refseq Protein Id'].append(row['Refseq_prot_Id'])
-    result['SampleId'].append(row['Tumor_Sample_Barcode'])
-    result['Hugo_Symbol'].append(row['Hugo_Symbol'])
-    result['Chromosome'].append(row['Chromosome'])
-    result['Start_position'].append(row['Start_position'])
+        # Make mutation
+        full_peptide = ref_seq.seq.tomutable()
+        full_peptide[position] = mutation
+        start = max(0, position - half_max)
+        stop = min(len(full_peptide), position + half_max + 1)
+        trimmed_peptide = full_epitope[start:stop]
+        position_in_epitope = position - max(0, position - half_max)
+        assert(trimmed_epitope[position_in_peptide] == full_peptide[position])
+        result['Peptide'].append(trimmed_epitope)
+        result['Mutation Position'].append(position_in_epitope)
+        result['Refseq Protein Id'].append(row['Refseq_prot_Id'])
+        result['SampleId'].append(row['Tumor_Sample_Barcode'])
+        result['Hugo_Symbol'].append(row['Hugo_Symbol'])
+        result['Chromosome'].append(row['Chromosome'])
+        result['Start_position'].append(row['Start_position'])
     result['Genome_Change'].append(row['Genome_Change'])
-
-  return pandas.DataFrame(result, columns = new_cols)
+    return pandas.DataFrame(result, columns = new_cols)
 
 
 def peptides_from_maf(
@@ -137,17 +136,16 @@ def peptides_from_maf(
         refseq_dir=['data/refseq'],
         epitope_max_length=31,
         nrows = None):
-  refseq_filenames = []
-  for dir in refseq_dir:
-    print dir
-    refseq_filenames.extend(glob.glob("%s/*" % dir))
-  refseq_map = refseq_id_to_sequence(refseq_filenames)
-  result_dfs = []
-  for (maf_num, maf_filename) in enumerate(maf_files):
-    df = open_maf(maf_filename)
-    result_df = extract(df, refseq_map, epitope_max_length)
-    result_df['MAF Num'] = maf_num
-    result_dfs.append(result_df)
-  result_df = pandas.concat(result_dfs)
-  return result_df[:nrows]
+    refseq_filenames = []
+    for dir in refseq_dir:
+        refseq_filenames.extend(glob.glob("%s/*" % dir))
+    refseq_map = refseq_id_to_sequence(refseq_filenames)
+    result_dfs = []
+    for (maf_num, maf_filename) in enumerate(maf_files):
+        df = open_maf(maf_filename)
+        result_df = extract(df, refseq_map, epitope_max_length)
+        result_df['MAF Num'] = maf_num
+        result_dfs.append(result_df)
+    result_df = pandas.concat(result_dfs)
+    return result_df[:nrows]
 

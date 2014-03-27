@@ -106,7 +106,7 @@ class ImmunogenicityRFModel(PipelineElement):
 
     def _apply(self, df):
         if self.vectorizer:
-            X = self.vectorizer.transform(df.peptide)
+            X = self.vectorizer.transform(df.Peptide)
         else:
-            X = df.peptide
+            X = df.Peptide
         return self.classifier.decision_function(X)

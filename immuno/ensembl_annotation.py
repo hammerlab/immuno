@@ -16,54 +16,89 @@ import pandas as pd
 
 from ensembl_io import download_transcript_metadata
 
+class EnsemblData(object):
+    def __init__(self):
+        pass
 
-TRANSCRIPT_META_DATA_FILE = download_transcript_metadata()
-EXON_DATA = pd.read_csv(TRANSCRIPT_META_DATA_FILE, sep='\t')
+    @property
+    def transcript_metadata_path(self):
+        if not hasattr(self, '_transcript_metadata_path'):
+            self._transcript_metadata_path = download_transcript_metadata()
+        return self._transcript_metadata_path
 
-# Subset columns for transcript data only
-TRANSCRIPT_DATA = EXON_DATA[['name', 'stable_id_gene', 'description_gene', 'seq_region_start_gene', 'seq_region_end_gene', 'stable_id_transcript',
-                'seq_region_start_transcript', 'seq_region_end_transcript']].drop_duplicates()
+    @property
+    def exon_data(self):
+        """
+        Dataframe containing exon data
+        """
+        if not hasattr(self, '_exon_data'):
+            path = self.transcript_metadata_path
+            self._exon_data = pd.read_csv(path, sep='\t')
+        return self._exon_data
 
-# Subset columns for gene data only
-GENE_DATA = TRANSCRIPT_DATA[['name', 'stable_id_gene', 'description_gene', 'seq_region_start_gene', 'seq_region_end_gene']].drop_duplicates()
+    @property
+    def transcript_data(self):
+        """
+        Subset columns for transcript data only
+        """
+        if not hasattr(self, '_transcript_data'):
+            transcript_cols = [
+                'name', 'stable_id_gene', 'description_gene',
+                'seq_region_start_gene', 'seq_region_end_gene',
+                'stable_id_transcript', 'seq_region_start_transcript',
+                'seq_region_end_transcript'
+            ]
+            self._transcript_data = self.exon_data[transcript_cols]
+        return self._transcript_data
+
+    @property
+    def gene_data(self):
+        """
+        Subset columns for gene data only
+        """
+        if not hasattr(self, '_gene_data'):
+            gene_cols = [
+                'name', 'stable_id_gene', 'description_gene',
+                'seq_region_start_gene', 'seq_region_end_gene'
+            ]
+            self._gene_data = self.transcript_data[gene_cols].drop_duplicates()
 
 def _transcript_matches(transcript_row):
     position = transcript_row['pos']
     contig = transcript_row['chr']
-    if transcript_row['seq_region_start_transcript'] < position and transcript_row['seq_region_end_transcript'] > position \
-        and transcript_row['name'] == contig:
-        return True
-    else:
-        return False
+    return transcript_row['seq_region_start_transcript'] < position \
+            and transcript_row['seq_region_end_transcript'] > position \
+            and transcript_row['name'] == contig:
 
 def _gene_matches(gene_row):
     position = gene_row['pos']
     contig = gene_row['chr']
-    if gene_row['seq_region_start_gene'] <= position and gene_row['seq_region_end_gene'] > position \
-        and gene_row['name'] == contig:
-        return True
-    else:
-        return False
+    return gene_row['seq_region_start_gene'] <= position \
+            and gene_row['seq_region_end_gene'] > position \
+            and gene_row['name'] == contig:
 
 def annotate_transcripts(vcf_df):
-    """ get list of transcript id from position
+    """
+    Get list of transcript id from position
 
-        Parameters
-        ----------
-        vcf : Pandas dataframe with chr, pos, ref, alt columns
+    Parameters
+    ----------
+    vcf : Pandas dataframe with chr, pos, ref, alt columns
 
-        Return df with gene and transcript ids
+    Return df with gene and transcript ids
 
     """
     if 'gene_stable_id' in vcf_df.columns:
-        annotated = annotate(vcf_df, TRANSCRIPT_DATA, _transcript_matches, left_col=['chr', 'gene_stable_id'], right=['name', 'gene_stable_id'])
+        annotated = annotate(vcf_df,
+            TRANSCRIPT_DATA, _transcript_matches, left_col=['chr', 'gene_stable_id'], right=['name', 'gene_stable_id'])
     else:
         annotated = annotate(vcf_df, TRANSCRIPT_DATA, _transcript_matches)
 
     return annotated
 
 def annotate_genes(vcf_df):
-    """ get list of gene id from position
+    """
+    Get list of gene id from position
 
     Parameters
     ----------
@@ -74,14 +109,20 @@ def annotate_genes(vcf_df):
     """
     return annotate(vcf_df, GENE_DATA, _gene_matches)
 
-def annotate(vcf_df, annotation_df, predicate, left_col = 'chr', right_col = 'name'):
-    crossed = vcf_df.merge(annotation_df, left_on=left_col, right_on=right_col, how='left')
+def annotate(
+        vcf_df,
+        annotation_df,
+        predicate,
+        left_col = 'chr',
+        right_col = 'name'):
+    crossed = vcf_df.merge(
+        annotation_df, left_on=left_col, right_on=right_col, how='left')
     annotated = crossed[crossed.apply(predicate, axis=1)]
-
     return annotated
 
 def get_exons_from_transcript(transcript_id):
-    """ filter exons down to those with this transcript_id
+    """
+    Filter exons down to those with this transcript_id
 
     Parameters
     ----------
@@ -94,7 +135,8 @@ def get_exons_from_transcript(transcript_id):
     return exons[fields]
 
 def get_transcript_index_from_pos(pos, transcript_id):
-    """ gets the index into to the transcript from genomic position
+    """
+    Gets the index into to the transcript from genomic position
     The transcript is composed of spliced exons that have genomic start and
     stop positions.  This function searches for the exon that matches this
     genomic positions and returns the index into the transcript
@@ -108,7 +150,8 @@ def get_transcript_index_from_pos(pos, transcript_id):
     """
     exons = get_exons_from_transcript(transcript_id)
     exons = exons.sort(columns=['seq_region_start_exon', 'seq_region_end_exon'])
-    return get_idx_from_interval(pos, zip(exons['seq_region_start_exon'], exons['seq_region_end_exon']))
+    return get_idx_from_interval(
+        pos, zip(exons['seq_region_start_exon'], exons['seq_region_end_exon']))
 
 def get_idx_from_interval(pos, intervals):
     idx = 0

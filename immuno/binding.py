@@ -54,20 +54,31 @@ class IEDBMHCBinding(PipelineElement):
 
   def apply(self,data):
     responses = {}
-    for epitope in data.Epitope:
+    for epitope in data.Peptide:
        responses[epitope] = self.query_iedb(epitope)
     responses = pd.concat(responses).reset_index(0)
-    responses.rename(columns={'level_0':'Epitope'}, inplace=True)
-    return data.merge(responses, on='Epitope')
+    responses.rename(columns={'level_0':'Peptide'}, inplace=True)
+    return data.merge(responses, on='Peptide')
 
 class IEDBMHC1Binding(IEDBMHCBinding):
-    def __init__(self, name = 'IEDB-MHC1-Binding', url='http://tools.iedb.org/tools_api/mhci/', alleles=[]):
-      super(IEDBMHC1Binding, self).__init__(name = name, url = url, alleles = alleles)
-
+    def __init__(self,
+            name = 'IEDB-MHC1-Binding',
+            url='http://tools.iedb.org/tools_api/mhci/',
+            alleles=[]):
+        super(IEDBMHC1Binding, self).__init__(
+            name = name,
+            url = url,
+            alleles = alleles)
 
 class IEDBMHC2Binding(IEDBMHCBinding):
-    def __init__(self, name = 'IEDB-MHC2-Binding', url='http://tools.iedb.org/tools_api/mhcii/', alleles=[]):
-      super(IEDBMHC2Binding, self).__init__(name = name, url = url, alleles = alleles)
+    def __init__(self,
+            name = 'IEDB-MHC2-Binding',
+            url='http://tools.iedb.org/tools_api/mhcii/',
+            alleles=[]):
+      super(IEDBMHC2Binding, self).__init__(
+        name = name,
+        url = url,
+        alleles = alleles)
 
     def _get_iedb_request_params(self, sequence):
       params = {

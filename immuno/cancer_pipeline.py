@@ -47,13 +47,13 @@ def peptides_from_fasta(fasta_files, peptide_length):
         'Filename': filenames,
     })
 
-def add_scoring(pipeline, alleles):
-    mhc = IEDBMHCBinding(name = 'mhc', alleles=alleles)
-    pipeline.add_scorer(mhc)
-
-    immunogenicity = ImmunogenicityRFModel(name = 'immunogenicity')
-    pipeline.add_scorer(immunogenicity)
-
+def add_scoring(pipeline, alleles, add_mhc = True, add_immunogenicity = True):
+    if add_mhc:
+        mhc = IEDBMHCBinding(name = 'mhc', alleles=alleles)
+        pipeline.add_scorer(mhc)
+    if add_immunogenicity:
+        immunogenicity = ImmunogenicityRFModel(name = 'immunogenicity')
+        pipeline.add_scorer(immunogenicity)
     return pipeline
 
 DEFAULT_ALLELE = 'HLA-A*02:01'
@@ -74,9 +74,12 @@ if __name__ == '__main__':
         help="comma separated list of allele (default HLA-A*02:01)")
     parser.add_argument("--output",
         help="output file for dataframes", required=False)
+    parser.add_argument("--immunogenicity",
+        default=True, help="Predict immunogenicity score")
+    parser.add_argument("--mhc", default=True,
+        help="Predict MHC binding")
 
     args = parser.parse_args()
-
     if args.string:
         full_peptide = args.string.upper().strip()
         n = len(full_peptide)
@@ -115,7 +118,7 @@ if __name__ == '__main__':
         alleles = [DEFAULT_ALLELE]
 
     pipeline = ImmunoPipeline()
-    add_scoring(pipeline, alleles)
+    add_scoring(pipeline, alleles, args.mhc, args.immunogenicity)
     scored_data = pipeline.score(epitope_data)
 
     if args.output:
