@@ -14,9 +14,13 @@
 
 from Bio import SeqIO
 
-import ensembl_io
+import ensembl_download
 
 class EnsemblReferenceData(object):
+    """
+    Singleton class which allows for lazy loading of reference
+    cDNA and amino acid sequences of transcripts
+    """
 
     def __init__(self):
         self._cdna_dict = None
@@ -24,11 +28,11 @@ class EnsemblReferenceData(object):
 
     def _load_cdna(self):
         self._cdna_dict = SeqIO.index(
-            ensembl_io.download_cdna_transcripts(), 'fasta')
+            ensembl_download.download_cdna_transcripts(), 'fasta')
 
     def _load_peptide(self):
         self._protein_dict = SeqIO.index(
-            ensembl_io.download_protein_transcripts(), 'fasta')
+            ensembl_download.download_protein_transcripts(), 'fasta')
 
     def get_cdna(self, transcript_id):
         if self._cdna_dict is None:

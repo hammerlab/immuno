@@ -94,8 +94,8 @@ def download_transcript_metadata(
             names = GENE_HEADER,
             index_col=False)
         seqregion_gene = gene.merge(seqregion, on='seq_region_id')
-        transcript = pd.read_csv(T
-            RANSCRIPT_DATA_PATH, sep='\t',
+        transcript = pd.read_csv(
+            TRANSCRIPT_DATA_PATH, sep='\t',
             names = TRANSCRIPT_HEADER,
             index_col=False)
         gene_transcript = transcript.merge(
@@ -143,6 +143,7 @@ def download_transcript_metadata(
 
 PROTEIN_TRANSCIPT_URL = \
 'ftp://ftp.ensembl.org/pub/release-74/fasta/homo_sapiens/pep/Homo_sapiens.GRCh37.74.pep.all.fa.gz'
+
 PROTEIN_TRANSCRIPT_FILE = 'Homo_sapiens.GRCh37.74.pep.all.fa.gz'
 
 def download_protein_transcripts():
