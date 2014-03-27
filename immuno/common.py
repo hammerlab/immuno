@@ -18,3 +18,7 @@ logging.basicConfig(
     format="[%(levelname)s %(filename)s:%(lineno)d %(funcName)s] %(message)s",
     level=logging.DEBUG)
 
+def peptide_substrings(full_peptide, window_length):
+    n = len(full_peptide)
+    return [full_peptide[i:i+window_length]
+            for i in xrange(n + 1 - window_length)]

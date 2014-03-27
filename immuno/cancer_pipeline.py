@@ -18,20 +18,34 @@ import argparse
 import pandas as pd
 from Bio import SeqIO
 
+from common import peptide_substrings
 from pipeline import ImmunoPipeline
 from immunogenicity import ImmunogenicityRFModel
 from binding import IEDBMHCBinding
 from maf_to_epitopes import get_eptiopes_from_maf
-from epitope_generation import generate_peptides_from_snpeff, generate_peptides_from_vcf
+from epitope_generation import (
+    peptides_from_snpeff, peptides_from_vcf
+)
 
-def get_epitopes_from_fasta(fasta_files):
+def peptides_from_fasta(fasta_files, peptide_length):
     epitope_dataframes = []
+    peptides = []
+    source_seqs = []
+    filenames = []
     for fasta_file in fasta_files:
-        epitope_data = SeqIO.parse(fasta_file, 'fasta')
-        peptides = list(set([e.seq for e in epitope_data]))
-        df = pd.DataFrame({'peptide': peptides})
-        epitope_dataframes.append(df)
-    return pd.concat(epitope_dataframes)
+        fasta_data = SeqIO.parse(fasta_file, 'fasta')
+        seqs = list(set([e.seq for e in fasta_data]))
+        for seq in seqs:
+            curr_peptides = peptide_substrings(seq, peptide_length)
+            peptides.extend(curr_peptides)
+            source_seqs.extend([seq] * len(curr_peptides))
+            filenames.extend([fasta_file] * len(curr_peptides))
+    assert len(peptides) == len(source_seqs) == len(filenames)
+    return pd.DataFrame({
+        'Peptide': peptides,
+        'SourceSequence': source_seqs,
+        'Filename': filenames,
+    })
 
 def add_scoring(pipeline, alleles):
     mhc = IEDBMHCBinding(name = 'mhc', alleles=alleles)
@@ -67,23 +81,26 @@ if __name__ == '__main__':
         full_peptide = args.string.upper().strip()
         n = len(full_peptide)
         peptide_length = min(args.peptide_length, n)
-        peptides = []
-        for i in xrange(n + 1 - peptide_length):
-            substr = full_peptide[i:i+peptide_length]
-            peptides.append(substr)
-        epitope_data = pd.DataFrame({'Epitope': peptides})
+        peptides = peptide_substrings(full_peptide, peptide_length)
+        epitope_data = pd.DataFrame({
+            'Peptide': peptides,
+            'SourceSequence': [full_peptide] * len(peptides)
+        })
 
     elif len(args.input) > 0:
         input_filename = args.input[0]
         if input_filename.endswith("eff.vcf"):
-            epitope_data = generate_peptides_from_snpeff(input_filename)
+            epitope_data = peptides_from_snpeff(
+                input_filename, args.peptide_length)
         if input_filename.endswith(".vcf"):
-            epitope_data = generate_peptides_from_vcf(input_filename, args.peptide_length)
+            epitope_data = peptides_from_vcf(
+                input_filename, args.peptide_length)
         elif input_filename.endswith(".maf"):
-            epitope_data = get_eptiopes_from_maf(args.input)
+            epitope_data = peptides_from_maf(args.input, args.peptide_length)
         elif input_filename.endswith(".fasta") \
                 or input_filename.endswith(".fa"):
-            epitope_data = get_epitopes_from_fasta(args.input)
+            epitope_data = peptides_from_fasta(
+                args.input, args.peptide_length)
         else:
             assert False, "Unrecognized file type %s" % input_filename
     else:

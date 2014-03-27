@@ -10,7 +10,7 @@
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
-# limitations under the License. 
+# limitations under the License.
 
 from Bio import SeqIO
 
@@ -23,10 +23,12 @@ class EnsemblReferenceData(object):
         self._protein_dict = None
 
     def _load_cdna(self):
-        self._cdna_dict = SeqIO.index(ensembl_io.download_cdna_transcripts(), 'fasta')
+        self._cdna_dict = SeqIO.index(
+            ensembl_io.download_cdna_transcripts(), 'fasta')
 
     def _load_peptide(self):
-        self._protein_dict = SeqIO.index(ensembl_io.download_protein_transcripts(), 'fasta')
+        self._protein_dict = SeqIO.index(
+            ensembl_io.download_protein_transcripts(), 'fasta')
 
     def get_cdna(self, transcript_id):
         if self._cdna_dict is None:
