@@ -31,6 +31,17 @@ def _gene_matches(gene_row):
             and gene_row['seq_region_end_gene'] > position \
             and gene_row['name'] == contig
 
+def annotate(
+        vcf_df,
+        annotation_df,
+        predicate,
+        left_col = 'chr',
+        right_col = 'name'):
+    crossed = vcf_df.merge(
+        annotation_df, left_on=left_col, right_on=right_col, how='left')
+    annotated = crossed[crossed.apply(predicate, axis=1)]
+    return annotated
+
 def annotate_transcripts(vcf_df):
     """
     Get list of transcript id from position
@@ -58,23 +69,15 @@ def annotate_genes(vcf_df):
 
     Parameters
     ----------
-    vcf : Pandas dataframe with chr, pos, ref, alt columns
+    vcf_df : Pandas dataframe
+        Expected to have columns 'chr', 'pos', 'ref', 'alt'
 
     Return df with gene ids
 
     """
-    return annotate(vcf_df, GENE_DATA, _gene_matches)
+    return annotate(vcf_df, data.gene_data, _gene_matches)
 
-def annotate(
-        vcf_df,
-        annotation_df,
-        predicate,
-        left_col = 'chr',
-        right_col = 'name'):
-    crossed = vcf_df.merge(
-        annotation_df, left_on=left_col, right_on=right_col, how='left')
-    annotated = crossed[crossed.apply(predicate, axis=1)]
-    return annotated
+
 
 def get_exons_from_transcript(transcript_id):
     """

@@ -53,3 +53,4 @@ class EnsemblAnnotationData(object):
                 'seq_region_start_gene', 'seq_region_end_gene'
             ]
             self._gene_data = self.transcript_data[gene_cols].drop_duplicates()
+        return self._gene_data

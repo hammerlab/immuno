@@ -54,19 +54,32 @@ def vcf_to_dataframe(vcf_filename):
         lines_to_skip = 0
         while next(fd).startswith('#'):
             lines_to_skip += 1
+
+    # first 8 columns of a VCF file are required to be:
+    #   chr    : chromosome (i.e., '20', 'chr20', 'MT')
+    #   pos    : where's the variant on the chromsome?
+    #   id     : dbSnp identifier of variant, if available (i.e. 'rs11449')
+    #   ref    : reference letter(s)
+    #   alt    : alternate letters(s) of variant
+    #   qual   : phred-scaled quality score
+    #   filter : "PASS" if variant passes all filters
+    #   info   : optional info, comma separated key=value list
     header = ['chr', 'pos', 'id', 'ref', 'alt','qual', 'filter', 'info']
+
     df = pd.read_csv(
             vcf_filename,
             sep='\t',
             skiprows=lines_to_skip,
+            header = None,
             names=header,
             usecols=header,
-            dtype={'pos' : np.int32})
+            dtype={'pos' : np.int32, 'chr':str})
+
     df['chr'] = df.chr.map(_shorten_chromosome_name)
     return df
 
 def peptides_from_vcf(input_file, length=31, log_filename = 'run.log'):
-    vcf_df = _vcf_to_dataframe(input_file)
+    vcf_df = vcf_to_dataframe(input_file)
     transcripts_df = ensembl_annotation.annotate_transcripts(vcf_df)
 
     def peptides_from_annotation(group):
