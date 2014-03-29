@@ -84,6 +84,7 @@ def peptides_from_vcf(input_file, length=31, log_filename = 'run.log'):
 
     def peptides_from_annotation(group):
         row = group.irow(0)
+
         transcript_id = row['stable_id_transcript']
         pos = row['pos']
         ref = row['ref']
@@ -93,6 +94,7 @@ def peptides_from_vcf(input_file, length=31, log_filename = 'run.log'):
             full_peptide = \
                 peptide_from_transcript_variant(
                     transcript_id, pos, ref, alt, min_padding = length)
+
         if full_peptide:
             peptides = peptide_substrings(full_peptide, length)
             for peptide in peptides:
@@ -103,6 +105,7 @@ def peptides_from_vcf(input_file, length=31, log_filename = 'run.log'):
         return new_df
     cols = ['chr','pos', 'ref', 'alt']
     variants = transcripts_df.groupby(cols, group_keys=False)
+
     peptides = variants.apply(peptides_from_annotation)
     transcripts_df = transcripts_df.merge(peptides)
     if log_filename:

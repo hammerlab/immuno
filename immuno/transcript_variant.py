@@ -44,9 +44,11 @@ def peptide_from_transcript_variant(
         min_padding=31):
     transcript = _ensembl.get_cdna(transcript_id)
     if transcript:
+
         idx = \
             ensembl_annotation.get_transcript_index_from_pos(pos, transcript_id)
-        if idx:
+
+        if idx is not None:
             try:
                 mutated = mutate_protein_from_transcript(
                     transcript.seq, idx, ref, alt,

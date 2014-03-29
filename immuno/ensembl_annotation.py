@@ -106,12 +106,13 @@ def get_transcript_index_from_pos(pos, transcript_id):
     position : int, genomic position in the contig
     transcript_id : transcript id, of the from EST#####
 
-    returns
     """
     exons = get_exons_from_transcript(transcript_id)
     exons = exons.sort(columns=['seq_region_start_exon', 'seq_region_end_exon'])
-    return get_idx_from_interval(
-        pos, zip(exons['seq_region_start_exon'], exons['seq_region_end_exon']))
+    starts = exons['seq_region_start_exon']
+    stops = exons['seq_region_end_exon']
+    intervals = zip(starts, stops)
+    return get_idx_from_interval(pos, intervals)
 
 def get_idx_from_interval(pos, intervals):
     idx = 0
@@ -123,4 +124,5 @@ def get_idx_from_interval(pos, intervals):
         else:
             ## error some
             return None
+
 
