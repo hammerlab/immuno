@@ -17,7 +17,7 @@ Apply a mutation to a transcript and return a window of amino acids around
 the mutated residue.
 """
 
-from epitopes.mutate import mutate_protein_from_transcript
+from epitopes.mutate import mutate_protein_from_transcript, mutate
 
 from ensembl_transcript_data import EnsemblReferenceData
 import ensembl_annotation
@@ -25,11 +25,16 @@ import ensembl_annotation
 _ensembl = EnsemblReferenceData()
 
 def peptide_from_protein_transcript_variant(transcript_id, pos, ref, alt):
+    """
+    Given an ensembl transcript ID, mutate amino acid `ref` to `alt` at
+    position `pos`.
+    """
     transcript = _ensembl.get_protein(transcript_id)
     if transcript:
         try:
-            return str(mutate.mutate(transcript.seq, pos, ref, alt))
+            return str(mutate(transcript.seq, pos, ref, alt))
         except:
+            raise
             return None
     return None
 

@@ -149,3 +149,8 @@ def test_interval_search():
     idx = ensembl.get_idx_from_interval(51, intervals)
     print idx
     assert(idx is None)
+
+
+if __name__ == '__main__':
+  from dsltools import testing_helpers
+  testing_helpers.run_local_tests()
