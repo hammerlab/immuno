@@ -18,9 +18,8 @@ from immuno import transcript_variant
 def test_peptide_from_protein_transcript():
     peptide = \
         transcript_variant.peptide_from_protein_transcript_variant(
-            'ENSP00000427553', 109, 'T', 'R')
+            'ENSP00000427553', 109, 'Q', 'R')
     assert peptide is not None
-    print(str(peptide))
 
 
 def test_peptide_from_transcript():
@@ -35,7 +34,7 @@ def test_peptide_from_transcript():
     transcript_id = 'ENST00000405570'
     peptide = transcript_variant.peptide_from_transcript_variant(
         transcript_id, 41275636, ref='G', alt='A')
-    assert pepide is not None
+    assert peptide is not None
     n = len(peptide)
     print(str(peptide))
     assert(peptide[n/2] == 'I')
