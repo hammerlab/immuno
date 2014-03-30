@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from immuno import transcript_variant
+from immuno.ensembl import transcript_variant
 
 
 def test_peptide_from_protein_transcript():

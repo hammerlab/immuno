@@ -20,8 +20,8 @@ import numpy as np
 import epitopes.mutate as mutate
 
 from common import peptide_substrings
-from transcript_variant import peptide_from_transcript_variant
-import ensembl_annotation
+from ensembl import annotation
+from ensembl.transcript_variant import peptide_from_transcript_variant
 
 
 def _shorten_chromosome_name(chr):
@@ -80,7 +80,7 @@ def vcf_to_dataframe(vcf_filename):
 
 def peptides_from_vcf(input_file, length=31, log_filename = 'run.log'):
     vcf_df = vcf_to_dataframe(input_file)
-    transcripts_df = ensembl_annotation.annotate_transcripts(vcf_df)
+    transcripts_df = annotation.annotate_transcripts(vcf_df)
 
     def peptides_from_annotation(group):
         row = group.irow(0)

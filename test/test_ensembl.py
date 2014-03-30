@@ -10,10 +10,11 @@
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
-# limitations under the License. 
+# limitations under the License.
 
-import immuno.ensembl_annotation as ensembl
-from immuno.ensembl_transcript_data import EnsemblReferenceData
+import immuno.ensembl.annotation as ensembl
+from immuno.ensembl.transcript_data import EnsemblReferenceData
+
 import pandas as pd
 
 # Test case
@@ -30,7 +31,7 @@ ref_data = EnsemblReferenceData()
 def test_load_transcripts():
     genomic_transcript = "ENST00000453024"
     transcript = ref_data.get_cdna(genomic_transcript)
-    print(str(transcript.seq))
+    # print(str(transcript.seq))
     assert(transcript is not None)
     assert(len(transcript.seq) == 2841)
 
@@ -38,7 +39,7 @@ def test_load_transcripts():
 def test_load_protein_transcript():
     protein_transcript = "ENSP00000427553"
     transcript = ref_data.get_protein(protein_transcript)
-    print(str(transcript.seq))
+    # print(str(transcript.seq))
     assert(transcript is not None)
     assert(transcript.seq[0] == 'M')
     assert(transcript.seq[-1] == 'E')
@@ -119,35 +120,35 @@ def test_get_transcript_index_from_pos():
 def test_interval_search():
     intervals = [ (7,13), (17,19), (21, 24), (35, 45), (47, 50), (60, 70)]
     idx = ensembl.get_idx_from_interval(7, intervals)
-    print idx
+    #print idx
     assert(idx == 0)
 
     idx = ensembl.get_idx_from_interval(13, intervals)
-    print idx
+    # print idx
     assert(idx == 6)
 
     idx = ensembl.get_idx_from_interval(14, intervals)
-    print idx
+    # print idx
     assert(idx is None)
 
     idx = ensembl.get_idx_from_interval(12, intervals)
-    print idx
+    # print idx
     assert(idx == 5)
 
     idx = ensembl.get_idx_from_interval(17, intervals)
-    print idx
+    # print idx
     assert(idx == 7)
 
     idx = ensembl.get_idx_from_interval(18, intervals)
-    print idx
+    # print idx
     assert(idx == 8)
 
     idx = ensembl.get_idx_from_interval(23, intervals)
-    print idx
+    # print idx
     assert(idx == 12)
 
     idx = ensembl.get_idx_from_interval(51, intervals)
-    print idx
+    # print idx
     assert(idx is None)
 
 

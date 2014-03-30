@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 import pandas as pd
-from ensembl_annotation_data import EnsemblAnnotationData
+from annotation_data import EnsemblAnnotationData
 
 data = EnsemblAnnotationData()
 
@@ -91,8 +93,22 @@ def get_exons_from_transcript(transcript_id):
     """
     exon_data = data.exon_data
     exons = exon_data[exon_data['stable_id_transcript'] == transcript_id]
+    assert len(exons) > 0, \
+        "Couldn't find exons for transcript %s" % transcript_id
     fields = ['stable_id_exon', 'seq_region_start_exon', 'seq_region_end_exon']
     return exons[fields]
+
+
+def get_idx_from_interval(pos, intervals):
+    idx = 0
+    for (start, end) in intervals:
+        if pos > end:
+            idx += (end - start) + 1
+        elif pos <= end and pos >= start:
+            return idx + (pos - start)
+        else:
+            return None
+
 
 def get_transcript_index_from_pos(pos, transcript_id):
     """
@@ -112,17 +128,8 @@ def get_transcript_index_from_pos(pos, transcript_id):
     starts = exons['seq_region_start_exon']
     stops = exons['seq_region_end_exon']
     intervals = zip(starts, stops)
-    return get_idx_from_interval(pos, intervals)
-
-def get_idx_from_interval(pos, intervals):
-    idx = 0
-    for (start, end) in intervals:
-        if pos > end:
-            idx += (end - start) + 1
-        elif pos <= end and pos >= start:
-            return idx + (pos - start)
-        else:
-            ## error some
-            return None
-
-
+    result = get_idx_from_interval(pos, intervals)
+    if result is None:
+        logging.warning("Couldn't find position %d in transcript %s",
+            pos, transcript_id)
+    return result

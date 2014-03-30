@@ -14,7 +14,7 @@
 
 from Bio import SeqIO
 
-import ensembl_download
+import download
 
 class EnsemblReferenceData(object):
     """
@@ -28,11 +28,11 @@ class EnsemblReferenceData(object):
 
     def _load_cdna(self):
         self._cdna_dict = SeqIO.index(
-            ensembl_download.download_cdna_transcripts(), 'fasta')
+            download.download_cdna_transcripts(), 'fasta')
 
     def _load_peptide(self):
         self._protein_dict = SeqIO.index(
-            ensembl_download.download_protein_transcripts(), 'fasta')
+            download.download_protein_transcripts(), 'fasta')
 
     def get_cdna(self, transcript_id):
         if self._cdna_dict is None:

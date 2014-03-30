@@ -17,44 +17,54 @@ from os import environ
 
 import appdirs
 import pandas as pd
-from epitopes.download import fetch_data, ensure_dir
+from epitopes.download import fetch_data, ensure_dir, DATA_DIR
 
 DATA_DIR = environ.get("IMMUNO_DATA_DIR", appdirs.user_cache_dir("immuno"))
 
 STANDARD_CONTIGS = set([
     '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14',
-    '15', '16', '17', '18', '19', '20', '21', '22', 'X', 'Y', 'M'])
-
-
-GENE_HEADER = [ 'gene_id', 'biotype', 'analysis_id',
-        'seq_region_id', 'seq_region_start', 'seq_region_end',
-        'seq_region_strand', 'display_xref_id',
-        'source', 'status', 'description', 'is_current',
-        'canonical_transcript_id', 'stable_id',
-        'version', 'created_date', 'modified_date']
-
-SEQ_REGION_HEADER = ['seq_region_id', 'name', 'coord_system_id']
-
-EXON_HEADER = ["exon_id", "seq_region_id", "seq_region_start",
-                "seq_region_end", "seq_region_strand", "phase", "end_phase",
-                "is_current", "is_constitutive", "stable_id", "version",
-                "created_date", "modified_date"]
-
-TRANSCRIPT_HEADER = ["transcript_id", "gene_id", "analysis_id",
-    "seq_region_id", "seq_region_start", "seq_region_end",
-    "seq_region_strand", "display_xref_id", "biotype", "status",
-     "description", "is_current", "canonical_translation_id", "stable_id",
-     "version", "created_date", "modified_date"]
+    '15', '16', '17', '18', '19', '20', '21', '22', 'X', 'Y', 'M'
+])
 
 # TODO: Generously describe what all these files are
+
+GENE_HEADER = [
+    'gene_id', 'biotype', 'analysis_id',
+    'seq_region_id', 'seq_region_start', 'seq_region_end',
+    'seq_region_strand', 'display_xref_id',
+    'source', 'status', 'description', 'is_current',
+    'canonical_transcript_id', 'stable_id',
+    'version', 'created_date', 'modified_date'
+]
+
 GENE_DATA_URL = \
 "ftp://ftp.ensembl.org/pub/release-74/mysql/homo_sapiens_core_74_37/gene.txt.gz"
+
+SEQ_REGION_HEADER = ['seq_region_id', 'name', 'coord_system_id']
 
 SEQ_REGION_DATA_URL = \
 "ftp://ftp.ensembl.org/pub/release-74/mysql/homo_sapiens_core_74_37/seq_region.txt.gz"
 
+
+EXON_HEADER = [
+    "exon_id", "seq_region_id", "seq_region_start",
+    "seq_region_end", "seq_region_strand", "phase", "end_phase",
+    "is_current", "is_constitutive", "stable_id", "version",
+    "created_date", "modified_date"
+]
+
+
 EXON_DATA_URL = \
 "ftp://ftp.ensembl.org/pub/release-74/mysql/homo_sapiens_core_74_37/exon.txt.gz"
+
+
+TRANSCRIPT_HEADER = [
+    "transcript_id", "gene_id", "analysis_id",
+    "seq_region_id", "seq_region_start", "seq_region_end",
+    "seq_region_strand", "display_xref_id", "biotype", "status",
+     "description", "is_current", "canonical_translation_id", "stable_id",
+     "version", "created_date", "modified_date"
+]
 
 TRANSCRIPT_DATA_URL = \
 "ftp://ftp.ensembl.org/pub/release-74/mysql/homo_sapiens_core_74_37/transcript.txt.gz"

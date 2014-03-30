@@ -1,5 +1,5 @@
 import pandas as pd
-from ensembl_download import download_transcript_metadata
+from download import download_transcript_metadata
 
 class EnsemblAnnotationData(object):
 
