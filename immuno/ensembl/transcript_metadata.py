@@ -16,6 +16,7 @@ from os.path import join, exists
 from os import environ
 import hashlib
 import base64
+import logging
 
 import appdirs
 import pandas as pd
@@ -73,7 +74,7 @@ EXON_TRANSCRIPT_DATA_URL = \
 "ftp://ftp.ensembl.org/pub/release-75/mysql/homo_sapiens_core_75_37/exon_transcript.txt.gz"
 
 def short_hash(s, n = 4):
-    return base64.urlsafe_b64encode(hashlib.sha1(s))[:n]
+    return base64.urlsafe_b64encode(hashlib.sha1(s).digest())[:n]
 
 def versioned_filename(base, deps, ext):
     """
@@ -88,7 +89,6 @@ def versioned_filename(base, deps, ext):
 
 def download_transcript_metadata(filter_contigs = STANDARD_CONTIGS):
 
-
     output_filename = versioned_filename(
         "transcript_metadata",
         deps = [
@@ -97,9 +97,8 @@ def download_transcript_metadata(filter_contigs = STANDARD_CONTIGS):
             EXON_DATA_URL,
             TRANSCRIPT_DATA_URL],
         ext = "tsv")
-    logging.info("Looking for transcript metadara in %s", output_filename)
     full_path = build_path(output_filename, subdir = "immuno")
-    logging.info("Full metadata path %s", full_path)
+    logging.info("Transcript metadata path %s", full_path)
 
     if not exists(full_path):
         GENE_DATA_PATH = fetch_data('gene.txt', GENE_DATA_URL)
@@ -115,7 +114,7 @@ def download_transcript_metadata(filter_contigs = STANDARD_CONTIGS):
             index_col=False)
 
         def in_filter_contigs(x):
-            return x in filter_configs
+            return x in filter_contigs
 
         if filter_contigs:
             seqregion = seqregion[seqregion['name'].map(in_filter_contigs)]

@@ -45,5 +45,6 @@ def peptides_from_snpeff(snpeff_annotated_file, window=7):
         if peptide:
           variant['Peptide'] = peptide
           results.append(variant)
+
     return pd.DataFrame.from_records(results)
 

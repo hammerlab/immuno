@@ -17,6 +17,8 @@ Apply a mutation to a transcript and return a window of amino acids around
 the mutated residue.
 """
 
+import logging
+
 from epitopes.mutate import mutate_protein_from_transcript, mutate
 
 from transcript_data import EnsemblReferenceData
@@ -34,7 +36,12 @@ def peptide_from_protein_transcript_variant(transcript_id, pos, ref, alt):
         try:
             return str(mutate(transcript, pos, ref, alt))
         except:
-            raise
+            logging.warning(
+                "Failed to mutate transcript %s '%s' (ref %s -> %s at pos %s)",
+                transcript,
+                ref,
+                alt,
+                pos)
             return None
     return None
 
@@ -43,17 +50,28 @@ def peptide_from_transcript_variant(
         max_length = 500,
         min_padding=31):
     transcript = _ensembl.get_cdna(transcript_id)
-    if transcript:
-
-        idx = annotation.get_transcript_index_from_pos(pos, transcript_id)
-
-        if idx is not None:
-            try:
-                mutated = mutate_protein_from_transcript(
-                    transcript, idx, ref, alt,
-                    max_length = max_length,
-                    min_padding = min_padding)
-                return str(mutated)
-            except AssertionError, error:
-                return None
-    return None
+    if not transcript:
+        logging.warning("Couldn't find transcript for ID %s", transcript_id)
+        return None
+    idx = annotation.get_transcript_index_from_pos(pos, transcript_id)
+    if idx is None:
+        logging.warning(
+            "Couldn't translate gene position %s into transcript index for %s",
+            pos,
+            transcript_id)
+        return None
+    try:
+        mutated = mutate_protein_from_transcript(
+            transcript, idx, ref, alt,
+            max_length = max_length,
+            min_padding = min_padding)
+        return str(mutated)
+    except AssertionError, error:
+        logging.warning(
+            "Failed to mutate %s '%s' (ref %s -> %s at pos %s)",
+            transcript_id,
+            transcript,
+            ref,
+            alt,
+            pos)
+        return None

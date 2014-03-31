@@ -116,7 +116,6 @@ def annotate_vcf_transcripts(vcf_df):
             left_col=['chr', 'gene_stable_id'],
             right=['name', 'gene_stable_id'])
     else:
-        logging.info("Column 'gene_stable_id' not found in VCF")
         annotated = annotate(vcf_df, data.transcript_data, _transcript_matches)
     return annotated
 

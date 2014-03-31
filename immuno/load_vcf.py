@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from copy import deepcopy
+import logging
 
 import pandas as pd
 import numpy as np
@@ -80,9 +81,9 @@ def vcf_to_dataframe(vcf_filename):
 
 def peptides_from_vcf(input_file, length=31, log_filename = 'run.log'):
     vcf_df = vcf_to_dataframe(input_file)
-    print vcf_df
+    logging.info("Loaded VCF %s with %d entries", input_file, len(vcf_df))
     transcripts_df = annotation.annotate_vcf_transcripts(vcf_df)
-    print transcripts_df
+    logging.info("Annotated VCF has %d entries", len(transcripts_df))
     def peptides_from_annotation(group):
         row = group.irow(0)
 
@@ -103,13 +104,17 @@ def peptides_from_vcf(input_file, length=31, log_filename = 'run.log'):
                 row = deepcopy(row)
                 row['Peptide'] = peptide
                 rows.append(row)
+        else:
+            logging.warning(
+                "Couldn't get peptide for transcript %s", transcript_id)
         new_df = pd.DataFrame.from_records(rows)
         return new_df
     cols = ['chr','pos', 'ref', 'alt']
     variants = transcripts_df.groupby(cols, group_keys=False)
-
     peptides = variants.apply(peptides_from_annotation)
     transcripts_df = transcripts_df.merge(peptides)
+    logging.info("Generated %d peptides from %s",
+        len(transcripts_df), input_file)
     if log_filename:
         transcripts_df.to_csv(log_filename, index=False)
     return transcripts_df
