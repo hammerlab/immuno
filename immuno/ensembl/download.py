@@ -36,12 +36,12 @@ GENE_HEADER = [
 ]
 
 GENE_DATA_URL = \
-"ftp://ftp.ensembl.org/pub/release-74/mysql/homo_sapiens_core_74_37/gene.txt.gz"
+"ftp://ftp.ensembl.org/pub/release-75/mysql/homo_sapiens_core_75_37/gene.txt.gz"
 
 SEQ_REGION_HEADER = ['seq_region_id', 'name', 'coord_system_id']
 
 SEQ_REGION_DATA_URL = \
-"ftp://ftp.ensembl.org/pub/release-74/mysql/homo_sapiens_core_74_37/seq_region.txt.gz"
+"ftp://ftp.ensembl.org/pub/release-75/mysql/homo_sapiens_core_75_37/seq_region.txt.gz"
 
 
 EXON_HEADER = [
@@ -53,7 +53,7 @@ EXON_HEADER = [
 
 
 EXON_DATA_URL = \
-"ftp://ftp.ensembl.org/pub/release-74/mysql/homo_sapiens_core_74_37/exon.txt.gz"
+"ftp://ftp.ensembl.org/pub/release-75/mysql/homo_sapiens_core_75_37/exon.txt.gz"
 
 
 TRANSCRIPT_HEADER = [
@@ -65,10 +65,10 @@ TRANSCRIPT_HEADER = [
 ]
 
 TRANSCRIPT_DATA_URL = \
-"ftp://ftp.ensembl.org/pub/release-74/mysql/homo_sapiens_core_74_37/transcript.txt.gz"
+"ftp://ftp.ensembl.org/pub/release-75/mysql/homo_sapiens_core_75_37/transcript.txt.gz"
 
 EXON_TRANSCRIPT_DATA_URL = \
-"ftp://ftp.ensembl.org/pub/release-74/mysql/homo_sapiens_core_74_37/exon_transcript.txt.gz"
+"ftp://ftp.ensembl.org/pub/release-75/mysql/homo_sapiens_core_75_37/exon_transcript.txt.gz"
 
 def download_transcript_metadata(
         output_file = 'gene_exon_transcript.tsv',
@@ -149,15 +149,15 @@ def download_transcript_metadata(
     return full_path
 
 PROTEIN_TRANSCIPT_URL = \
-'ftp://ftp.ensembl.org/pub/release-74/fasta/homo_sapiens/pep/Homo_sapiens.GRCh37.74.pep.all.fa.gz'
+'ftp://ftp.ensembl.org/pub/release-75/fasta/homo_sapiens/pep/Homo_sapiens.GRCh37.74.pep.all.fa.gz'
 
 PROTEIN_TRANSCRIPT_FILE = 'Homo_sapiens.GRCh37.74.pep.all.fa.gz'
 
 CDNA_TRANSCRIPT_URL = \
-'ftp://ftp.ensembl.org/pub/release-74/fasta/homo_sapiens/cdna/Homo_sapiens.GRCh37.74.cdna.all.fa.gz'
+'ftp://ftp.ensembl.org/pub/release-75/fasta/homo_sapiens/cdna/Homo_sapiens.GRCh37.74.cdna.all.fa.gz'
 CDNA_TRANSCRIPT_FILE = 'Homo_sapiens.GRCh37.74.cdna.all.fa.gz'
 
 CDS_TRANSCRIPTS_URL = \
-'ftp://ftp.ensembl.org/pub/release-74/fasta/homo_sapiens/cds/Homo_sapiens.GRCh37.74.cds.all.fa.gz'
+'ftp://ftp.ensembl.org/pub/release-75/fasta/homo_sapiens/cds/Homo_sapiens.GRCh37.74.cds.all.fa.gz'
 
 CDS_TRANSCRIPTS_FILE = 'Homo_sapiens.GRCh37.74.cds.all.fa.gz'
