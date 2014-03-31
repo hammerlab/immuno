@@ -47,14 +47,6 @@ def peptides_from_fasta(fasta_files, peptide_length):
         'Filename': filenames,
     })
 
-def add_scoring(pipeline, alleles, add_mhc = True, add_immunogenicity = True):
-    if add_mhc:
-        mhc = IEDBMHCBinding(name = 'mhc', alleles=alleles)
-        pipeline.add_scorer(mhc)
-    if add_immunogenicity:
-        immunogenicity = ImmunogenicityRFModel(name = 'immunogenicity')
-        pipeline.add_scorer(immunogenicity)
-    return pipeline
 
 DEFAULT_ALLELE = 'HLA-A*02:01'
 
@@ -113,6 +105,10 @@ if __name__ == '__main__':
         assert False, \
             "Either amino acid string or input file required"
 
+    # get rid of gene descriptions if they're in the dataframe
+    if 'description_gene' in epitope_data.columns:
+        epitope_data = epitope_data.drop('description_gene', axis = 1)
+
     if args.allele_file:
         alleles = [l.strip() for l in open(args.allele_file)]
     elif args.alleles:
@@ -121,9 +117,29 @@ if __name__ == '__main__':
         alleles = [DEFAULT_ALLELE]
 
     pipeline = ImmunoPipeline()
-    add_scoring(pipeline, alleles, args.mhc, args.immunogenicity)
+
+    if args.mhc not in (False, 0, "False", "0"):
+        mhc = IEDBMHCBinding(name = 'mhc', alleles=alleles)
+        pipeline.add_scorer(mhc)
+
+    if args.immunogenicity not in (False, 0, "False", "0"):
+        immunogenicity = ImmunogenicityRFModel(name = 'immunogenicity')
+        pipeline.add_scorer(immunogenicity)
+
     scored_data = pipeline.score(epitope_data)
 
+    # some of the MHC scores come back as all NaN so drop them
+    scored_data = scored_data.dropna(axis=1, how='all')
+
+    # IEDB returns a noisy column with 'method' descriptions, drop it
+    if 'method' in scored_data.columns:
+        scored_data = scored_data.drop('method', axis = 1)
+
+    # TODO: combine based on commandline args mhc, immunogenicity, etc..
+    scored_data['combined_score']= \
+        scored_data['percentile_rank'] / 100.0 + \
+        scored_data['immunogenicity']
+    scored_data = scored_data.sort(columns=('combined_score',))
     if args.output:
         scored_data.to_csv(args.output, index=False)
     else:

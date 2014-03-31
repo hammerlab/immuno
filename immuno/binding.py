@@ -59,7 +59,7 @@ class IEDBMHCBinding(PipelineElement):
   def apply(self,data):
     responses = {}
     for peptide in data.Peptide:
-        if peptide not in response:
+        if peptide not in responses:
             responses[peptide] = self.query_iedb(peptide)
         else:
             logging.info(

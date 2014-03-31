@@ -84,7 +84,7 @@ def annotate(
     crossed = vcf_df.merge(
         annotation_df, left_on=left_col, right_on=right_col, how='left')
     annotated = crossed[crossed.apply(predicate, axis=1)]
-    return annotated
+    return annotated.drop_duplicates()
 
 
 def _transcript_matches(transcript_row):
