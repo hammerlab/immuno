@@ -48,14 +48,23 @@ class IEDBMHCBinding(PipelineElement):
       response = urllib2.urlopen(req).read()
 
       return pd.read_csv(StringIO(response), sep='\t', na_values=['-'])
+    except KeyboardInterrupt:
+        raise
     except:
-      logging.error("Connection error: Failed on sequence {}".format(sequence))
-      return pd.DataFrame()
+        logging.error(
+            "Connection error: Failed on sequence {}".format(sequence))
+        return pd.DataFrame()
+
 
   def apply(self,data):
     responses = {}
-    for epitope in data.Peptide:
-       responses[epitope] = self.query_iedb(epitope)
+    for peptide in data.Peptide:
+        if peptide not in response:
+            responses[peptide] = self.query_iedb(peptide)
+        else:
+            logging.info(
+                "Skipping binding for peptide %s, already queried",
+                peptide)
     responses = pd.concat(responses).reset_index(0)
     responses.rename(columns={'level_0':'Peptide'}, inplace=True)
     return data.merge(responses, on='Peptide')
