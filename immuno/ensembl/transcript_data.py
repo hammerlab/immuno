@@ -12,36 +12,86 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from Bio import SeqIO
+import logging
+from os.path import join
+import sqlite3
 
-import download
+from Bio import SeqIO
+import appdirs
+from epitopes.download import fetch_fasta_db, ensure_dir
+
+CDNA_TRANSCRIPT_URL = \
+'ftp://ftp.ensembl.org/pub/release-75/fasta/homo_sapiens/cdna/Homo_sapiens.GRCh37.75.cdna.all.fa.gz'
+
+CDNA_TRANSCRIPT_FILE = 'Homo_sapiens.GRCh37.75.cdna.all.fa'
+
+def _build_cdna_db():
+    """
+    Download a FASTA file containing cDNA sequences for each known transcript,
+    return sqlite3 database mapping ensembl transcript IDs to cDNA sequences.
+    """
+    return fetch_fasta_db(
+        table_name = "CDNA",
+        fasta_filename = CDNA_TRANSCRIPT_FILE,
+        download_url = CDNA_TRANSCRIPT_URL,
+        key_column = 'id',
+        value_column = 'seq',
+        subdir = "immuno")
+
+PROTEIN_TRANSCIPT_URL = \
+'ftp://ftp.ensembl.org/pub/release-75/fasta/homo_sapiens/pep/Homo_sapiens.GRCh37.75.pep.all.fa.gz'
+
+PROTEIN_TRANSCRIPT_FILE = 'Homo_sapiens.GRCh37.75.pep.all.fa'
+
+def _build_protein_db():
+    """
+    Downloads a FASTA file containing amino acid sequences of human
+    transcripts, return sqlite3 database mapping ensembl protein IDs to
+    amino acid sequences.
+    """
+    return fetch_fasta_db(
+        table_name = "PROTEIN",
+        fasta_filename = PROTEIN_TRANSCRIPT_FILE,
+        download_url = PROTEIN_TRANSCIPT_URL,
+        key_column = 'id',
+        value_column = 'seq',
+        subdir = "immuno")
+
+def _exec_transcript_query(db, table_name, transcript_id):
+    query = "select seq from %s where id = ?" % table_name
+
+    cursor = db.execute(query, (transcript_id,))
+    results = cursor.fetchmany()
+    if len(results) == 0:
+        logging.warning("No entries found with transcript_id = %s",
+            transcript_id)
+        return None
+    else:
+        assert len(results) == 1, \
+            "Too many entries (%d) with transcript_id = %s" % \
+            (len(results), transcript_id)
+        # get the first result
+        # and return the first element of its tuple
+        return results[0][0]
 
 class EnsemblReferenceData(object):
     """
     Singleton class which allows for lazy loading of reference
     cDNA and amino acid sequences of transcripts
     """
-
     def __init__(self):
-        self._cdna_dict = None
-        self._protein_dict = None
-
-    def _load_cdna(self):
-        self._cdna_dict = SeqIO.index(
-            download.download_cdna_transcripts(), 'fasta')
-
-    def _load_peptide(self):
-        self._protein_dict = SeqIO.index(
-            download.download_protein_transcripts(), 'fasta')
+        self._cdna_db = None
+        self._protein_db = None
 
     def get_cdna(self, transcript_id):
-        if self._cdna_dict is None:
-            self._load_cdna()
-        transcript = self._cdna_dict.get(transcript_id, None)
-        return transcript
+        if self._cdna_db is None:
+            self._cdna_db = _build_cdna_db()
+        return _exec_transcript_query(
+            self._cdna_db, "CDNA", transcript_id)
 
     def get_protein(self, transcript_id):
-        if self._protein_dict is None:
-            self._load_peptide()
-        transcript = self._protein_dict.get(transcript_id, None)
-        return transcript
+        if self._protein_db is None:
+            self._protein_db = _build_protein_db()
+        print transcript_id
+        return _exec_transcript_query(
+            self._protein_db, "PROTEIN", transcript_id)

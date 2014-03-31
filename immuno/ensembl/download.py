@@ -17,9 +17,7 @@ from os import environ
 
 import appdirs
 import pandas as pd
-from epitopes.download import fetch_data, ensure_dir, DATA_DIR
-
-DATA_DIR = environ.get("IMMUNO_DATA_DIR", appdirs.user_cache_dir("immuno"))
+from epitopes.download import fetch_data, ensure_dir, build_path
 
 STANDARD_CONTIGS = set([
     '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14',
@@ -62,8 +60,8 @@ TRANSCRIPT_HEADER = [
     "transcript_id", "gene_id", "analysis_id",
     "seq_region_id", "seq_region_start", "seq_region_end",
     "seq_region_strand", "display_xref_id", "biotype", "status",
-     "description", "is_current", "canonical_translation_id", "stable_id",
-     "version", "created_date", "modified_date"
+    "description", "is_current", "canonical_translation_id", "stable_id",
+    "version", "created_date", "modified_date"
 ]
 
 TRANSCRIPT_DATA_URL = \
@@ -75,8 +73,7 @@ EXON_TRANSCRIPT_DATA_URL = \
 def download_transcript_metadata(
         output_file = 'gene_exon_transcript.tsv',
         filter_contigs = STANDARD_CONTIGS):
-    ensure_dir(DATA_DIR)
-    full_path = join(DATA_DIR, output_file)
+    full_path = build_path(output_file, subdir = "immuno")
     if not exists(full_path):
         GENE_DATA_PATH = fetch_data('gene.txt', GENE_DATA_URL)
         SEQ_REGION_DATA_PATH = fetch_data('seq_region.txt', SEQ_REGION_DATA_URL)
@@ -156,31 +153,11 @@ PROTEIN_TRANSCIPT_URL = \
 
 PROTEIN_TRANSCRIPT_FILE = 'Homo_sapiens.GRCh37.74.pep.all.fa.gz'
 
-def download_protein_transcripts():
-    """
-    Downloads a FASTA file containing amino acid sequences of human
-    transcripts, return local path.
-    """
-    return fetch_data(PROTEIN_TRANSCRIPT_FILE, PROTEIN_TRANSCIPT_URL)
-
 CDNA_TRANSCRIPT_URL = \
 'ftp://ftp.ensembl.org/pub/release-74/fasta/homo_sapiens/cdna/Homo_sapiens.GRCh37.74.cdna.all.fa.gz'
 CDNA_TRANSCRIPT_FILE = 'Homo_sapiens.GRCh37.74.cdna.all.fa.gz'
-
-def download_cdna_transcripts():
-    """
-    Download a FASTA file containing cDNA sequences for each known transcript,
-    return its local path.
-    """
-    return fetch_data(CDNA_TRANSCRIPT_FILE, CDNA_TRANSCRIPT_URL)
 
 CDS_TRANSCRIPTS_URL = \
 'ftp://ftp.ensembl.org/pub/release-74/fasta/homo_sapiens/cds/Homo_sapiens.GRCh37.74.cds.all.fa.gz'
 
 CDS_TRANSCRIPTS_FILE = 'Homo_sapiens.GRCh37.74.cds.all.fa.gz'
-
-def download_cds_transcripts():
-    """
-    TODO: What are CDS transcripts?
-    """
-    return fetch_data(CDS_TRANSCRIPTS_FILE, CDS_TRANSCRIPTS_URL)

@@ -32,7 +32,7 @@ def peptide_from_protein_transcript_variant(transcript_id, pos, ref, alt):
     transcript = _ensembl.get_protein(transcript_id)
     if transcript:
         try:
-            return str(mutate(transcript.seq, pos, ref, alt))
+            return str(mutate(transcript, pos, ref, alt))
         except:
             raise
             return None
@@ -50,7 +50,7 @@ def peptide_from_transcript_variant(
         if idx is not None:
             try:
                 mutated = mutate_protein_from_transcript(
-                    transcript.seq, idx, ref, alt,
+                    transcript, idx, ref, alt,
                     max_length = max_length,
                     min_padding = min_padding)
                 return str(mutated)

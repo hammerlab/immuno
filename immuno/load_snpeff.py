@@ -13,10 +13,11 @@
 # limitations under the License.
 
 from copy import deepcopy
+import logging
 
 from load_vcf import vcf_to_dataframe
 from snpeff_effect import SnpEffEffect
-from transcript_variant import peptide_from_transcript_variant
+from ensembl.transcript_variant import peptide_from_transcript_variant
 
 def _parse_effects(info_field):
     info_fields = info_field.split(";")
@@ -24,6 +25,7 @@ def _parse_effects(info_field):
         if field.startswith("EFF"):
             key, value = field.split("=")
             return [SnpEffEffect(effect) for effect in value.split(",")]
+    logging.warning("Couldn't find EFF info in %s", info_field)
     return None
 
 def peptides_from_snpeff(snpeff_annotated_file, window=7):
