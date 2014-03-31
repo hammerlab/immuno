@@ -83,27 +83,30 @@ if __name__ == '__main__':
     if args.string:
         full_peptide = args.string.upper().strip()
         n = len(full_peptide)
-        peptide_length = min(args.peptide_length, n)
+        peptide_length = min(int(args.peptide_length), n)
         peptides = peptide_substrings(full_peptide, peptide_length)
         epitope_data = pd.DataFrame({
             'Peptide': peptides,
             'SourceSequence': [full_peptide] * len(peptides)
         })
 
+    # TODO: allow for multiple input files by concatenating
+    # their dataframes
     elif len(args.input) > 0:
         input_filename = args.input[0]
+        peptide_length = int(args.peptide_length)
         if input_filename.endswith("eff.vcf"):
             epitope_data = peptides_from_snpeff(
-                input_filename, args.peptide_length)
+                input_filename, peptide_length)
         if input_filename.endswith(".vcf"):
             epitope_data = peptides_from_vcf(
-                input_filename, args.peptide_length)
+                input_filename, peptide_length)
         elif input_filename.endswith(".maf"):
-            epitope_data = peptides_from_maf(args.input, args.peptide_length)
+            epitope_data = peptides_from_maf(args.input, peptide_length)
         elif input_filename.endswith(".fasta") \
                 or input_filename.endswith(".fa"):
             epitope_data = peptides_from_fasta(
-                args.input, args.peptide_length)
+                args.input, peptide_length)
         else:
             assert False, "Unrecognized file type %s" % input_filename
     else:
