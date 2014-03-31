@@ -14,6 +14,8 @@
 
 from os.path import join, exists
 from os import environ
+import hashlib
+import base64
 
 import appdirs
 import pandas as pd
@@ -70,10 +72,35 @@ TRANSCRIPT_DATA_URL = \
 EXON_TRANSCRIPT_DATA_URL = \
 "ftp://ftp.ensembl.org/pub/release-75/mysql/homo_sapiens_core_75_37/exon_transcript.txt.gz"
 
-def download_transcript_metadata(
-        output_file = 'gene_exon_transcript.tsv',
-        filter_contigs = STANDARD_CONTIGS):
-    full_path = build_path(output_file, subdir = "immuno")
+def short_hash(s, n = 4):
+    return base64.urlsafe_b64encode(hashlib.sha1(s))[:n]
+
+def versioned_filename(base, deps, ext):
+    """
+    Create a unique filename based on some URL dependencies
+    by adding a subset of each URL's hash to a base name.
+    """
+
+    result = base
+    for dep in deps:
+        result = result + "_" + short_hash(dep)
+    return result + "." + ext
+
+def download_transcript_metadata(filter_contigs = STANDARD_CONTIGS):
+
+
+    output_filename = versioned_filename(
+        "transcript_metadata",
+        deps = [
+            GENE_DATA_URL,
+            SEQ_REGION_DATA_URL,
+            EXON_DATA_URL,
+            TRANSCRIPT_DATA_URL],
+        ext = "tsv")
+    logging.info("Looking for transcript metadara in %s", output_filename)
+    full_path = build_path(output_filename, subdir = "immuno")
+    logging.info("Full metadata path %s", full_path)
+
     if not exists(full_path):
         GENE_DATA_PATH = fetch_data('gene.txt', GENE_DATA_URL)
         SEQ_REGION_DATA_PATH = fetch_data('seq_region.txt', SEQ_REGION_DATA_URL)
@@ -81,7 +108,6 @@ def download_transcript_metadata(
         TRANSCRIPT_DATA_PATH = fetch_data('transcript.txt', TRANSCRIPT_DATA_URL)
         EXON_TRANSCRIPT_DATA_PATH = \
             fetch_data('exon_transcript.txt', EXON_TRANSCRIPT_DATA_URL)
-
         seqregion = pd.read_csv(
             SEQ_REGION_DATA_PATH,
             sep='\t',
@@ -147,17 +173,3 @@ def download_transcript_metadata(
         exon_data = exon_w_transcript[exon_cols]
         exon_data.to_csv(full_path, index=False, sep='\t')
     return full_path
-
-PROTEIN_TRANSCIPT_URL = \
-'ftp://ftp.ensembl.org/pub/release-75/fasta/homo_sapiens/pep/Homo_sapiens.GRCh37.74.pep.all.fa.gz'
-
-PROTEIN_TRANSCRIPT_FILE = 'Homo_sapiens.GRCh37.74.pep.all.fa.gz'
-
-CDNA_TRANSCRIPT_URL = \
-'ftp://ftp.ensembl.org/pub/release-75/fasta/homo_sapiens/cdna/Homo_sapiens.GRCh37.74.cdna.all.fa.gz'
-CDNA_TRANSCRIPT_FILE = 'Homo_sapiens.GRCh37.74.cdna.all.fa.gz'
-
-CDS_TRANSCRIPTS_URL = \
-'ftp://ftp.ensembl.org/pub/release-75/fasta/homo_sapiens/cds/Homo_sapiens.GRCh37.74.cds.all.fa.gz'
-
-CDS_TRANSCRIPTS_FILE = 'Homo_sapiens.GRCh37.74.cds.all.fa.gz'

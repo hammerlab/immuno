@@ -80,8 +80,9 @@ def vcf_to_dataframe(vcf_filename):
 
 def peptides_from_vcf(input_file, length=31, log_filename = 'run.log'):
     vcf_df = vcf_to_dataframe(input_file)
-    transcripts_df = annotation.annotate_transcripts(vcf_df)
-
+    print vcf_df
+    transcripts_df = annotation.annotate_vcf_transcripts(vcf_df)
+    print transcripts_df
     def peptides_from_annotation(group):
         row = group.irow(0)
 
@@ -91,6 +92,7 @@ def peptides_from_vcf(input_file, length=31, log_filename = 'run.log'):
         alt = row['alt']
         rows = []
         if transcript_id:
+            logging.info("Getting peptide from transcript ID %s", transcript_id)
             full_peptide = \
                 peptide_from_transcript_variant(
                     transcript_id, pos, ref, alt, min_padding = length)

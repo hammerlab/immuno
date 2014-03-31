@@ -19,66 +19,6 @@ from annotation_data import EnsemblAnnotationData
 
 data = EnsemblAnnotationData()
 
-def _transcript_matches(transcript_row):
-    position = transcript_row['pos']
-    contig = transcript_row['chr']
-    return transcript_row['seq_region_start_transcript'] < position \
-            and transcript_row['seq_region_end_transcript'] > position \
-            and transcript_row['name'] == contig
-
-def _gene_matches(gene_row):
-    position = gene_row['pos']
-    contig = gene_row['chr']
-    return gene_row['seq_region_start_gene'] <= position \
-            and gene_row['seq_region_end_gene'] > position \
-            and gene_row['name'] == contig
-
-def annotate(
-        vcf_df,
-        annotation_df,
-        predicate,
-        left_col = 'chr',
-        right_col = 'name'):
-    crossed = vcf_df.merge(
-        annotation_df, left_on=left_col, right_on=right_col, how='left')
-    annotated = crossed[crossed.apply(predicate, axis=1)]
-    return annotated
-
-def annotate_transcripts(vcf_df):
-    """
-    Get list of transcript id from position
-
-    Parameters
-    ----------
-    vcf : Pandas dataframe with chr, pos, ref, alt columns
-
-    Return df with gene and transcript ids
-
-    """
-    if 'gene_stable_id' in vcf_df.columns:
-        annotated = annotate(vcf_df,
-            data.transcript_data,
-            _transcript_matches,
-            left_col=['chr', 'gene_stable_id'],
-            right=['name', 'gene_stable_id'])
-    else:
-        annotated = annotate(vcf_df, data.transcript_data, _transcript_matches)
-    return annotated
-
-def annotate_genes(vcf_df):
-    """
-    Get list of gene id from position
-
-    Parameters
-    ----------
-    vcf_df : Pandas dataframe
-        Expected to have columns 'chr', 'pos', 'ref', 'alt'
-
-    Return df with gene ids
-
-    """
-    return annotate(vcf_df, data.gene_data, _gene_matches)
-
 
 
 def get_exons_from_transcript(transcript_id):
@@ -133,3 +73,76 @@ def get_transcript_index_from_pos(pos, transcript_id):
         logging.warning("Couldn't find position %d in transcript %s",
             pos, transcript_id)
     return result
+
+
+def annotate(
+        vcf_df,
+        annotation_df,
+        predicate,
+        left_col = 'chr',
+        right_col = 'name'):
+    crossed = vcf_df.merge(
+        annotation_df, left_on=left_col, right_on=right_col, how='left')
+    annotated = crossed[crossed.apply(predicate, axis=1)]
+    return annotated
+
+
+def _transcript_matches(transcript_row):
+    position = transcript_row['pos']
+    contig = transcript_row['chr']
+    return transcript_row['seq_region_start_transcript'] < position \
+            and transcript_row['seq_region_end_transcript'] > position \
+            and transcript_row['name'] == contig
+
+def annotate_vcf_transcripts(vcf_df):
+    """
+    Get list of transcript id from position
+
+    Parameters
+    ----------
+    vcf : Pandas dataframe with chr, pos, ref, alt columns
+
+    Return df with extra columns:
+        'name', 'stable_id_gene', 'description_gene',
+        'seq_region_start_gene', 'seq_region_end_gene',
+        'stable_id_transcript', 'seq_region_start_transcript',
+        'seq_region_end_transcript'
+
+    """
+    if 'gene_stable_id' in vcf_df.columns:
+        annotated = annotate(vcf_df,
+            data.transcript_data,
+            _transcript_matches,
+            left_col=['chr', 'gene_stable_id'],
+            right=['name', 'gene_stable_id'])
+    else:
+        logging.info("Column 'gene_stable_id' not found in VCF")
+        annotated = annotate(vcf_df, data.transcript_data, _transcript_matches)
+    return annotated
+
+
+
+def _gene_matches(gene_row):
+    position = gene_row['pos']
+    contig = gene_row['chr']
+    return gene_row['seq_region_start_gene'] <= position \
+            and gene_row['seq_region_end_gene'] > position \
+            and gene_row['name'] == contig
+
+
+def annotate_vcf_genes(vcf_df):
+    """
+    Get list of gene id from position
+
+    Parameters
+    ----------
+    vcf_df : Pandas dataframe
+        Expected to have columns 'chr', 'pos', 'ref', 'alt'
+
+    Return df with extra columns:
+        'name', 'stable_id_gene', 'description_gene',
+        'seq_region_start_gene', 'seq_region_end_gene'
+
+    """
+    return annotate(vcf_df, data.gene_data, _gene_matches)
+
