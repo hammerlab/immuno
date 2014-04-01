@@ -23,7 +23,11 @@ from pipeline import PipelineElement
 
 class IEDBMHCBinding(PipelineElement):
 
-  def __init__(self, alleles=[], name="IEDB-MHC-Binding", method='recommended', lengths = [9,10,11], url='http://tools.iedb.org/tools_api/mhci/'):
+  def __init__(self, alleles=[],
+        name="IEDB-MHC-Binding",
+        method='recommended',
+        lengths = [9,10,11],
+        url='http://tools.iedb.org/tools_api/mhci/'):
     self.name = name
     self._method = method
     self._lengths = lengths
@@ -56,9 +60,17 @@ class IEDBMHCBinding(PipelineElement):
         return pd.DataFrame()
 
 
-  def apply(self,data):
+  def apply(self, data):
+    """
+    Given a dataframe with long amino acid sequences in the
+    'SourceSequence' field, return an augmented dataframe
+    with shorter k-mers in the 'Epitope' column and several
+    columns of MHC binding predictions with names such as 'percentile_rank'
+    """
+    # take each mutated sequence in the dataframe
+    # and general MHC binding scores for all k-mer substrings
     responses = {}
-    for peptide in data.Peptide:
+    for peptide in data.SourceSequence:
         if peptide not in responses:
             responses[peptide] = self.query_iedb(peptide)
         else:
@@ -66,8 +78,23 @@ class IEDBMHCBinding(PipelineElement):
                 "Skipping binding for peptide %s, already queried",
                 peptide)
     responses = pd.concat(responses).reset_index(0)
-    responses.rename(columns={'level_0':'Peptide'}, inplace=True)
-    return data.merge(responses, on='Peptide')
+    responses.rename(
+        columns={
+            'level_0':'SourceSequence',
+            'peptide': 'Epitope',
+            'length' : 'EpitopeLength',
+            'start' : 'EpitopeStart',
+            'end' : 'EpitopeEnd',
+        },
+        inplace=True)
+
+    result = data.merge(responses, on='SourceSequence')
+
+    # some of the MHC scores come back as all NaN so drop them
+    result = result.dropna(axis=1, how='all')
+     # no idea what this field does but always seems to be the same value
+    result = result.drop('seq_num', axis=1)
+    return result
 
 class IEDBMHC1Binding(IEDBMHCBinding):
     def __init__(self,

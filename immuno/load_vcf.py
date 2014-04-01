@@ -99,13 +99,19 @@ def peptides_from_vcf(input_file, length=31, log_filename = 'vcf_csv.log'):
                     transcript_id, pos, ref, alt,
                     min_padding = length)
 
+
+        if full_peptide and '*' in full_peptide:
+                logging.warning(
+                    "Found stop codon in peptide %s, truncating sequence",
+                    full_peptide)
+                full_peptide = full_peptide[:full_peptide.index('*')]
         if full_peptide:
             row = deepcopy(row)
-            row['MutatedRegion'] = full_peptide
+            row['SourceSequence'] = full_peptide
             # TODO: actually use the  position
             # to compute the start/stop of the mutated region
             row['MutationStart'] = 0
-            row['MutationStop'] = len(peptide)
+            row['MutationEnd'] = len(full_peptide)
 
             rows.append(row)
         else:
@@ -120,10 +126,10 @@ def peptides_from_vcf(input_file, length=31, log_filename = 'vcf_csv.log'):
     logging.info("Generated %d peptides from %s",
         len(transcripts_df), input_file)
     # drop verbose or uninteresting columns from VCF
-    if 'description_gene' in transcripts_df.columns:
-        transcripts_df = transcripts_df.drop('description_gene', axis = 1)
-    if 'filter' in transcripts_df.columns:
-        transcripts_df = transcripts_df.drop('filter', axis = 1)
+    for dumb_field in ('description_gene', 'filter', 'qual', 'id', 'name'):
+
+        if dumb_field in transcripts_df.columns:
+            transcripts_df = transcripts_df.drop(dumb_field, axis = 1)
     if log_filename:
         transcripts_df.to_csv(log_filename, index=False)
     return transcripts_df

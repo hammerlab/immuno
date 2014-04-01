@@ -82,10 +82,10 @@ def train_cached(
     vectorizer, clf = train()
 
     with open(vectorizer_filename, 'w') as vectorizer_file:
-        cPickle.dump(vectorizer, vectorizer_file)
+        cPickle.dump(vectorizer, vectorizer_file, cPickle.HIGHEST_PROTOCOL)
 
     with open(model_filename, 'w') as model_file:
-        cPickle.dump(clf, model_file)
+        cPickle.dump(clf, model_file, cPickle.HIGHEST_PROTOCOL)
 
     return vectorizer, clf
 
@@ -106,7 +106,7 @@ class ImmunogenicityRFModel(PipelineElement):
 
     def _apply(self, df):
         if self.vectorizer:
-            X = self.vectorizer.transform(df.Peptide)
+            X = self.vectorizer.transform(df.Epitope)
         else:
-            X = df.Peptide
+            X = df.Epitope
         return self.classifier.decision_function(X)
