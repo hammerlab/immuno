@@ -89,6 +89,7 @@ if __name__ == "__main__":
     rsem_ranks = combined.pop('RSEM').rank(method = group_rank_method) - 1
 
     rsem_ranks /= len(rsem_ranks)
+    rsem_rank.sort()
     n = len(combined)
     counts = pd.DataFrame({
         "Hugo": combined.index,
