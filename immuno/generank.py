@@ -82,12 +82,12 @@ if __name__ == "__main__":
         normal_df[tissue_cols] = \
             normal_df[tissue_cols].rank(method = group_rank_method) - 1
         normal_df[tissue_cols] /= len(normal_df)
+
     # result has a Hugo ID column, RSEM values,
     # and all the tissue-specific ranks from normal_df
     combined = hugo_df.merge(normal_df).set_index("Hugo")
+    rsem_ranks = combined.pop('RSEM').rank(method = group_rank_method) - 1
 
-    rsem_ranks = combined['RSEM'].rank(method = group_rank_method) - 1
-    combined = combined.drop("RSEM", axis=1)
     rsem_ranks /= len(rsem_ranks)
     n = len(combined)
     counts = pd.DataFrame({
