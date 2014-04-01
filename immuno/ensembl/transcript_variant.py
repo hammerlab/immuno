@@ -37,8 +37,7 @@ def peptide_from_protein_transcript_variant(transcript_id, pos, ref, alt):
             return str(mutate(transcript, pos, ref, alt))
         except:
             logging.warning(
-                "Failed to mutate transcript %s '%s' (ref %s -> %s at pos %s)",
-                transcript,
+                "Failed to mutate transcript %s (ref %s, alt %s at pos %s)",
                 ref,
                 alt,
                 pos)
@@ -68,9 +67,8 @@ def peptide_from_transcript_variant(
         return str(mutated)
     except AssertionError, error:
         logging.warning(
-            "Failed to mutate %s '%s' (ref %s -> %s at pos %s)",
+            "Failed to mutate %s (ref %s, alt %s at position %s)",
             transcript_id,
-            transcript,
             ref,
             alt,
             pos)

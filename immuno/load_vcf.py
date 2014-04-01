@@ -100,23 +100,20 @@ def peptides_from_vcf(input_file, length=31, log_filename = 'vcf_csv.log'):
                     min_padding = length)
 
 
-        if full_peptide and '*' in full_peptide:
-                logging.warning(
-                    "Found stop codon in peptide %s, truncating sequence",
-                    full_peptide)
-                full_peptide = full_peptide[:full_peptide.index('*')]
         if full_peptide:
-            row = deepcopy(row)
-            row['SourceSequence'] = full_peptide
-            # TODO: actually use the  position
-            # to compute the start/stop of the mutated region
-            row['MutationStart'] = 0
-            row['MutationEnd'] = len(full_peptide)
-
-            rows.append(row)
-        else:
-            logging.warning(
-                "Couldn't get peptide for transcript %s", transcript_id)
+            if '*' in full_peptide:
+                logging.warning(
+                    "Found stop codon in peptide %s from transcript_id %s",
+                    full_peptide,
+                    transcript_id)
+            else:
+                row = deepcopy(row)
+                row['SourceSequence'] = full_peptide
+                # TODO: actually use the  position
+                # to compute the start/stop of the mutated region
+                row['MutationStart'] = 0
+                row['MutationEnd'] = len(full_peptide)
+                rows.append(row)
         new_df = pd.DataFrame.from_records(rows)
         return new_df
     cols = ['chr','pos', 'ref', 'alt']
