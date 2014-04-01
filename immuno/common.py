@@ -23,3 +23,13 @@ def peptide_substrings(full_peptide, window_length):
     n = len(full_peptide)
     return [full_peptide[i:i+window_length]
             for i in xrange(n + 1 - window_length)]
+
+def memoize(original_fn):
+    _cache = {}
+    def cached_fn(*args):
+        if args in _cache:
+            return _cache[args]
+        result = original_fn(*args)
+        _cache[args] = result
+        return result
+    return cached_fn

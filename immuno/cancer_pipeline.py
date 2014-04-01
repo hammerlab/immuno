@@ -58,7 +58,9 @@ if __name__ == '__main__':
         help="input file name (i.e. FASTA, MAF, VCF)")
     input_group.add_argument("--string", default = None,
         help="amino acid string")
-    parser.add_argument("--peptide_length", default=31,
+    parser.add_argument("--peptide_length",
+        default=31,
+        type = int,
         help="length of vaccine peptides (may contain multiple epitopes)")
     parser.add_argument("--allele_file",
         help="file with one allele per line")
@@ -66,49 +68,60 @@ if __name__ == '__main__':
         help="comma separated list of allele (default HLA-A*02:01)")
     parser.add_argument("--output",
         help="output file for dataframes", required=False)
-    parser.add_argument("--immunogenicity",
-        default=True, help="Predict immunogenicity score")
-    parser.add_argument("--mhc", default=True,
-        help="Predict MHC binding")
+    parser.add_argument("--no-immunogenicity",
+        default=False,
+        action="store_true",
+        help="Don't predict immunogenicity score")
+    parser.add_argument("--no-mhc",
+        default=False,
+        action="store_true",
+        help="Don't predict MHC binding")
 
     args = parser.parse_args()
+
+    # stack up the dataframes and later concatenate in case we
+    # want both commandline strings (for weird mutations like translocations)
+    # and files
+    mutated_region_dfs = []
+
     if args.string:
         full_peptide = args.string.upper().strip()
         n = len(full_peptide)
-        peptide_length = min(int(args.peptide_length), n)
-        peptides = peptide_substrings(full_peptide, peptide_length)
-        epitope_data = pd.DataFrame({
-            'Peptide': peptides,
-            'SourceSequence': [full_peptide] * len(peptides)
+        df = pd.DataFrame({
+            'MutatedRegion': [full_peptide],
+            'MutationStart' : [start],
+            'MutationStop' : [stop],
         })
+        mutated_region_dfs.append(df)
 
-    # TODO: allow for multiple input files by concatenating
-    # their dataframes
-    elif len(args.input) > 0:
-        input_filename = args.input[0]
-        peptide_length = int(args.peptide_length)
+
+    # loop over all the input files and
+    # load each one into a dataframe
+
+    for input_filename in args.input:
         if input_filename.endswith("eff.vcf"):
-            epitope_data = peptides_from_snpeff(
-                input_filename, peptide_length)
+            df = peptides_from_snpeff(input_filename)
         if input_filename.endswith(".vcf"):
-            epitope_data = peptides_from_vcf(
-                input_filename, peptide_length)
+            df = peptides_from_vcf(input_filename)
         elif input_filename.endswith(".maf"):
-            epitope_data = peptides_from_maf(args.input, peptide_length)
+            df = peptides_from_maf(input_filename)
         elif input_filename.endswith(".fasta") \
                 or input_filename.endswith(".fa"):
-            epitope_data = peptides_from_fasta(
-                args.input, peptide_length)
+            df = peptides_from_fasta(input_filename)
         else:
             assert False, "Unrecognized file type %s" % input_filename
+        mutated_region_dfs.append(df)
     else:
         assert False, \
             "Either amino acid string or input file required"
 
-    # get rid of gene descriptions if they're in the dataframe
-    if 'description_gene' in epitope_data.columns:
-        epitope_data = epitope_data.drop('description_gene', axis = 1)
+    mutated_regions = pd.concat(mutated_region_dfs)
+    print mutated_regions
 
+    peptide_length = int(args.peptide_length)
+    # peptides = peptide_substrings(full_peptide, peptide_length)
+
+    # get rid of gene descriptions if they're in the dataframe
     if args.allele_file:
         alleles = [l.strip() for l in open(args.allele_file)]
     elif args.alleles:
@@ -118,15 +131,15 @@ if __name__ == '__main__':
 
     pipeline = ImmunoPipeline()
 
-    if args.mhc not in (False, 0, "False", "0"):
+    if not args.no_mhc:
         mhc = IEDBMHCBinding(name = 'mhc', alleles=alleles)
         pipeline.add_scorer(mhc)
 
-    if args.immunogenicity not in (False, 0, "False", "0"):
+    if not args.no_immunogenicity:
         immunogenicity = ImmunogenicityRFModel(name = 'immunogenicity')
         pipeline.add_scorer(immunogenicity)
 
-    scored_data = pipeline.score(epitope_data)
+    scored_data = pipeline.score(mutated_regions)
 
     # some of the MHC scores come back as all NaN so drop them
     scored_data = scored_data.dropna(axis=1, how='all')

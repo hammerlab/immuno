@@ -79,7 +79,7 @@ def vcf_to_dataframe(vcf_filename):
     df['chr'] = df.chr.map(_shorten_chromosome_name)
     return df
 
-def peptides_from_vcf(input_file, length=31, log_filename = 'run.log'):
+def peptides_from_vcf(input_file, length=31, log_filename = 'vcf_csv.log'):
     vcf_df = vcf_to_dataframe(input_file)
     logging.info("Loaded VCF %s with %d entries", input_file, len(vcf_df))
     transcripts_df = annotation.annotate_vcf_transcripts(vcf_df)
@@ -96,14 +96,18 @@ def peptides_from_vcf(input_file, length=31, log_filename = 'run.log'):
             logging.info("Getting peptide from transcript ID %s", transcript_id)
             full_peptide = \
                 peptide_from_transcript_variant(
-                    transcript_id, pos, ref, alt, min_padding = length)
+                    transcript_id, pos, ref, alt,
+                    min_padding = length)
 
         if full_peptide:
-            peptides = peptide_substrings(full_peptide, length)
-            for peptide in peptides:
-                row = deepcopy(row)
-                row['Peptide'] = peptide
-                rows.append(row)
+            row = deepcopy(row)
+            row['MutatedRegion'] = full_peptide
+            # TODO: actually use the  position
+            # to compute the start/stop of the mutated region
+            row['MutationStart'] = 0
+            row['MutationStop'] = len(peptide)
+
+            rows.append(row)
         else:
             logging.warning(
                 "Couldn't get peptide for transcript %s", transcript_id)
@@ -115,6 +119,11 @@ def peptides_from_vcf(input_file, length=31, log_filename = 'run.log'):
     transcripts_df = transcripts_df.merge(peptides)
     logging.info("Generated %d peptides from %s",
         len(transcripts_df), input_file)
+    # drop verbose or uninteresting columns from VCF
+    if 'description_gene' in transcripts_df.columns:
+        transcripts_df = transcripts_df.drop('description_gene', axis = 1)
+    if 'filter' in transcripts_df.columns:
+        transcripts_df = transcripts_df.drop('filter', axis = 1)
     if log_filename:
         transcripts_df.to_csv(log_filename, index=False)
     return transcripts_df
