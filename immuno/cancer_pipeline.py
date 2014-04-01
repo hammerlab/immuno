@@ -76,8 +76,10 @@ def build_html_report(scored_data):
         gene_info = None
         for _, row in rowslice.iterrows():
             gene_info = row['info']
-            start = row['EpitopeStart'] - 1
-            stop = row['EpitopeEnd']
+            start = int(row['EpitopeStart'] - 1)
+            assert start >= 0, start
+            stop = int(row['EpitopeEnd'])
+            assert stop > start, stop
             scores[start:stop] += row['combined_score']
             imm_scores[start:stop] += row['immunogenicity']
             mhc_scores[start:stop] += row['percentile_rank'] / 100.0
@@ -101,10 +103,12 @@ def build_html_report(scored_data):
             imm = imm_scores[i]
             mhc = mhc_scores[i]
             maxval = 256
-            mhc_intensity = int(mhc*maxval)
-            mhc_rgb = "rgb(%d, %d, %d)" % (mhc_intensity, mhc_intensity/2, 0)
-            imm_intensity =  int(imm*maxval)
-            imm_rgb = "rgb(%d, %d, %d)" % (0, imm_intensity/2, imm_intensity)
+            mhc_intensity = int(mhc**2*maxval)
+            mhc_rgb = "rgb(%d, %d, %d)" % \
+                (mhc_intensity/3, mhc_intensity, mhc_intensity/2)
+            imm_intensity =  int(imm**2*maxval)
+            imm_rgb = "rgb(%d, %d, %d)" % \
+                (imm_intensity, imm_intensity/2, imm_intensity/3)
 
 
             color_cell = \
@@ -122,8 +126,9 @@ def build_html_report(scored_data):
         imm_color_cols = '\n\t'.join(imm_colors)
         colored_letters_table = \
             """
+
+            <table>
             <center>
-            <table border="1">
             <tr>
             <td style='background-color: rgb(190,190,190);'>Sequence</td>
             %s
@@ -138,12 +143,14 @@ def build_html_report(scored_data):
             <td style='background-color: rgb(190,190,190);'>Immunogenicity</td>
             %s
             </tr>
-            </table>
             </center>
+            </table>
             """ % (letters_cols, mhc_color_cols, imm_color_cols)
 
         div = """
-            <div style="border-bottom: 1px solid gray; margin-bottom: 1em;">
+            <div
+                style="border-bottom: 1px solid gray; margin-bottom: 1em;"
+                class="seq">
             <h3>Median Epitope Score = %0.4f (%s)</h3>
             %s
             <br>
@@ -158,18 +165,24 @@ def build_html_report(scored_data):
     page = """
         <html>
         <style>
-            body { padding: 1em; }
+            body { padding: 2em; font-family: sans-serif; }
+            table { padding: 0em; border: 0px solid black; }
             table, td, th
             {
-                border:1px solid gray;
+
                 text-align:center;
-                padding: 0em;
+
             }
-            td {
+            td, th {
+                padding: 0.2em;
+                border:1px solid gray;
+            }
+
+            .seq td {
                 height: 2em;
                 width:1.5em;
-                background-color:
-                rgb(220,220,220);
+                background-color: rgb(220,220,220);
+                padding: 0em;
             }
             th { background-color: rgb(90, 190, 240); }
         </style>
@@ -179,7 +192,9 @@ def build_html_report(scored_data):
         %s
         <hr>
         <h2>Sorted Scores Results</h2>
+        <center>
         %s
+        </center>
         </body>
         </html>
     """ % (datetime.date.today(), seq_divs_html, table)
