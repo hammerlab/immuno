@@ -40,8 +40,10 @@ if __name__ == "__main__":
         action="store_true",
         help="Don't convert sample IDs from Entrez, they're already Hugo names")
     parser.add_argument(
-        "--reference",
-        help="Reference values for a variety of tissues")
+        "--normal",
+        default = None,
+        required=False,
+        help="Reference values for normal tissues mapping Entrez to RSEM")
     parser.add_argument(
         "--tissue",
         help="Which column to select from the reference")
@@ -67,43 +69,60 @@ if __name__ == "__main__":
     hugo_df = hugo_df.groupby("Hugo").mean().reset_index()
 
     group_rank_method = 'min'
-    normal_df = rnaseq_atlas.hugo_to_rank(group_rank_method)
 
+    if args.normal is None:
+        normal_df = rnaseq_atlas.hugo_to_rank(group_rank_method)
+        tissue_cols = rnaseq_atlas.TISSUE_COLUMNS
+    else:
+        normal_df = pd.read_csv(args.normal)
+        normal_df = hugo_mapping.merge(normal_df, on = "Entrez")
+        normal_df = normal_df.drop("Entrez", axis=1)
+        normal_df = normal_df.drop("RefSeq", axis=1)
+        tissue_cols = normal_df.columns[1:]
+        normal_df[tissue_cols] = \
+            normal_df[tissue_cols].rank(method = group_rank_method) - 1
+        normal_df[tissue_cols] /= len(normal_df)
     # result has a Hugo ID column, RSEM values,
     # and all the tissue-specific ranks from normal_df
     combined = hugo_df.merge(normal_df).set_index("Hugo")
 
     rsem_ranks = combined['RSEM'].rank(method = group_rank_method) - 1
+    combined = combined.drop("RSEM", axis=1)
     rsem_ranks /= len(rsem_ranks)
+    n = len(combined)
     counts = pd.DataFrame({
         "Hugo": combined.index,
-        "Up" : np.zeros(len(combined), dtype=float),
-        "Down" : np.zeros(len(combined), dtype=float),
-        "Diff" :  np.zeros(len(combined), dtype=float),
+        "Up" : np.zeros(n, dtype=float),
+        "Down" : np.zeros(n, dtype=float),
+        "PrctDiff" :  np.zeros(n, dtype=float),
     }).set_index("Hugo")
 
     p = args.percentile
     if p > 1.0:
         p /= 100.0
-    for tissue in rnaseq_atlas.TISSUE_COLUMNS:
+    for tissue in tissue_cols:
+
+        print tissue
+
         tissue_ranks = combined[tissue]
+
         normal_low = tissue_ranks < p
-        normal_high = tissue_ranks > 1.0 - p
+        normal_high = tissue_ranks > (1.0 - p)
 
         cancer_low = rsem_ranks < p
-        cancer_high = rsem_ranks > 1.0 - p
+        cancer_high = rsem_ranks > (1.0 - p)
 
         decrease = normal_high & cancer_low
         increase = normal_low & cancer_high
         counts.Up += increase
         counts.Down += decrease
+        counts.PrctDiff += (rsem_ranks - tissue_ranks)
 
-        counts.Diff += (rsem_ranks - tissue_ranks)
-
-    counts.Diff /= len(rnaseq_atlas.TISSUE_COLUMNS)
+    counts['CountDiff'] = counts.Up - counts.Down
+    counts.PrctDiff /= len(tissue_cols)
     k = 30
     print "Top %d over-expressed genes" % k
-    print counts.sort("Diff", ascending=False)[:k]
+    print counts.sort("PrctDiff", ascending=False)[:k]
 
     def tally(category, filename):
         with open(filename, 'r') as f:
@@ -113,7 +132,7 @@ if __name__ == "__main__":
         score = 0
         for gene in genes:
             row = counts.ix[counts.index == gene]
-            diff = float(row.Diff)
+            diff = float(row.PrctDiff)
             print "  - %s : %s" % (gene, diff)
             score += diff
         print "Mean: %s" % (score / len(genes))
