@@ -15,10 +15,11 @@
 
 import pandas as pd
 import epitopes
+
 from common import memoize
 
 ENTREZ_HUGO_URL = \
-"http://www.genenames.org/cgi-bin/download?col=gd_app_sym&col=gd_pub_eg_id&col=gd_pub_refseq_ids&status=Approved&status_opt=2&where=&order_by=gd_hgnc_id&format=text&limit=&hgnc_dbtag=on&submit=submit"
+"http://www.genenames.org/cgi-bin/download?col=gd_app_sym&col=gd_pub_eg_id&status=Approved&status_opt=2&where=&order_by=gd_hgnc_id&format=text&limit=&hgnc_dbtag=on&submit=submit"
 
 ENTREZ_HUGO_FILENAME = "entrez_huge_gene_mapping.txt"
 
@@ -33,7 +34,7 @@ def entrez_hugo_dataframe():
     df = pd.read_csv(
             path,
             sep='\t',
-            names=('Hugo', 'Entrez', 'RefSeq'),
+            names=('Hugo', 'Entrez'),
             header=0)
     return df
 

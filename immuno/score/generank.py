@@ -52,13 +52,18 @@ if __name__ == "__main__":
         help="Which rank percentile do we consider 'low'?",
         type = float,
         default = 0.25)
+    parser.add_argument(
+        "--compare-rsem",
+        default = False,
+        action = "store_true",
+        help = "Compare RSEM values directly instead of rank (default: False)")
 
     args = parser.parse_args()
 
     if not args.sample_uses_hugo_ids:
         entrez_df = pd.read_csv(args.sample, sep='\t', names=('Entrez', 'RSEM'))
 
-        # mapping from Entrez IDs to Hugo and RefSeq
+        # mapping from Entrez IDs to Hugo
         hugo_mapping = entrez.entrez_hugo_dataframe()
         # add Hugo column
         merged_df = entrez_df.merge(hugo_mapping, on='Entrez')
@@ -68,62 +73,84 @@ if __name__ == "__main__":
         hugo_df = pd.read_csv(args.sample, sep='\t', names=('Hugo', 'RSEM'))
     hugo_df = hugo_df.groupby("Hugo").mean().reset_index()
 
-    group_rank_method = 'min'
+    group_rank_method = 'average'
 
     if args.normal is None:
-        normal_df = rnaseq_atlas.hugo_to_rank(group_rank_method)
+        if args.compare_rsem:
+            normal_df = rnaseq_atlas.hugo_to_rpkm()
+        else:
+            normal_df = rnaseq_atlas.hugo_to_rank(group_rank_method)
         tissue_cols = rnaseq_atlas.TISSUE_COLUMNS
     else:
         normal_df = pd.read_csv(args.normal)
         normal_df = hugo_mapping.merge(normal_df, on = "Entrez")
         normal_df = normal_df.drop("Entrez", axis=1)
-        normal_df = normal_df.drop("RefSeq", axis=1)
         tissue_cols = normal_df.columns[1:]
-        normal_df[tissue_cols] = \
-            normal_df[tissue_cols].rank(method = group_rank_method) - 1
-        normal_df[tissue_cols] /= len(normal_df)
+
+        if not args.compare_rsem:
+            normal_df[tissue_cols] = \
+                normal_df[tissue_cols].rank(method = group_rank_method)
+            normal_df[tissue_cols] /= len(normal_df)
 
     # result has a Hugo ID column, RSEM values,
     # and all the tissue-specific ranks from normal_df
     combined = hugo_df.merge(normal_df).set_index("Hugo")
-    rsem_ranks = combined.pop('RSEM').rank(method = group_rank_method) - 1
+    rsem = combined.pop('RSEM')
+    if not args.compare_rsem:
+        rsem_ranks = rsem.rank(method = group_rank_method)
+        rsem_ranks /= len(rsem_ranks)
 
-    rsem_ranks /= len(rsem_ranks)
-    rsem_rank.sort()
     n = len(combined)
     counts = pd.DataFrame({
         "Hugo": combined.index,
         "Up" : np.zeros(n, dtype=float),
         "Down" : np.zeros(n, dtype=float),
-        "PrctDiff" :  np.zeros(n, dtype=float),
+        "Diff" :  np.zeros(n, dtype=float),
     }).set_index("Hugo")
 
-    p = args.percentile
-    if p > 1.0:
-        p /= 100.0
-    for tissue in tissue_cols:
+    if args.compare_rsem:
+        mean = combined[tissue_cols].mean(axis=1)
+        eps = 10.0 ** -10
+        std = combined[tissue_cols].std(axis=1)
+        zscore = (rsem - mean) / (std + eps)
+        counts['ZScore'] = zscore
+        for tissue in tissue_cols:
+            tissue_vals = combined[tissue]
 
-        print tissue
+            ratio = (rsem + eps) / (tissue_vals + eps)
+            logratio = np.log(ratio)
+            counts.Diff += logratio
+            counts.Up += logratio > 1
+            counts.Down += logratio < -1
+    else:
 
-        tissue_ranks = combined[tissue]
+        p = args.percentile
+        if p > 1.0: p /= 100.0
 
-        normal_low = tissue_ranks < p
-        normal_high = tissue_ranks > (1.0 - p)
+        for tissue in tissue_cols:
 
-        cancer_low = rsem_ranks < p
-        cancer_high = rsem_ranks > (1.0 - p)
+            tissue_ranks = combined[tissue]
 
-        decrease = normal_high & cancer_low
-        increase = normal_low & cancer_high
-        counts.Up += increase
-        counts.Down += decrease
-        counts.PrctDiff += (rsem_ranks - tissue_ranks)
+            normal_low = tissue_ranks < p
+            normal_high = tissue_ranks > (1.0 - p)
 
-    counts['CountDiff'] = counts.Up - counts.Down
-    counts.PrctDiff /= len(tissue_cols)
-    k = 30
+            cancer_low = rsem_ranks < p
+            cancer_high = rsem_ranks > (1.0 - p)
+
+            decrease = normal_high & cancer_low
+            increase = normal_low & cancer_high
+            counts.Up += increase
+            counts.Down += decrease
+            counts.Diff += (rsem_ranks - tissue_ranks)
+
+
+    counts.Diff /= len(tissue_cols)
+    k = 20
     print "Top %d over-expressed genes" % k
-    print counts.sort("PrctDiff", ascending=False)[:k]
+    print counts.sort("Diff", ascending=False)[:k]
+
+    print "Bottom %d under-expressed genes" % k
+    print counts.sort("Diff", ascending=True)[:k]
 
     def tally(category, filename):
         with open(filename, 'r') as f:
@@ -133,7 +160,7 @@ if __name__ == "__main__":
         score = 0
         for gene in genes:
             row = counts.ix[counts.index == gene]
-            diff = float(row.PrctDiff)
+            diff = float(row.Diff)
             print "  - %s : %s" % (gene, diff)
             score += diff
         print "Mean: %s" % (score / len(genes))

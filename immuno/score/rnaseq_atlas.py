@@ -83,14 +83,14 @@ def entrez_to_rpkm():
 def hugo_to_rank(group_rank_method='average'):
     df = hugo_to_rpkm()
     values = df[TISSUE_COLUMNS]
-    ranks = (values.rank(method=group_rank_method) - 1) / len(values)
+    ranks = values.rank(method=group_rank_method)  / len(values)
     df[TISSUE_COLUMNS] = ranks
     return df
 
 def entrez_to_rank(group_rank_method='average'):
     df = entrez_to_rpkm()
     values = df[TISSUE_COLUMNS]
-    ranks = (values.rank(method=group_rank_method) - 1) / len(values)
+    ranks = values.rank(method=group_rank_method) / len(values)
     df[TISSUE_COLUMNS] = ranks
     return df
 
