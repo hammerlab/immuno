@@ -17,14 +17,14 @@
 Prints ranks for immune-related genes in the given sample.
 """
 
-
-import csv
 import argparse
 
 import pandas as pd
 import numpy as np
+
 import entrez
 import rnaseq_atlas
+from load_rna_data import load_rsem
 
 
 if __name__ == "__main__":
@@ -61,18 +61,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if not args.sample_uses_hugo_ids:
-        entrez_df = pd.read_csv(args.sample, sep='\t', names=('Entrez', 'RSEM'))
-
-        # mapping from Entrez IDs to Hugo
-        hugo_mapping = entrez.entrez_hugo_dataframe()
-        # add Hugo column
-        merged_df = entrez_df.merge(hugo_mapping, on='Entrez')
-        # keep only the Hugo IDs and RSEM
-        hugo_df = merged_df[['Hugo', 'RSEM']]
+        hugo_df = load_rsem(args.sample, translate_entrez_ids = True)
     else:
-        hugo_df = pd.read_csv(args.sample, sep='\t', names=('Hugo', 'RSEM'))
-    hugo_df = hugo_df.groupby("Hugo").mean().reset_index()
-
+        hugo_df = load_rsem(args.sample, translate_entrez_ids = False)
     group_rank_method = 'average'
 
     if args.normal is None:
