@@ -81,6 +81,7 @@ def vcf_to_dataframe(vcf_filename):
 
 def peptides_from_vcf(input_file, length=31, log_filename = 'vcf_csv.log'):
     vcf_df = vcf_to_dataframe(input_file)
+    mask = vcf_df['qual']
     logging.info("Loaded VCF %s with %d entries", input_file, len(vcf_df))
     transcripts_df = annotation.annotate_vcf_transcripts(vcf_df)
     logging.info("Annotated VCF has %d entries", len(transcripts_df))
