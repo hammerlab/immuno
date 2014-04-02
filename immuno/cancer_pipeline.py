@@ -22,7 +22,6 @@ from Bio import SeqIO
 import numpy as np
 
 from common import peptide_substrings
-from pipeline import ImmunoPipeline
 from immunogenicity import ImmunogenicityRFModel
 from binding import IEDBMHCBinding
 

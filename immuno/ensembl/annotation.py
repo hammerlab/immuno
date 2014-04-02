@@ -14,12 +14,9 @@
 
 import logging
 
-import pandas as pd
 from annotation_data import EnsemblAnnotationData
 
 data = EnsemblAnnotationData()
-
-
 
 def get_exons_from_transcript(transcript_id):
     """

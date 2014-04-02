@@ -18,9 +18,6 @@ import logging
 import pandas as pd
 import numpy as np
 
-import epitopes.mutate as mutate
-
-from common import peptide_substrings
 from ensembl import annotation
 from ensembl.transcript_variant import peptide_from_transcript_variant
 
@@ -104,7 +101,7 @@ def peptides_from_vcf(
         rows = []
         if transcript_id:
             logging.info("Getting peptide from transcript ID %s", transcript_id)
-            full_peptide = \
+            full_peptide, mutation_start, mutation_stop = \
                 peptide_from_transcript_variant(
                     transcript_id, pos, ref, alt,
                     min_padding = length)
@@ -121,8 +118,8 @@ def peptides_from_vcf(
                 row['SourceSequence'] = full_peptide
                 # TODO: actually use the  position
                 # to compute the start/stop of the mutated region
-                row['MutationStart'] = 0
-                row['MutationEnd'] = len(full_peptide)
+                row['MutationStart'] = mutation_start
+                row['MutationEnd'] = mutation_stop
                 rows.append(row)
         new_df = pd.DataFrame.from_records(rows)
         return new_df
