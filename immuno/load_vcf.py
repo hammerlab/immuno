@@ -26,12 +26,11 @@ from ensembl.transcript_variant import peptide_from_transcript_variant
 
 
 def _shorten_chromosome_name(chr):
-    if chr.startswith('chr'):
-        chr = chr[-1]
-        if chr =='M':
-            return 'MT'
+    chr = chr.replace('chr', '')
+    if chr =='M':
+        return 'MT'
+    else:
         return chr
-    return chr
 
 def vcf_to_dataframe(vcf_filename):
     """
