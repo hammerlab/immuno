@@ -43,9 +43,10 @@ class IEDBMHCBinding(PipelineElement):
     }
     return params
 
-  def query_iedb(self, sequence):
+  def query_iedb(self, sequence, gene_info):
     request_values = self._get_iedb_request_params(sequence)
-    logging.info("Calling iedb with {}, {}".format(sequence, self._alleles))
+    logging.info("Calling iedb with {} {}, {}".format(
+        gene_info, sequence, self._alleles))
     try:
       data = urllib.urlencode(request_values)
       req = urllib2.Request(self._url, data)
@@ -70,9 +71,9 @@ class IEDBMHCBinding(PipelineElement):
     # take each mutated sequence in the dataframe
     # and general MHC binding scores for all k-mer substrings
     responses = {}
-    for peptide in data.SourceSequence:
+    for i, peptide in enumerate(data.SourceSequence):
         if peptide not in responses:
-            responses[peptide] = self.query_iedb(peptide)
+            responses[peptide] = self.query_iedb(peptide, data['info'][i])
         else:
             logging.info(
                 "Skipping binding for peptide %s, already queried",
