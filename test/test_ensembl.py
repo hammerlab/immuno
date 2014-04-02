@@ -14,6 +14,8 @@
 
 import immuno.ensembl.annotation as ensembl
 from immuno.ensembl.transcript_data import EnsemblReferenceData
+from epitopes.mutate import mutate_protein_from_transcript
+from Bio.Seq import Seq
 
 import pandas as pd
 
@@ -70,7 +72,7 @@ def test_get_gene_from_pos():
         'alt' : 'C'
     }
     vcf = pd.DataFrame.from_records([variant])
-    genes = ensembl.annotate_genes(vcf)
+    genes = ensembl.annotate_vcf_genes(vcf)
     assert( "ENSG00000168036" in set(genes['stable_id_gene']))
 
 def test_get_transcript_from_pos():
@@ -81,7 +83,7 @@ def test_get_transcript_from_pos():
         'alt' : 'C'
     }
     vcf = pd.DataFrame.from_records([variant])
-    transcripts_ids = ensembl.annotate_transcripts(vcf)
+    transcripts_ids = ensembl.annotate_vcf_transcripts(vcf)
     assert( "ENST00000453024" in set(transcripts_ids['stable_id_transcript']))
 
 def test_get_all_transcript_from_pos():
@@ -92,7 +94,7 @@ def test_get_all_transcript_from_pos():
         'alt' : 'A'
     }
     vcf = pd.DataFrame.from_records([variant])
-    transcripts_ids = ensembl.annotate_transcripts(vcf)
+    transcripts_ids = ensembl.annotate_vcf_transcripts(vcf)
     transcript_ids = set(transcripts_ids['stable_id_transcript'])
     assert( "ENST00000405570" in transcript_ids)
     assert( "ENST00000396183" in transcript_ids)
@@ -115,38 +117,55 @@ def test_get_transcript_index_from_pos():
     transcript = ref_data.get_cdna(transcript_id)
     assert(transcript[idx] == variant['ref'])
 
+def test_get_transcript_and_mutate_vcf():
+    variant = {
+        'chr' : '10',
+        'pos' : 43617416,
+        'ref' : 'T',
+        'alt' : 'C'
+    }
+
+    vcf = pd.DataFrame.from_records([variant])
+    transcripts_ids = ensembl.annotate_vcf_transcripts(vcf)
+
+    transcript_ids = set(transcripts_ids['stable_id_transcript'])
+    assert( "ENST00000355710" in transcript_ids)
+    assert( "ENST00000340058" in transcript_ids)
+
+    transcript_id = "ENST00000355710"
+    idx = ensembl.get_transcript_index_from_pos(variant['pos'], transcript_id)
+    transcript = ref_data.get_cdna(transcript_id)
+    assert(transcript[idx] == variant['ref'])
+
+    mutated, start, stop = mutate_protein_from_transcript(
+            transcript, idx, variant['ref'], variant['alt'], min_padding = 10, with_mutation_coordinates=True)
+    assert(str(mutated) == 'MDGN')
+
 def test_interval_search():
     intervals = [ (7,13), (17,19), (21, 24), (35, 45), (47, 50), (60, 70)]
     idx = ensembl.get_idx_from_interval(7, intervals)
-    #print idx
+    
     assert(idx == 0), idx
 
     idx = ensembl.get_idx_from_interval(13, intervals)
-    # print idx
     assert(idx == 6), idx
 
     idx = ensembl.get_idx_from_interval(14, intervals)
-    # print idx
     assert(idx is None), idx
 
     idx = ensembl.get_idx_from_interval(12, intervals)
-    # print idx
     assert(idx == 5), idx
 
     idx = ensembl.get_idx_from_interval(17, intervals)
-    # print idx
     assert(idx == 7), idx
 
     idx = ensembl.get_idx_from_interval(18, intervals)
-    # print idx
     assert(idx == 8), idx
 
     idx = ensembl.get_idx_from_interval(23, intervals)
-    # print idx
     assert(idx == 12), idx
 
     idx = ensembl.get_idx_from_interval(51, intervals)
-    # print idx
     assert(idx is None), idx
 
 

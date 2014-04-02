@@ -51,20 +51,21 @@ def peptide_from_transcript_variant(
     transcript = _ensembl.get_cdna(transcript_id)
     if not transcript:
         logging.warning("Couldn't find transcript for ID %s", transcript_id)
-        return None
+        return None, -1, -1
     idx = annotation.get_transcript_index_from_pos(pos, transcript_id)
     if idx is None:
         logging.warning(
             "Couldn't translate gene position %s into transcript index for %s",
             pos,
             transcript_id)
-        return None
+        return None, -1, -1
     try:
-        mutated = mutate_protein_from_transcript(
+        mutated, start, stop = mutate_protein_from_transcript(
             transcript, idx, ref, alt,
             max_length = max_length,
-            min_padding = min_padding)
-        return str(mutated)
+            min_padding = min_padding,
+            with_mutation_coordinates=True)
+        return str(mutated), start, stop
     except AssertionError, error:
         logging.warning(
             "Failed to mutate %s (ref %s, alt %s at position %s)",
@@ -72,4 +73,4 @@ def peptide_from_transcript_variant(
             ref,
             alt,
             pos)
-        return None
+        return None, -1, -1
