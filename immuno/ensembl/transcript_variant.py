@@ -48,7 +48,7 @@ def peptide_from_transcript_variant(
         transcript_id, pos, ref, alt,
         max_length = 500,
         min_padding=31):
-    transcript = _ensembl.get_cdna(transcript_id)
+    transcript = _ensembl.get_cds(transcript_id)
     if not transcript:
         logging.warning("Couldn't find transcript for ID %s", transcript_id)
         return None, -1, -1
