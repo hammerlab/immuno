@@ -12,13 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from os.path import join, exists
-from os import environ
+from os.path import exists
+
 import hashlib
 import base64
 import logging
 
-import appdirs
 import pandas as pd
 from epitopes.download import fetch_data, ensure_dir, build_path
 
@@ -73,6 +72,15 @@ TRANSCRIPT_DATA_URL = \
 EXON_TRANSCRIPT_DATA_URL = \
 "ftp://ftp.ensembl.org/pub/release-75/mysql/homo_sapiens_core_75_37/exon_transcript.txt.gz"
 
+TRANSLATION_HEADER = [
+    "translation_id", "transcript_id", "seq_start",
+    "start_exon_id", "seq_end", "end_exon_id",
+    "stable_id","version", "created_date", "modified_date"
+]
+
+TRANSLATION_DATA_URL = \
+"ftp://ftp.ensembl.org/pub/release-75/mysql/homo_sapiens_core_75_37/translation.txt.gz"
+
 def short_hash(s, n = 4):
     return base64.urlsafe_b64encode(hashlib.sha1(s).digest())[:n]
 
@@ -95,7 +103,8 @@ def download_transcript_metadata(filter_contigs = STANDARD_CONTIGS):
             GENE_DATA_URL,
             SEQ_REGION_DATA_URL,
             EXON_DATA_URL,
-            TRANSCRIPT_DATA_URL],
+            TRANSCRIPT_DATA_URL,
+            TRANSLATION_DATA_URL],
         ext = "tsv")
     full_path = build_path(output_filename, subdir = "immuno")
     logging.info("Transcript metadata path %s", full_path)
@@ -105,6 +114,7 @@ def download_transcript_metadata(filter_contigs = STANDARD_CONTIGS):
         SEQ_REGION_DATA_PATH = fetch_data('seq_region.txt', SEQ_REGION_DATA_URL)
         EXON_DATA_PATH = fetch_data('exon.txt', EXON_DATA_URL)
         TRANSCRIPT_DATA_PATH = fetch_data('transcript.txt', TRANSCRIPT_DATA_URL)
+        TRANSLATION_DATA_PATH = fetch_data('translation.txt', TRANSLATION_DATA_URL)
         EXON_TRANSCRIPT_DATA_PATH = \
             fetch_data('exon_transcript.txt', EXON_TRANSCRIPT_DATA_URL)
         seqregion = pd.read_csv(
@@ -130,6 +140,17 @@ def download_transcript_metadata(filter_contigs = STANDARD_CONTIGS):
             TRANSCRIPT_DATA_PATH, sep='\t',
             names = TRANSCRIPT_HEADER,
             index_col=False)
+
+        translation = pd.read_csv(
+            TRANSLATION_DATA_PATH, sep='\t',
+            names = TRANSLATION_HEADER,
+            index_col=False)
+
+        transcript = transcript.merge(
+                translation,
+                on='transcript_id',
+                suffixes = ['', '_translation'])
+
         gene_transcript = transcript.merge(
             seqregion_gene,
             on='gene_id',
@@ -166,6 +187,8 @@ def download_transcript_metadata(filter_contigs = STANDARD_CONTIGS):
             'stable_id_transcript',
             'seq_region_start_transcript',
             'seq_region_end_transcript',
+            'seq_start',
+            'stable_id_translation',
             'stable_id_exon',
             'seq_region_start_exon',
             'seq_region_end_exon']

@@ -38,6 +38,24 @@ def _build_cdna_db():
         value_column = 'seq',
         subdir = "immuno")
 
+CDS_TRANSCRIPT_URL = \
+'ftp://ftp.ensembl.org/pub/release-75/fasta/homo_sapiens/cds/Homo_sapiens.GRCh37.75.cds.all.fa.gz'
+
+CDS_TRANSCRIPT_FILE = 'Homo_sapiens.GRCh37.75.cds.all.fa'
+
+def _build_cds_db():
+    """
+    Download a FASTA file containing CDS sequences for each known transcript,
+    return sqlite3 database mapping ensembl transcript IDs to CDS sequences.
+    """
+    return fetch_fasta_db(
+        table_name = "CDS",
+        fasta_filename = CDS_TRANSCRIPT_FILE,
+        download_url = CDS_TRANSCRIPT_URL,
+        key_column = 'id',
+        value_column = 'seq',
+        subdir = "immuno")
+
 PROTEIN_TRANSCIPT_URL = \
 'ftp://ftp.ensembl.org/pub/release-75/fasta/homo_sapiens/pep/Homo_sapiens.GRCh37.75.pep.all.fa.gz'
 
@@ -81,6 +99,7 @@ class EnsemblReferenceData(object):
     """
     def __init__(self):
         self._cdna_db = None
+        self._cds_db = None
         self._protein_db = None
 
     def get_cdna(self, transcript_id):
@@ -88,6 +107,12 @@ class EnsemblReferenceData(object):
             self._cdna_db = _build_cdna_db()
         return _exec_transcript_query(
             self._cdna_db, "CDNA", transcript_id)
+
+    def get_cds(self, transcript_id):
+        if self._cds_db is None:
+            self._cds_db = _build_cds_db()
+        return _exec_transcript_query(
+            self._cds_db, "CDS", transcript_id)
 
     def get_protein(self, transcript_id):
         if self._protein_db is None:

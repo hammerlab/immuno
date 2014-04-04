@@ -134,12 +134,13 @@ def test_get_transcript_and_mutate_vcf():
 
     transcript_id = "ENST00000355710"
     idx = ensembl.get_transcript_index_from_pos(variant['pos'], transcript_id)
-    transcript = ref_data.get_cdna(transcript_id)
+    transcript = ref_data.get_cds(transcript_id)
     assert(transcript[idx] == variant['ref'])
 
     mutated, start, stop = mutate_protein_from_transcript(
             transcript, idx, variant['ref'], variant['alt'], min_padding = 10, with_mutation_coordinates=True)
-    assert(str(mutated) == 'MDGN')
+    
+    assert(str(mutated) == 'RSQGRIPVKWTAIESLFDHIY')
 
 def test_interval_search():
     intervals = [ (7,13), (17,19), (21, 24), (35, 45), (47, 50), (60, 70)]
