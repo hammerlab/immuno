@@ -76,11 +76,41 @@ def vcf_to_dataframe(vcf_filename):
     return df
 
 def peptides_from_vcf(
-        input_file,
-        length=31,
+        input_filename,
+        peptide_length=31,
         drop_low_quality = True,
         log_filename = 'vcf_csv.log'):
-    vcf_df = vcf_to_dataframe(input_file)
+    """
+    Parameters
+    --------
+
+    input_filename : str
+        Path to VCF file
+
+    peptide_length : int
+        How long will the vaccine peptides be? Used to determine
+        required padding.
+
+    drop_low_quality : bool, optional
+        Keep variants whose 'QUAL' columns doesn't say 'PASS' or '.'
+
+    log_filename : str, optional
+        Where should we log the parsed VCF dataframe?
+
+    Returns a dataframe with columns:
+        - chr : chomosome
+        - pos : position in the chromosome
+        - ref : reference DNA
+        - alt : alternate DNA
+        - info : gene name and entrez gene ID
+        - stable_id_transcript : Ensembl transcript ID
+        - SourceSequence : region of protein around mutation
+        - MutationStart : first amino acid modified
+        - MutationEnd : last mutated amino acid
+        - MutationInfo : annotation i.e. V600E
+
+    """
+    vcf_df = vcf_to_dataframe(input_filename)
 
     # drop variants marked as low quality
     if drop_low_quality:
@@ -101,25 +131,25 @@ def peptides_from_vcf(
         rows = []
         if transcript_id:
             logging.info("Getting peptide from transcript ID %s", transcript_id)
-            full_peptide, mutation_start, mutation_stop = \
-                peptide_from_transcript_variant(
-                    transcript_id, pos, ref, alt,
-                    min_padding = length)
+            region = peptide_from_transcript_variant(
+                transcript_id, pos, ref, alt,
+                min_padding = length)
 
-
-        if full_peptide:
-            if '*' in full_peptide:
+        if region and region.seq:
+            if '*' in region.seq:
                 logging.warning(
                     "Found stop codon in peptide %s from transcript_id %s",
-                    full_peptide,
+                    region.seq,
                     transcript_id)
             else:
                 row = deepcopy(row)
-                row['SourceSequence'] = full_peptide
+                row['SourceSequence'] = region.seq
                 # TODO: actually use the  position
                 # to compute the start/stop of the mutated region
-                row['MutationStart'] = mutation_start
-                row['MutationEnd'] = mutation_stop
+                row['MutationStart'] = region.mutation_start
+                row['MutationEnd'] = \
+                    region.mutation_start + region.number_mutated_residues
+                row['MutationInfo'] = region.annot
                 rows.append(row)
         new_df = pd.DataFrame.from_records(rows)
         return new_df
