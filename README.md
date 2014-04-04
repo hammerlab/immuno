@@ -3,9 +3,11 @@
 ### Usage
 First you'll have to setup the epitopes package.  You can download that here: https://github.com/hammerlab/epitopes
 
+```sh
 git clone https://github.com/hammerlab/epitopes.git
 cd epitopes
 python setup.py install
+```
 
 #### From peptide string
 ```sh
