@@ -1,35 +1,38 @@
+# Copyright (c) 2014. Mount Sinai School of Medicine
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import datetime
 import numpy as np
 
-def build_html_report(scored_data):
-    scored_data = scored_data.sort(columns=('combined_score',), ascending=False)
-    table = scored_data.to_html(
-        index=False,
-        na_rep="-",
-        columns = [
-            'SourceSequence', 'info', 'ref', 'alt', 'pos',
-            'Epitope', 'EpitopeStart', 'EpitopeEnd',
-            'percentile_rank',
-            'ann_rank',
-            'ann_ic50',
-            'immunogenicity',
-            'mhc_score', 'imm_score',
-            'combined_score'
-        ])
+def build_html_report(scored_epitopes, scored_peptides):
+    scored_epitopes = scored_epitopes.sort(columns=('combined_score',), ascending=False)
+
 
     # take each source sequence and shade its amino acid letters
     # based on the average score of each epitope containing that letter
     seq_divs = []
     seq_scores = []
 
-    for seq in scored_data.SourceSequence.unique():
+    for seq, rows in scored_epitopes.groupby("SourceSequence"):
+
         scores = np.zeros(len(seq), dtype=float)
         imm_scores = np.zeros(len(seq), dtype=float)
         mhc_scores = np.zeros(len(seq), dtype=float)
         score_counts = np.ones(len(seq), dtype=int)
-        rowslice = scored_data[scored_data.SourceSequence == seq]
+        rowslice = scored_epitopes[scored_epitopes.SourceSequence == seq]
         gene_info = None
-        for _, row in rowslice.iterrows():
+        for seq, row in rowslice.iterrows():
             gene_info = row['info']
             start = int(row['EpitopeStart'] - 1)
             assert start >= 0, start
@@ -117,6 +120,19 @@ def build_html_report(scored_data):
     seq_order = reversed(np.argsort(seq_scores))
     seq_divs_html = "\n".join(seq_divs[i] for i in seq_order)
 
+    epitope_table = scored_epitopes.to_html(
+        index=False,
+        na_rep="-",
+        columns = [
+            'Epitope',
+            'info', 'stable_id_transcript', 'ref', 'alt',  'chr', 'pos',
+            'percentile_rank',
+            'ann_rank',
+            'ann_ic50',
+            'immunogenicity',
+            'mhc_score', 'imm_score',
+            'combined_score'
+        ])
     page = """
         <html>
         <style>
@@ -152,5 +168,5 @@ def build_html_report(scored_data):
         </center>
         </body>
         </html>
-    """ % (datetime.date.today(), seq_divs_html, table)
+    """ % (datetime.date.today(), seq_divs_html,  epitope_table)
     return page
