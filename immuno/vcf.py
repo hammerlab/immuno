@@ -18,8 +18,8 @@ import logging
 import pandas as pd
 import numpy as np
 
-from ..ensembl import annotation
-from ..ensembl.transcript_variant import peptide_from_transcript_variant
+from ensembl import annotation
+from ensembl.transcript_variant import peptide_from_transcript_variant
 
 
 def _shorten_chromosome_name(chr):
@@ -155,9 +155,9 @@ def load_vcf(
     transcripts_df = transcripts_df.merge(peptides)
     logging.info("Generated %d peptides from %s",
         len(transcripts_df), input_file)
+
     # drop verbose or uninteresting columns from VCF
     for dumb_field in ('description_gene', 'filter', 'qual', 'id', 'name'):
-
         if dumb_field in transcripts_df.columns:
             transcripts_df = transcripts_df.drop(dumb_field, axis = 1)
     if log_filename:

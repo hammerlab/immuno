@@ -15,9 +15,69 @@
 import datetime
 import numpy as np
 
-def build_html_report(scored_epitopes, scored_peptides):
-    scored_epitopes = scored_epitopes.sort(columns=('combined_score',), ascending=False)
+page_template = \
+"""
+<html>
+<style>
+    body { padding: 2em; font-family: sans-serif; }
+    table { padding: 0em; border: 0px solid black; }
+    table, td, th
+    {
 
+        text-align:center;
+
+    }
+    td, th {
+        padding: 0.2em;
+        border:1px solid gray;
+    }
+
+    .seq td {
+        height: 2em;
+        width:1.5em;
+        background-color: rgb(220,220,220);
+        padding: 0em;
+    }
+    th { background-color: rgb(90, 190, 240); }
+</style>
+<head><title>Immune Pipeline Results (%s)</title></head>
+<body>
+<h2>Mutation Regions</h2>
+%s
+<hr>
+<h2>Sorted Scores Results</h2>
+<center>
+%s
+</center>
+</body>
+</html>
+"""
+
+table_template = \
+"""
+<table>
+<center>
+<tr>
+<td style='background-color: rgb(190,190,190);'>Sequence</td>
+%s
+</tr>
+<tr>
+
+<td style='background-color: rgb(190,190,190);'>MHC Binding</td>
+%s
+</tr>
+<tr>
+
+<td style='background-color: rgb(190,190,190);'>Immunogenicity</td>
+%s
+</tr>
+</center>
+</table>
+"""
+
+def build_html_report(scored_epitopes, scored_peptides):
+    scored_epitopes = scored_epitopes.sort(
+        columns=('combined_score',), ascending=False)
 
     # take each source sequence and shade its amino acid letters
     # based on the average score of each epitope containing that letter
@@ -83,27 +143,7 @@ def build_html_report(scored_epitopes, scored_peptides):
         mhc_color_cols = '\n\t'.join(mhc_colors)
         imm_color_cols = '\n\t'.join(imm_colors)
         colored_letters_table = \
-            """
-
-            <table>
-            <center>
-            <tr>
-            <td style='background-color: rgb(190,190,190);'>Sequence</td>
-            %s
-            </tr>
-            <tr>
-
-            <td style='background-color: rgb(190,190,190);'>MHC Binding</td>
-            %s
-            </tr>
-            <tr>
-
-            <td style='background-color: rgb(190,190,190);'>Immunogenicity</td>
-            %s
-            </tr>
-            </center>
-            </table>
-            """ % (letters_cols, mhc_color_cols, imm_color_cols)
+            table_template % (letters_cols, mhc_color_cols, imm_color_cols)
 
         div = """
             <div
@@ -133,40 +173,6 @@ def build_html_report(scored_epitopes, scored_peptides):
             'mhc_score', 'imm_score',
             'combined_score'
         ])
-    page = """
-        <html>
-        <style>
-            body { padding: 2em; font-family: sans-serif; }
-            table { padding: 0em; border: 0px solid black; }
-            table, td, th
-            {
-
-                text-align:center;
-
-            }
-            td, th {
-                padding: 0.2em;
-                border:1px solid gray;
-            }
-
-            .seq td {
-                height: 2em;
-                width:1.5em;
-                background-color: rgb(220,220,220);
-                padding: 0em;
-            }
-            th { background-color: rgb(90, 190, 240); }
-        </style>
-        <head><title>Immune Pipeline Results (%s)</title></head>
-        <body>
-        <h2>Mutation Regions</h2>
-        %s
-        <hr>
-        <h2>Sorted Scores Results</h2>
-        <center>
-        %s
-        </center>
-        </body>
-        </html>
-    """ % (datetime.date.today(), seq_divs_html,  epitope_table)
+    page = page_template % \
+        (datetime.date.today(), seq_divs_html,  epitope_table)
     return page

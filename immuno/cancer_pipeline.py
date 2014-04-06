@@ -25,7 +25,8 @@ from common import peptide_substrings
 from immunogenicity import ImmunogenicityRFModel
 from binding import IEDBMHCBinding
 
-from input_sources import load_file, load_strings
+from load_file import load_file
+from strings import load_comma_string
 
 from report import build_html_report
 
@@ -66,8 +67,7 @@ if __name__ == '__main__':
     mutated_region_dfs = []
 
     if args.string:
-        mutated_region_dfs.extend(parse_commandline_peptides(args.string))
-
+        df = load_comma_string(args.string)
         mutated_region_dfs.append(df)
 
 
@@ -75,8 +75,7 @@ if __name__ == '__main__':
     # load each one into a dataframe
 
     for input_filename in args.input:
-        mutated_region_dfs.append(df)
-
+        mutated_region_dfs.append(load_file(input_filename))
 
     if len(mutated_region_dfs) == 0:
         parser.print_help()

@@ -20,7 +20,7 @@ import gzip, logging, argparse, glob, re, pickle
 import pandas
 import Bio.SeqIO
 
-from .. import common
+import common
 
 def refseq_id_to_sequence(refseq_filenames):
   result = {}
@@ -43,14 +43,14 @@ def refseq_id_to_sequence(refseq_filenames):
   logging.info("loaded %d refseq sequences from %d files", len(result), len(refseq_filenames))
   return result
 
-def open_maf(filename):
-  print filename
+def parse_maf(filename):
   logging.info("Opening %s" % filename)
   with open(filename) as fd:
     lines_to_skip = 0
     while next(fd).startswith('#'):
         lines_to_skip += 1
-  return pandas.read_csv(filename, skiprows=lines_to_skip, sep="\t", low_memory=False)
+  return pandas.read_csv(
+    filename, skiprows=lines_to_skip, sep="\t", low_memory=False)
 
 SINGLE_AMINO_ACID_SUBSTITUTION = "p.([A-Z])([0-9]+)([A-Z])"
 DELETION = "p.([A-Z])([0-9]+)del"
@@ -131,8 +131,8 @@ def extract(maf_df, refseq_map, epitope_max_length):
     return pandas.DataFrame(result, columns = new_cols)
 
 
-def peptides_from_maf(
-        maf_files,
+def load_maf(
+        maf_filename,
         refseq_dir=['data/refseq'],
         epitope_max_length=31,
         nrows = None):
@@ -141,11 +141,6 @@ def peptides_from_maf(
         refseq_filenames.extend(glob.glob("%s/*" % dir))
     refseq_map = refseq_id_to_sequence(refseq_filenames)
     result_dfs = []
-    for (maf_num, maf_filename) in enumerate(maf_files):
-        df = open_maf(maf_filename)
-        result_df = extract(df, refseq_map, epitope_max_length)
-        result_df['MAF Num'] = maf_num
-        result_dfs.append(result_df)
-    result_df = pandas.concat(result_dfs)
-    return result_df[:nrows]
+    raw_df = parse_maf(maf_filename)
+    return extract(raw_df, refseq_map, epitope_max_length)
 
