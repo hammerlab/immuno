@@ -24,10 +24,9 @@ import numpy as np
 from common import peptide_substrings
 from immunogenicity import ImmunogenicityRFModel
 from binding import IEDBMHCBinding
-
 from load_file import load_file
 from strings import load_comma_string
-
+from vaccine_peptides import build_peptides_dataframe
 from report import build_html_report
 
 
@@ -82,7 +81,8 @@ if __name__ == '__main__':
         print("\nERROR: Must supply at least --string or --input")
         sys.exit()
     mutated_regions = pd.concat(mutated_region_dfs)
-
+    print(mutated_regions.columns)
+    #assert False
     # get rid of gene descriptions if they're in the dataframe
     if args.allele_file:
         alleles = [l.strip() for l in open(args.allele_file)]
@@ -92,42 +92,44 @@ if __name__ == '__main__':
         alleles = [DEFAULT_ALLELE]
 
     mhc = IEDBMHCBinding(name = 'mhc', alleles=alleles)
-    mhc_data = mhc.apply(mutated_regions)
-
+    mhc_epitopes_data = mhc.apply(mutated_regions)
+    print("MHC", mhc_epitopes_data.columns)
     immunogenicity = ImmunogenicityRFModel(name = 'immunogenicity')
-    scored_data = immunogenicity.apply(mhc_data)
-
+    scored_epitopes = immunogenicity.apply(mhc_epitopes_data)
+    print("IMM", scored_epitopes.columns)
 
     # IEDB returns a noisy column with 'method' descriptions, drop it
-    if 'method' in scored_data.columns:
-        scored_data = scored_data.drop('method', axis = 1)
+    if 'method' in scored_epitopes.columns:
+        scored_epitopes = scored_epitopes.drop('method', axis = 1)
 
     # strong binders are considered percentile_rank < 2.0
-    mhc_percentile = scored_data['percentile_rank']
+    mhc_percentile = scored_epitopes['percentile_rank']
     # rescale [0,2] -> [0,1]
     mhc_score = mhc_percentile / 2
     # treat anything at percentile above 2 as just as bad as 2
     mhc_score[mhc_score > 1] = 1
     # lower percentiles are stronger binders
     mhc_score = 1.0 - mhc_score
-    scored_data['mhc_score'] = mhc_score
+    scored_epitopes['mhc_score'] = mhc_score
 
     # rescale immune score so anything less than 0.5 is 0
-    imm_score = scored_data['immunogenicity']
+    imm_score = scored_epitopes['immunogenicity']
     imm_score -= 0.5
     imm_score *= 2
     imm_score[imm_score < 0] = 0
-    scored_data['imm_score'] = imm_score
+    scored_epitopes['imm_score'] = imm_score
 
-    scored_data['combined_score']= (mhc_score + imm_score) / 2.0
+    scored_epitopes['combined_score']= (mhc_score + imm_score) / 2.0
 
-    scored_data = scored_data.sort(columns=('combined_score',))
+    scored_epitopes = scored_epitopes.sort(columns=('combined_score',))
     if args.output:
-        scored_data.to_csv(args.output, index=False)
+        scored_epitopes.to_csv(args.output, index=False)
     else:
-        print(scored_data.to_string())
-
-    html = build_html_report(scored_data)
+        print(scored_epitopes.to_string())
+    scored_peptides = build_peptides_dataframe(scored_epitopes,
+        peptide_length = peptide_length)
+    print (scored_peptides)
+    html = build_html_report(scored_epitopes, scored_peptides)
     with open('results.html', 'w') as f:
         f.write(html)
 

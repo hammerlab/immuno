@@ -84,20 +84,33 @@ def build_html_report(scored_epitopes, scored_peptides):
     seq_divs = []
     seq_scores = []
 
-    for seq, rows in scored_epitopes.groupby("SourceSequence"):
+    group_cols = ["Peptide", "PeptideStart", "PeptideEnd", "SourceSequence"]
+    for (peptide, peptide_start, peptide_end, src_seq), rows in\
+            scored_peptides.groupby(group_cols):
+        n = len(peptide)
+        scores = np.zeros(n, dtype=float)
+        imm_scores = np.zeros(n, dtype=float)
+        mhc_scores = np.zeros(n, dtype=float)
+        score_counts = np.ones(n, dtype=int)
 
-        scores = np.zeros(len(seq), dtype=float)
-        imm_scores = np.zeros(len(seq), dtype=float)
-        mhc_scores = np.zeros(len(seq), dtype=float)
-        score_counts = np.ones(len(seq), dtype=int)
-        rowslice = scored_epitopes[scored_epitopes.SourceSequence == seq]
+        mask = (scored_epitopes.SourceSequence == src_seq)
+        mask &= scored_epitopes.EpitopeStart >= peptide_start
+        mask &= scored_epitopes.EpitopeEnd <= peptide_end
+
+        rowslice = scored_epitopes[mask]
         gene_info = None
         for seq, row in rowslice.iterrows():
             gene_info = row['info']
-            start = int(row['EpitopeStart'] - 1)
-            assert start >= 0, start
-            stop = int(row['EpitopeEnd'])
-            assert stop > start, stop
+            epitope_start = int(row['EpitopeStart'] - 1)
+            assert epitope_start >= 0, epitope_start
+            assert epitope_start >= peptide_start, epitope_start
+            epitope_end = int(row['EpitopeEnd'])
+            assert epitope_end > epitope_start, epitope_end
+            assert epitope_end <= peptide_end, epitope_end
+
+            start = epitope_start - peptide_start
+            stop = epitope_end - peptide_end
+
             scores[start:stop] += row['combined_score']
             imm_scores[start:stop] += row['immunogenicity']
             mhc_scores[start:stop] += (100 - row['percentile_rank']) / 100.0
@@ -112,8 +125,8 @@ def build_html_report(scored_epitopes, scored_peptides):
         scores /= score_counts
         imm_scores /= score_counts
         mhc_scores /= score_counts
-        for i in xrange(len(seq)):
-            letter = seq[i]
+        for i in xrange(n):
+            letter = peptide[i]
             score = scores[i]
             letter_td = "<td>%s</td>" % letter
             letters.append(letter_td)

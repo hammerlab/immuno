@@ -46,20 +46,25 @@ def parse_string(string):
 
 def load_strings(strings, source = 'commandline'):
     # allow multiple strings to be specified in comma-separated list
-    starts = []
-    stops = []
-    full_peptides = []
+
+    rows = []
     for string in strings:
         full_peptide, start, stop = parse_string(string)
-        full_peptides.append(full_peptide)
-        starts = starts.append(start)
-        stops.append(stop)
-    return pd.DataFrame({
-        'SourceSequence': full_peptides,
-        'MutationStart' : starts,
-        'MutationEnd' : stops,
-        'info' : [source] * len(full_peptides),
-    })
+        row = {}
+        row['SourceSequence'] = full_peptide
+        row['MutationStart'] = start
+        row['MutationEnd'] = stop
+        row['info'] = source
+        row['MutationInfo'] = "-"
+        rows.append(row)
+    return pd.DataFrame.from_records(rows,
+        columns = (
+            'SourceSequence',
+            'MutationStart',
+            'MutationEnd',
+            'info',
+            'MutationInfo'
+        ))
 
 def load_comma_string(s, source = 'commandline'):
     return load_strings(s.split(","), source = source)

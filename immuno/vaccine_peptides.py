@@ -14,6 +14,7 @@
 
 import logging
 
+import pandas as pd
 
 def build_peptides_dataframe(
         epitopes_df,
@@ -52,10 +53,12 @@ def build_peptides_dataframe(
         Omitting min_peptide_length sets it equal to peptide_length.
 
     Returns a new dataframe with columns:
-        - 'Peptide': longer amino acid sequence composed of multiple epitopes
+        - 'Peptide':  amino acid sequence composed of multiple epitopes
+        - 'SourceSequence' : longer amino acid sequence from which
+            peptide was extracted
         - 'MutatedScore' : median score of epitopes with mutations
         - 'SelfScore' : median score of epitopes without mutations
-        - 'Score' : 'MutatedScore' - 'SelfScore'
+        - 'Score' : log2(MutatedScore / SelfScore) if SelfScore > 0, else -inf
         - 'MutationStart' : first mutated reside in the peptide
         - 'MutationEnd' : last mutated residue in the peptide
         - 'chr': chromosome of original DNA variant
@@ -69,15 +72,33 @@ def build_peptides_dataframe(
         min_peptide_length = peptide_length
 
     group_cols = [
-        'SourceSequence', 'MutationStart', 'MutationEnd',
-        'chr', 'pos', 'ref', 'alt', 'info', 'stable_id_transcript']
-    for (seq, mut_start, mut_stop, chr, pos, ref, alt, info, t_id), rows \
-    in epitopes_df.groupby(cols):
-        peptides = []
-        mut_scores = []
-        self_scores = []
-        mut_starts = []
-        mut_ends = []
+        'SourceSequence',
+        'MutationStart',
+        'MutationEnd',
+        'MutationInfo',
+        'info']
+
+
+    # if we loaded from VCF, these extra fields will be available:
+    optional_cols = [
+        'chr', 'pos', 'ref', 'alt', 'info', 'stable_id_transcript'
+    ]
+
+    records = []
+    print epitopes_df
+    for (seq, mut_start, mut_stop, mut_info, info), rows in\
+            epitopes_df.groupby(group_cols):
+        first_row = rows.irow(0)
+
+        # common properties that all the peptides we extract from
+        # SourceSequence share
+        base_record = {
+            'SourceSequence' : seq,
+            'MutationInfo' : mut_info,
+        }
+        for optional_field in optional_cols:
+            if optional_field in first_row:
+                base_record[optional_field] = first_row[optional_field]
 
         n = len(seq)
         if n >= peptide_length:
@@ -86,9 +107,10 @@ def build_peptides_dataframe(
             window_size = min(n, min_peptide_length)
         else:
             logging.info("Skipping source sequence %s from %s, shorter than %d",
-                seq, min_peptide_length)
+                seq, info, min_peptide_length)
             continue
         for i in xrange(n + 1 - window_size):
+
             peptide_start = i
             peptide_end = i + window_size
             peptide = seq[peptide_start : peptide_end]
@@ -100,13 +122,21 @@ def build_peptides_dataframe(
             # if mutation isn't in the peptide, skip it
             if peptide_mut_start >= window_size or peptide_mut_end <= 0:
                 logging.info(
-                    "Skipping self peptide %s from %s(transcript %s)[%d:%d]",
+                    "Skipping self peptide %s from %s [%d:%d]",
                     peptide,
                     info,
-                    t_id,
                     peptide_start,
                     peptide_end)
                 continue
+
+            # copy fields of this record so we can add it to the data frame
+            row = dict(base_row)
+            row['Peptide'] = peptide
+            row['PeptideStart'] = peptide_start
+            row['PeptideEnd'] = peptide_end
+            row['PeptideMutationStart'] = peptide_mut_start
+            row['PeptideMutationEnd'] = peptide_mut_end
+
 
             # To clarify the nomenclature (source seq vs. peptide vs. epitope)
             # look at this example.
@@ -158,6 +188,7 @@ def build_peptides_dataframe(
 
             mutated_epitopes = df[mutated_epitope_mask]
             mutated_epitope_score = mutated_epitopes['combined_score'].median()
+            row['MutatedScore'] = mutated_epitope_score
 
             # self epitopes are those that overlap with the peptide but not
             # with the mutated epitopes
@@ -169,14 +200,14 @@ def build_peptides_dataframe(
 
             self_epitopes = df[self_epitope_mask]
             self_epitope_score = self_epitopes['combined_score'].median()
-
-            peptides.append(peptide)
-
-            mut_scores.append(mutated_epitope_score)
-            self_scores.append(self_epitope_score)
-            mut_starts.append(peptide_mut_start)
-            mut_ends.append(peptide_mut_start)
-
+            row['SelfScore'] = self_epitope_score
+            if self_epitope_score > 0:
+                score = np.log2(mutated_epitope_score / self_epitope_score)
+            else:
+                score = -np.inf
+            row['Score'] = score
+            rows.append(row)
+    return pd.DataFrame.from_records(rows)
 
 
 
