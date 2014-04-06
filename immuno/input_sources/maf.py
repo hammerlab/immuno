@@ -20,7 +20,7 @@ import gzip, logging, argparse, glob, re, pickle
 import pandas
 import Bio.SeqIO
 
-import common
+from .. import common
 
 def refseq_id_to_sequence(refseq_filenames):
   result = {}

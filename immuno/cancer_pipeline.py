@@ -25,14 +25,9 @@ from common import peptide_substrings
 from immunogenicity import ImmunogenicityRFModel
 from binding import IEDBMHCBinding
 
-from load_maf import peptides_from_maf
-from load_vcf import peptides_from_vcf
-from load_snpeff import peptides_from_snpeff
-from load_fasta import peptides_from_fasta
+from input_sources import load_file, load_strings
 
 from report import build_html_report
-
-
 
 
 DEFAULT_ALLELE = 'HLA-A*02:01'
@@ -62,44 +57,17 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+
+    peptide_length = int(args.peptide_length)
+
     # stack up the dataframes and later concatenate in case we
     # want both commandline strings (for weird mutations like translocations)
     # and files
     mutated_region_dfs = []
 
     if args.string:
-        # allow multiple strings to be specified in comma-separated list
-        starts = []
-        stops = []
-        full_peptides = []
-        for string in args.string.split(","):
-            full_peptide = string.upper().strip()
-            # allow the user to specify mutated region of the amino acid
-            # string QLSQ_Y_QQ (the full peptide is QLSQYQQ and Y is mutated)
-            parts = full_peptide.split("_")
-            if len(parts) == 1:
-                full_peptide = parts[0]
-                start = 0
-                stop = len(full_peptide)
-            elif len(parts) == 2:
-                full_peptide = parts[0] + parts[1]
-                start = len(parts[0])
-                stop = len(full_peptide)
-            else:
-                assert len(parts) == 3, \
-                    "Can't parse peptide string %s" % full_peptide
-                full_peptide = parts[0] + parts[1] + parts[2]
-                start = len(parts[0])
-                stop = start + len(parts[1])
-            full_peptides.append(full_peptide)
-            starts = starts.append(start)
-            stops.append(stop)
-        df = pd.DataFrame({
-            'SourceSequence': full_peptides,
-            'MutationStart' : starts,
-            'MutationEnd' : stops,
-            'info' : ['commandline'] * len(full_peptides),
-        })
+        mutated_region_dfs.extend(parse_commandline_peptides(args.string))
+
         mutated_region_dfs.append(df)
 
 
@@ -107,17 +75,6 @@ if __name__ == '__main__':
     # load each one into a dataframe
 
     for input_filename in args.input:
-        if input_filename.endswith("eff.vcf"):
-            df = peptides_from_snpeff(input_filename)
-        if input_filename.endswith(".vcf"):
-            df = peptides_from_vcf(input_filename)
-        elif input_filename.endswith(".maf"):
-            df = peptides_from_maf(input_filename)
-        elif input_filename.endswith(".fasta") \
-                or input_filename.endswith(".fa"):
-            df = peptides_from_fasta(input_filename)
-        else:
-            assert False, "Unrecognized file type %s" % input_filename
         mutated_region_dfs.append(df)
 
 
@@ -126,9 +83,6 @@ if __name__ == '__main__':
         print("\nERROR: Must supply at least --string or --input")
         sys.exit()
     mutated_regions = pd.concat(mutated_region_dfs)
-
-    peptide_length = int(args.peptide_length)
-    # peptides = peptide_substrings(full_peptide, peptide_length)
 
     # get rid of gene descriptions if they're in the dataframe
     if args.allele_file:

@@ -18,8 +18,8 @@ import logging
 import pandas as pd
 import numpy as np
 
-from ensembl import annotation
-from ensembl.transcript_variant import peptide_from_transcript_variant
+from ..ensembl import annotation
+from ..ensembl.transcript_variant import peptide_from_transcript_variant
 
 
 def _shorten_chromosome_name(chr):
@@ -29,7 +29,7 @@ def _shorten_chromosome_name(chr):
     else:
         return chr
 
-def vcf_to_dataframe(vcf_filename):
+def parse_vcf(vcf_filename):
     """
     Transforms a VCF file to a Pandas Dataframe
 
@@ -75,7 +75,7 @@ def vcf_to_dataframe(vcf_filename):
     df['chr'] = df.chr.map(_shorten_chromosome_name)
     return df
 
-def peptides_from_vcf(
+def load_vcf(
         input_filename,
         peptide_length=31,
         drop_low_quality = True,
@@ -110,7 +110,7 @@ def peptides_from_vcf(
         - MutationInfo : annotation i.e. V600E
 
     """
-    vcf_df = vcf_to_dataframe(input_filename)
+    vcf_df = parse_vcf(input_filename)
 
     # drop variants marked as low quality
     if drop_low_quality:
@@ -119,21 +119,21 @@ def peptides_from_vcf(
         vcf_df = vcf_df[mask]
 
     logging.info("Loaded VCF %s with %d entries", input_file, len(vcf_df))
-    transcripts_df = annotation.annotate_vcf_transcripts(vcf_df)
-    logging.info("Annotated VCF has %d entries", len(transcripts_df))
-    def peptides_from_annotation(group):
-        row = group.irow(0)
 
-        transcript_id = row['stable_id_transcript']
-        pos = row['pos']
-        ref = row['ref']
-        alt = row['alt']
-        rows = []
+    transcripts_df = annotation.annotate_vcf_transcripts(vcf_df)
+
+    logging.info("Annotated VCF has %d entries", len(transcripts_df))
+
+    new_rows = []
+    group_cols = ['chr','pos', 'ref', 'alt', 'stable_id_transcript']
+    for (_, pos, ref, alt, transcript_id), group in \
+            transcripts_df.groupby(group_cols):
+        row = group.irow(0)
         if transcript_id:
             logging.info("Getting peptide from transcript ID %s", transcript_id)
             region = peptide_from_transcript_variant(
                 transcript_id, pos, ref, alt,
-                min_padding = length)
+                padding = length / 2 + 1)
 
         if region and region.seq:
             if '*' in region.seq:
@@ -147,15 +147,11 @@ def peptides_from_vcf(
                 # TODO: actually use the  position
                 # to compute the start/stop of the mutated region
                 row['MutationStart'] = region.mutation_start
-                row['MutationEnd'] = \
-                    region.mutation_start + region.number_mutated_residues
+                row['MutationEnd'] = region.mutation_start + region.n_inserted
                 row['MutationInfo'] = region.annot
-                rows.append(row)
-        new_df = pd.DataFrame.from_records(rows)
-        return new_df
-    cols = ['chr','pos', 'ref', 'alt']
-    variants = transcripts_df.groupby(cols, group_keys=False)
-    peptides = variants.apply(peptides_from_annotation)
+                new_rows.append(row)
+    peptides = pd.DataFrame.from_records(new_rows)
+    # peptides = variants.apply(peptides_from_annotation)
     transcripts_df = transcripts_df.merge(peptides)
     logging.info("Generated %d peptides from %s",
         len(transcripts_df), input_file)
