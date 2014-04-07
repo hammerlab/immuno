@@ -37,7 +37,25 @@ page_template = \
         width:1.5em;
         background-color: rgb(220,220,220);
         padding: 0em;
+        color: rgb(0,0,0);
     }
+
+    .seq td.wildtype { color: rgb(30, 30, 30); }
+    .seq td.mutant  {
+        color: rgb(190, 30, 30);
+        background-color: rgb(220, 240, 220);
+        font-weight: bold;
+    }
+
+    .seq td.near_mutant {
+        color: rgb(100, 30, 30);
+        background-color: rgb(235, 235, 220);
+    }
+
+    .seq td.row_title {
+        background-color: rgb(190,190,190);
+    }
+
     th { background-color: rgb(90, 190, 240); }
 </style>
 <head><title>Immune Pipeline Results (%s)</title></head>
@@ -58,17 +76,17 @@ table_template = \
 <table>
 <center>
 <tr>
-<td style='background-color: rgb(190,190,190);'>Sequence</td>
+<td  class='row_title'>Sequence</td>
 %s
 </tr>
 <tr>
 
-<td style='background-color: rgb(190,190,190);'>MHC Binding</td>
+<td class='row_title'>MHC Binding</td>
 %s
 </tr>
 <tr>
 
-<td style='background-color: rgb(190,190,190);'>Immunogenicity</td>
+<td class='row_title'>Immunogenicity</td>
 %s
 </tr>
 </center>
@@ -100,6 +118,11 @@ def build_html_report(scored_epitopes, scored_peptides):
     peptide_divs = []
     peptide_scores = []
 
+    # use size of longest possible epitope to figure out if a letter
+    # is 'near' a mutation
+    max_epitope_len = scored_epitopes.Epitope.str.len().max()
+
+
     group_cols = [
         "Peptide",
         "PeptideStart",
@@ -110,15 +133,17 @@ def build_html_report(scored_epitopes, scored_peptides):
         "TranscriptId",
         "Score",
         "SourceSequence"]
+
     for (
             peptide,
             peptide_start, peptide_end,
             mut_start, mut_end,
             gene_info,
             transcript_id,
-            peptide_score, src_seq), _ in\
-            scored_peptides.groupby(group_cols):
+            peptide_score, src_seq
+        ), _ in scored_peptides.groupby(group_cols):
         n = len(peptide)
+
         scores = np.zeros(n, dtype=float)
         imm_scores = np.zeros(n, dtype=float)
         mhc_scores = np.zeros(n, dtype=float)
@@ -145,8 +170,10 @@ def build_html_report(scored_epitopes, scored_peptides):
             stop = epitope_end - peptide_end
 
             scores[start:stop] += row['combined_score']
-            imm_scores[start:stop] += row['immunogenicity']
-            mhc_scores[start:stop] += (100 - row['percentile_rank']) / 100.0
+            if 'immunogenicity' in row:
+                imm_scores[start:stop] += row['immunogenicity']
+            if 'percentile_rank' in row:
+                mhc_scores[start:stop] += (100 - row['percentile_rank']) / 100.0
             score_counts[start:stop] += 1
 
         # default background for all letters of the sequence is gray
@@ -161,17 +188,24 @@ def build_html_report(scored_epitopes, scored_peptides):
         for i in xrange(n):
             letter = peptide[i]
             score = scores[i]
+            # is the amino acid at position i inside a mutated region?
             if i >= mut_start and i < mut_end:
-                letter_td = \
-                    "<td style='background-color: #773333;'>%s</td>" % letter
+                letter_class = 'mutant'
+            # if not, is it at least within an epitope's length near the
+            # mutated region?
+            elif (i < mut_start and mut_start - i < max_epitope_len) or \
+                    (i >= mut_end and i - mut_end < max_epitope_len - 1):
+                letter_class = 'near_mutant'
             else:
-                letter_td = "<td>%s</td>" % letter
+                letter_class = 'wildtype'
+
+            letter_td = "<td class = '%s'>%s</td>" % (letter_class, letter)
             letters.append(letter_td)
 
             imm = imm_scores[i]
             mhc = mhc_scores[i]
             maxval = 256
-            mhc_intensity = int(mhc**2*maxval)
+            mhc_intensity = int(mhc**1.5*maxval)
             mhc_rgb = "rgb(%d, %d, %d)" % \
                 (mhc_intensity/3, mhc_intensity, mhc_intensity/2)
             imm_intensity =  int(imm**2*maxval)
@@ -201,16 +235,18 @@ def build_html_report(scored_epitopes, scored_peptides):
     epitope_columns = [
         'Epitope',
         'info',
-        'percentile_rank',
-        'ann_rank',
-        'ann_ic50',
-        'immunogenicity',
-        'mhc_score', 'imm_score',
         'combined_score'
     ]
 
     optional_columns = [
-        'stable_id_transcript', 'ref', 'alt',  'chr', 'pos', "MutationInfo"
+        'percentile_rank',
+        'ann_rank',
+        'ann_ic50',
+        'immunogenicity',
+        'mhc_score',
+        'imm_score',
+        'stable_id_transcript',
+        'ref', 'alt',  'chr', 'pos', "MutationInfo"
     ]
     for col_name in optional_columns:
         if col_name in scored_epitopes:

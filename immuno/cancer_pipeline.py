@@ -40,17 +40,24 @@ if __name__ == '__main__':
         help="input file name (i.e. FASTA, MAF, VCF)")
     input_group.add_argument("--string", default = None,
         help="amino acid string")
-    parser.add_argument("--peptide_length",
+    parser.add_argument("--peptide-length",
         default=31,
         type = int,
         help="length of vaccine peptides (may contain multiple epitopes)")
-    parser.add_argument("--allele_file",
+    parser.add_argument("--allele-file",
         help="file with one allele per line")
-    parser.add_argument("--alleles",
+    parser.add_argument(
+        "--alleles",
         help="comma separated list of allele (default HLA-A*02:01)")
-    parser.add_argument("--output",
-        help="output file for dataframes", required=False)
-    parser.add_argument("--no-mhc",
+    parser.add_argument(
+        "--output",
+        help="output file for dataframe containing scored epitopes",
+        required=False)
+    parser.add_argument(
+        "--html-report",
+        default = "report.html",
+        help = "Path to HTML report containing scored peptides and epitopes")
+    parser.add_argument("--skip-mhc",
         default=False,
         action="store_true",
         help="Don't predict MHC binding")
@@ -92,28 +99,44 @@ if __name__ == '__main__':
     else:
         alleles = [DEFAULT_ALLELE]
 
-    mhc = IEDBMHCBinding(name = 'mhc', alleles=alleles)
-    mhc_epitopes_data = mhc.apply(mutated_regions)
+
+
+    if args.skip_mhc:
+        records = []
+        # if wer'e not running the MHC prediction then we have to manually
+        # extract 9mer substrings
+        for _, row in mutated_regions.iterrows():
+            seq = row.SourceSequence
+            epitope_length = 9
+            for i in xrange(len(seq) - epitope_length):
+                record = dict(row)
+                record['Epitope'] = seq[i:i+epitope_length]
+                record['EpitopeStart'] = i
+                record['EpitopeEnd'] = i + epitope_length
+                records.append(record)
+        scored_epitopes = pd.DataFrame.from_records(records)
+    else:
+        mhc = IEDBMHCBinding(name = 'mhc', alleles=alleles)
+        scored_epitopes = mhc.apply(mutated_regions)
+        # strong binders are considered percentile_rank < 2.0
+        mhc_percentile = scored_epitopes['percentile_rank']
+        mhc_score = (100.0 - mhc_percentile) / 100.0
+        scored_epitopes['mhc_score'] = mhc_score
+
     immunogenicity = ImmunogenicityRFModel(name = 'immunogenicity')
-    scored_epitopes = immunogenicity.apply(mhc_epitopes_data)
-
-    # IEDB returns a noisy column with 'method' descriptions, drop it
-    if 'method' in scored_epitopes.columns:
-        scored_epitopes = scored_epitopes.drop('method', axis = 1)
-
-    # strong binders are considered percentile_rank < 2.0
-    mhc_percentile = scored_epitopes['percentile_rank']
-    mhc_score = (100.0 - mhc_percentile) / 100.0
-    scored_epitopes['mhc_score'] = mhc_score
-
-    # rescale immune score so anything less than 0.5 is 0
-    #imm_percentile = scored_epitope['immunogenicity_percentile']
-    #imm_score = (100.0 - imm_percentile) / 100.0
-    #scored_epitopes['imm_score'] = imm_score
+    scored_epitopes = immunogenicity.apply(scored_epitopes)
     imm_score = scored_epitopes['immunogenicity']
-    scored_epitopes['imm_score'] = imm_score
-    scored_epitopes['combined_score']= (mhc_score + imm_score) / 2.0
 
+    # TODO: make the imm score based on percentile in normal human proteins
+    scored_epitopes['imm_score'] = imm_score
+
+
+    if args.skip_mhc:
+        combined_score = imm_score
+    else:
+        combined_score = (mhc_score + imm_score) / 2.0
+
+    scored_epitopes['combined_score'] = combined_score
     scored_epitopes = scored_epitopes.sort(columns=('combined_score',))
     if args.output:
         scored_epitopes.to_csv(args.output, index=False)
@@ -124,6 +147,6 @@ if __name__ == '__main__':
         peptide_length = peptide_length)
 
     html = build_html_report(scored_epitopes, scored_peptides)
-    with open('results.html', 'w') as f:
+    with open(args.html_report, 'w') as f:
         f.write(html)
 

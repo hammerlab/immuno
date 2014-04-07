@@ -124,11 +124,11 @@ def build_peptides_dataframe(
             peptide = seq[peptide_start : peptide_end]
 
             # where is the mutation relative to this peptide?
-            peptide_mut_start = min(mut_start - peptide_start, 0)
-            peptide_mut_end = max(mut_end - peptide_start, window_size)
+            peptide_mut_start = mut_start - peptide_start
+            peptide_mut_end = mut_end - peptide_start
 
             # if mutation isn't in the peptide, skip it
-            if peptide_mut_start >= window_size or peptide_mut_end <= 0:
+            if peptide_mut_start >= window_size or peptide_mut_end < 0:
                 logging.info(
                     "Skipping self peptide %s from %s [%d:%d]",
                     peptide,
@@ -136,6 +136,14 @@ def build_peptides_dataframe(
                     peptide_start,
                     peptide_end)
                 continue
+
+
+            # mutation start in the peptide should be between [0, len)
+            # and end should be between [0, len]
+            assert peptide_mut_start >= 0
+            assert peptide_mut_start < window_size
+            assert peptide_mut_end >= 0
+            assert peptide_mut_end <= window_size
 
             # copy fields of this record so we can add it to the data frame
             row = dict(base_record)
