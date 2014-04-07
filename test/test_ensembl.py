@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from Bio.Seq import Seq
+import pandas as pd
+from epitopes.mutate import mutate_protein_from_transcript
+
 import immuno.ensembl.annotation as ensembl
 from immuno.ensembl.transcript_data import EnsemblReferenceData
-from epitopes.mutate import mutate_protein_from_transcript
-from Bio.Seq import Seq
 
-import pandas as pd
-
-# Test case
+# Test case CTNNB1
 # Transcript Id: ENST00000453024
 # Gene Id : ENSG00000168036
 # 17 Exons
@@ -30,21 +30,21 @@ import pandas as pd
 
 ref_data = EnsemblReferenceData()
 
-def test_load_transcripts():
+def test_load_CTNNB1_cdna_transcript():
     genomic_transcript = "ENST00000453024"
     transcript = ref_data.get_cdna(genomic_transcript)
     assert(transcript is not None)
     assert(len(transcript) == 2841), (transcript, len(transcript))
 
 
-def test_load_protein_transcript():
+def test_load_CTNNB1_protein_transcript():
     protein_transcript = "ENSP00000427553"
     transcript = ref_data.get_protein(protein_transcript)
     assert(transcript is not None)
     assert(transcript[0] == 'M'), (transcript, len(transcript))
     assert(transcript[-1] == 'E'), (transcript, len(transcript))
 
-def test_load_exon_from_transcript():
+def test_load_CTNNB1_exon_from_transcript():
     transcript_id = "ENST00000453024"
     exons = ensembl.get_exons_from_transcript(transcript_id)
     assert(exons.shape[0] == 17)
@@ -53,16 +53,21 @@ def test_load_exon_from_transcript():
     exons = ensembl.get_exons_from_transcript(transcript_id)
     assert(exons.shape[0] == 16)
 
-def test_load_exon_from_transcript_length():
+def test_load_CTNNB1_exon_from_transcript_length():
 
     transcript_id = 'ENST00000405570'
-
     transcript = ref_data.get_cdna(transcript_id)
-
     exons = ensembl.get_exons_from_transcript(transcript_id)
     exons['length'] = exons['seq_region_end_exon'] - exons['seq_region_start_exon'] + 1
-
     assert(exons['length'].sum() == len(transcript)), exons
+
+def test_load_SMAD4_cdna_transcript():
+    transcript_id = "ENST00000342988"
+    transcript = ref_data.get_cdna(transcript_id)
+    assert transcript is not None
+    assert len(transcript) == 8769, len(transcript)
+    assert transcript[0] == 'A', transcript[0]
+    assert transcript[-1] == 'T', transcript[-1]
 
 def test_get_gene_from_pos():
     variant = {
@@ -110,9 +115,9 @@ def test_get_transcript_index_from_pos():
         'alt' : 'A'
     }
     transcript_id = 'ENST00000405570'
-
-    idx = ensembl.get_transcript_index_from_pos(41275636, transcript_id)
-    assert(idx == 1686)
+    idx = ensembl.get_transcript_index_from_pos(
+        41275636, transcript_id, skip_untranslated_region = False)
+    assert(idx == 1686), idx
 
     transcript = ref_data.get_cdna(transcript_id)
     assert(transcript[idx] == variant['ref'])
@@ -133,19 +138,35 @@ def test_get_transcript_and_mutate_vcf():
     assert( "ENST00000340058" in transcript_ids)
 
     transcript_id = "ENST00000355710"
-    idx = ensembl.get_transcript_index_from_pos(variant['pos'], transcript_id)
-    transcript = ref_data.get_cds(transcript_id)
-    assert(transcript[idx] == variant['ref'])
 
-    mutated, start, stop = mutate_protein_from_transcript(
-            transcript, idx, variant['ref'], variant['alt'], min_padding = 10, with_mutation_coordinates=True)
-    
-    assert(str(mutated) == 'RSQGRIPVKWTAIESLFDHIY')
+
+    cdna_idx = ensembl.get_transcript_index_from_pos(
+        variant['pos'], transcript_id, skip_untranslated_region = False)
+    assert cdna_idx is not None
+    assert cdna_idx < 5569
+    cdna_transcript = ref_data.get_cdna(transcript_id)
+    assert(cdna_transcript[cdna_idx] == variant['ref'])
+
+    cds_idx = ensembl.get_transcript_index_from_pos(
+        variant['pos'], transcript_id, skip_untranslated_region = True)
+    assert cds_idx is not None
+    cds_transcript = ref_data.get_cds(transcript_id)
+    assert(cds_transcript[cds_idx] == variant['ref'])
+
+    region = mutate_protein_from_transcript(
+            cds_transcript,
+            cds_idx,
+            variant['ref'],
+            variant['alt'],
+            padding = 10)
+    assert region is not None
+    assert len(region.seq) == 21, (region.seq, len(region.seq))
+    assert region.seq == 'RSQGRIPVKWTAIESLFDHIY'
 
 def test_interval_search():
     intervals = [ (7,13), (17,19), (21, 24), (35, 45), (47, 50), (60, 70)]
     idx = ensembl.get_idx_from_interval(7, intervals)
-    
+
     assert(idx == 0), idx
 
     idx = ensembl.get_idx_from_interval(13, intervals)

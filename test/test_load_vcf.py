@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from immuno import load_vcf
+from immuno import vcf
 
 def test_vcf_to_dataframe():
     vcf_file = 'example.vcf'
-    df = load_vcf.vcf_to_dataframe(vcf_file)
+    df = vcf.parse_vcf(vcf_file)
     assert df is not None
     assert(len(df) == 3)
     assert(len(df.columns) == 8)

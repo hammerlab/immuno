@@ -15,8 +15,9 @@
 from copy import deepcopy
 import logging
 
-from load_vcf import vcf_to_dataframe
+from vcf import parse_vcf
 from snpeff_effect import SnpEffEffect
+
 from ensembl.transcript_variant import peptide_from_transcript_variant
 
 def _parse_effects(info_field):
@@ -28,8 +29,8 @@ def _parse_effects(info_field):
     logging.warning("Couldn't find EFF info in %s", info_field)
     return None
 
-def peptides_from_snpeff(snpeff_annotated_file, window=7):
-    data = vcf_to_dataframe(snpeff_annotated_file)
+def load_snpeff(snpeff_annotated_file, window=7):
+    data = parse_vcf(snpeff_annotated_file)
     results = []
     for idx, variant in data.iterrows():
       variant = dict(variant)

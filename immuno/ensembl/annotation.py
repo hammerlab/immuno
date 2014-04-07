@@ -32,7 +32,12 @@ def get_exons_from_transcript(transcript_id):
     exons = exon_data[exon_data['stable_id_transcript'] == transcript_id]
     assert len(exons) > 0, \
         "Couldn't find exons for transcript %s" % transcript_id
-    fields = ['seq_start', 'stable_id_exon', 'seq_region_start_exon', 'seq_region_end_exon']
+    fields = [
+        'seq_start',
+        'stable_id_exon',
+        'seq_region_start_exon',
+        'seq_region_end_exon'
+    ]
     return exons[fields]
 
 
@@ -47,7 +52,8 @@ def get_idx_from_interval(pos, intervals):
             return None
 
 
-def get_transcript_index_from_pos(pos, transcript_id):
+def get_transcript_index_from_pos(pos, transcript_id,
+        skip_untranslated_region= True):
     """
     Gets the index into to the transcript from genomic position
     The transcript is composed of spliced exons that have genomic start and
@@ -56,9 +62,15 @@ def get_transcript_index_from_pos(pos, transcript_id):
 
     Parameters
     ----------
-    position : int, genomic position in the contig
-    transcript_id : transcript id, of the from EST#####
+    position : int
+        Genomic position in the contig
 
+    transcript_id :
+        Transcript id, of the from EST#####
+
+    skip_untranslated_region : bool, optional
+        If True (default), then give position in the CDS (coding sequence),
+        otherwise give position in the longer full cDNA sequence.
     """
     exons = get_exons_from_transcript(transcript_id)
     exons = exons.sort(columns=['seq_region_start_exon', 'seq_region_end_exon'])
@@ -66,14 +78,15 @@ def get_transcript_index_from_pos(pos, transcript_id):
     stops = exons['seq_region_end_exon']
     intervals = zip(starts, stops)
     result = get_idx_from_interval(pos, intervals)
-    
+
     if result is None:
         logging.warning("Couldn't find position %d in transcript %s",
             pos, transcript_id)
-    else:
+    elif skip_untranslated_region:
         # Adjust for translations (CDS) start region
-        result -= int(list(exons['seq_start'])[0]) - 1
-        
+        utr_length = int(list(exons['seq_start'])[0]) - 1
+        logging.info("UTR length for %s = %d", transcript_id, utr_length)
+        result -= utr_length
     return result
 
 

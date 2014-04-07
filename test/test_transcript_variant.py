@@ -13,31 +13,39 @@
 # limitations under the License.
 
 from immuno.ensembl import transcript_variant
+import immuno.common
 
+protein_id = "ENSP00000427553"
+protein_sequence = \
+"""MRLPGAPALPDADFLVHLHFLVQTSWFICNFLVRIPWASALPDAPALLVILEKTFPEHATCRGCWVSGYLCWTAPGNCICSANVGFLKIENTYRQIHHTHMHRHTHTHTQTNPSHTHAQTHTHRVNDIGSQVELFVCLYLMQLLIHLSLELLFSFTYTVCLQILCINSFLSCRLLDDFPQLTLRTFEQTDTLKE"""
 
 def test_peptide_from_protein_transcript():
     peptide = \
         transcript_variant.peptide_from_protein_transcript_variant(
-            'ENSP00000427553', 109, 'Q', 'R')
+            protein_id, 109, 'Q', 'R')
     assert peptide is not None
-
+    assert peptide[109] == 'R', peptide
 
 def test_peptide_from_transcript():
     """
-    Example:
-    'ENST00000405570'
-    pos: 41275636, ref : G, alt : A
+    test_peptide_from_transcript:
 
-    should return
-    MAQNAVRLHYGLPVVVKLLHPPSHWPLIKATIGLIRNLALCPANHAPLREQGAIPRLVQLLVR
+    Apply Cosmic mutation COSM27279
+    transcript = 'ENST00000405570'
+    pos: 41265571,
+    ref : A, alt : T
+    amino acids = Q -> H  @ pos 4 (mutation = Q4H)
     """
     transcript_id = 'ENST00000405570'
-    peptide = transcript_variant.peptide_from_transcript_variant(
-        transcript_id, 41275636, ref='G', alt='A')
+    peptide, start, stop, annot = \
+        transcript_variant.peptide_from_transcript_variant(
+            transcript_id, 41265571, ref='A', alt='T')
     assert peptide is not None
     n = len(peptide)
+    assert n == 781, n
     print(str(peptide))
-    assert(peptide[n/2] == 'I')
+    assert(peptide[3] == 'H')
+
 
 if __name__ == '__main__':
   from dsltools import testing_helpers

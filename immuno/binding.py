@@ -93,8 +93,10 @@ class IEDBMHCBinding(PipelineElement):
 
     # some of the MHC scores come back as all NaN so drop them
     result = result.dropna(axis=1, how='all')
-     # no idea what this field does but always seems to be the same value
-    result = result.drop('seq_num', axis=1)
+
+    drop_fields = ('seq_num', 'method')
+    for field in drop_fields:
+        result = result.drop(field, axis = 1)
     return result
 
 class IEDBMHC1Binding(IEDBMHCBinding):

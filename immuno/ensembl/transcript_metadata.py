@@ -114,7 +114,8 @@ def download_transcript_metadata(filter_contigs = STANDARD_CONTIGS):
         SEQ_REGION_DATA_PATH = fetch_data('seq_region.txt', SEQ_REGION_DATA_URL)
         EXON_DATA_PATH = fetch_data('exon.txt', EXON_DATA_URL)
         TRANSCRIPT_DATA_PATH = fetch_data('transcript.txt', TRANSCRIPT_DATA_URL)
-        TRANSLATION_DATA_PATH = fetch_data('translation.txt', TRANSLATION_DATA_URL)
+        TRANSLATION_DATA_PATH = \
+            fetch_data('translation.txt', TRANSLATION_DATA_URL)
         EXON_TRANSCRIPT_DATA_PATH = \
             fetch_data('exon_transcript.txt', EXON_TRANSCRIPT_DATA_URL)
         seqregion = pd.read_csv(

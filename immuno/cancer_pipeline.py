@@ -24,15 +24,10 @@ import numpy as np
 from common import peptide_substrings
 from immunogenicity import ImmunogenicityRFModel
 from binding import IEDBMHCBinding
-
-from load_maf import peptides_from_maf
-from load_vcf import peptides_from_vcf
-from load_snpeff import peptides_from_snpeff
-from load_fasta import peptides_from_fasta
-
+from load_file import load_file
+from strings import load_comma_string
+from vaccine_peptides import build_peptides_dataframe
 from report import build_html_report
-
-
 
 
 DEFAULT_ALLELE = 'HLA-A*02:01'
@@ -45,22 +40,32 @@ if __name__ == '__main__':
         help="input file name (i.e. FASTA, MAF, VCF)")
     input_group.add_argument("--string", default = None,
         help="amino acid string")
-    parser.add_argument("--peptide_length",
+    parser.add_argument("--peptide-length",
         default=31,
         type = int,
         help="length of vaccine peptides (may contain multiple epitopes)")
-    parser.add_argument("--allele_file",
+    parser.add_argument("--allele-file",
         help="file with one allele per line")
-    parser.add_argument("--alleles",
+    parser.add_argument(
+        "--alleles",
         help="comma separated list of allele (default HLA-A*02:01)")
-    parser.add_argument("--output",
-        help="output file for dataframes", required=False)
-    parser.add_argument("--no-mhc",
+    parser.add_argument(
+        "--output",
+        help="output file for dataframe containing scored epitopes",
+        required=False)
+    parser.add_argument(
+        "--html-report",
+        default = "report.html",
+        help = "Path to HTML report containing scored peptides and epitopes")
+    parser.add_argument("--skip-mhc",
         default=False,
         action="store_true",
         help="Don't predict MHC binding")
 
     args = parser.parse_args()
+
+
+    peptide_length = int(args.peptide_length)
 
     # stack up the dataframes and later concatenate in case we
     # want both commandline strings (for weird mutations like translocations)
@@ -68,38 +73,7 @@ if __name__ == '__main__':
     mutated_region_dfs = []
 
     if args.string:
-        # allow multiple strings to be specified in comma-separated list
-        starts = []
-        stops = []
-        full_peptides = []
-        for string in args.string.split(","):
-            full_peptide = string.upper().strip()
-            # allow the user to specify mutated region of the amino acid
-            # string QLSQ_Y_QQ (the full peptide is QLSQYQQ and Y is mutated)
-            parts = full_peptide.split("_")
-            if len(parts) == 1:
-                full_peptide = parts[0]
-                start = 0
-                stop = len(full_peptide)
-            elif len(parts) == 2:
-                full_peptide = parts[0] + parts[1]
-                start = len(parts[0])
-                stop = len(full_peptide)
-            else:
-                assert len(parts) == 3, \
-                    "Can't parse peptide string %s" % full_peptide
-                full_peptide = parts[0] + parts[1] + parts[2]
-                start = len(parts[0])
-                stop = start + len(parts[1])
-            full_peptides.append(full_peptide)
-            starts = starts.append(start)
-            stops.append(stop)
-        df = pd.DataFrame({
-            'SourceSequence': full_peptides,
-            'MutationStart' : starts,
-            'MutationEnd' : stops,
-            'info' : ['commandline'] * len(full_peptides),
-        })
+        df = load_comma_string(args.string)
         mutated_region_dfs.append(df)
 
 
@@ -107,28 +81,15 @@ if __name__ == '__main__':
     # load each one into a dataframe
 
     for input_filename in args.input:
-        if input_filename.endswith("eff.vcf"):
-            df = peptides_from_snpeff(input_filename)
-        if input_filename.endswith(".vcf"):
-            df = peptides_from_vcf(input_filename)
-        elif input_filename.endswith(".maf"):
-            df = peptides_from_maf(input_filename)
-        elif input_filename.endswith(".fasta") \
-                or input_filename.endswith(".fa"):
-            df = peptides_from_fasta(input_filename)
-        else:
-            assert False, "Unrecognized file type %s" % input_filename
+        df = load_file(input_filename, peptide_length)
+        assert df is not None
         mutated_region_dfs.append(df)
-
 
     if len(mutated_region_dfs) == 0:
         parser.print_help()
         print("\nERROR: Must supply at least --string or --input")
         sys.exit()
     mutated_regions = pd.concat(mutated_region_dfs)
-
-    peptide_length = int(args.peptide_length)
-    # peptides = peptide_substrings(full_peptide, peptide_length)
 
     # get rid of gene descriptions if they're in the dataframe
     if args.allele_file:
@@ -138,43 +99,54 @@ if __name__ == '__main__':
     else:
         alleles = [DEFAULT_ALLELE]
 
-    mhc = IEDBMHCBinding(name = 'mhc', alleles=alleles)
-    mhc_data = mhc.apply(mutated_regions)
+
+
+    if args.skip_mhc:
+        records = []
+        # if wer'e not running the MHC prediction then we have to manually
+        # extract 9mer substrings
+        for _, row in mutated_regions.iterrows():
+            seq = row.SourceSequence
+            epitope_length = 9
+            for i in xrange(len(seq) - epitope_length):
+                record = dict(row)
+                record['Epitope'] = seq[i:i+epitope_length]
+                record['EpitopeStart'] = i
+                record['EpitopeEnd'] = i + epitope_length
+                records.append(record)
+        scored_epitopes = pd.DataFrame.from_records(records)
+    else:
+        mhc = IEDBMHCBinding(name = 'mhc', alleles=alleles)
+        scored_epitopes = mhc.apply(mutated_regions)
+        # strong binders are considered percentile_rank < 2.0
+        mhc_percentile = scored_epitopes['percentile_rank']
+        mhc_score = (100.0 - mhc_percentile) / 100.0
+        scored_epitopes['mhc_score'] = mhc_score
 
     immunogenicity = ImmunogenicityRFModel(name = 'immunogenicity')
-    scored_data = immunogenicity.apply(mhc_data)
+    scored_epitopes = immunogenicity.apply(scored_epitopes)
+    imm_score = scored_epitopes['immunogenicity']
+
+    # TODO: make the imm score based on percentile in normal human proteins
+    scored_epitopes['imm_score'] = imm_score
 
 
-    # IEDB returns a noisy column with 'method' descriptions, drop it
-    if 'method' in scored_data.columns:
-        scored_data = scored_data.drop('method', axis = 1)
-
-    # strong binders are considered percentile_rank < 2.0
-    mhc_percentile = scored_data['percentile_rank']
-    # rescale [0,2] -> [0,1]
-    mhc_score = mhc_percentile / 2
-    # treat anything at percentile above 2 as just as bad as 2
-    mhc_score[mhc_score > 1] = 1
-    # lower percentiles are stronger binders
-    mhc_score = 1.0 - mhc_score
-    scored_data['mhc_score'] = mhc_score
-
-    # rescale immune score so anything less than 0.5 is 0
-    imm_score = scored_data['immunogenicity']
-    imm_score -= 0.5
-    imm_score *= 2
-    imm_score[imm_score < 0] = 0
-    scored_data['imm_score'] = imm_score
-
-    scored_data['combined_score']= (mhc_score + imm_score) / 2.0
-
-    scored_data = scored_data.sort(columns=('combined_score',))
-    if args.output:
-        scored_data.to_csv(args.output, index=False)
+    if args.skip_mhc:
+        combined_score = imm_score
     else:
-        print(scored_data.to_string())
+        combined_score = (mhc_score + imm_score) / 2.0
 
-    html = build_html_report(scored_data)
-    with open('results.html', 'w') as f:
+    scored_epitopes['combined_score'] = combined_score
+    scored_epitopes = scored_epitopes.sort(columns=('combined_score',))
+    if args.output:
+        scored_epitopes.to_csv(args.output, index=False)
+    else:
+        print(scored_epitopes.to_string())
+
+    scored_peptides = build_peptides_dataframe(scored_epitopes,
+        peptide_length = peptide_length)
+
+    html = build_html_report(scored_epitopes, scored_peptides)
+    with open(args.html_report, 'w') as f:
         f.write(html)
 
