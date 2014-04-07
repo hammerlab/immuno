@@ -102,6 +102,7 @@ def build_peptides_dataframe(
             'SourceSequence' : seq,
             'MutationInfo' : mut_info,
             'TranscriptId' : transcript_id,
+            'GeneInfo' : info,
         }
         for optional_field in optional_cols:
             if optional_field in first_row:

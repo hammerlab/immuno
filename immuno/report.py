@@ -80,7 +80,7 @@ peptide_div_template = \
 <div
     style="border-bottom: 1px solid gray; margin-bottom: 1em;"
     class="seq">
-<h3>Peptide Score = %0.4f (%s)</h3>
+<h3>Peptide Score = %0.4f (%s, transcript=%s)</h3>
 %s
 <br>
 </div>
@@ -104,9 +104,19 @@ def build_html_report(scored_epitopes, scored_peptides):
         "Peptide",
         "PeptideStart",
         "PeptideEnd",
+        "PeptideMutationStart",
+        "PeptideMutationEnd",
+        "GeneInfo",
+        "TranscriptId",
         "Score",
         "SourceSequence"]
-    for (peptide, peptide_start, peptide_end, peptide_score, src_seq), _ in\
+    for (
+            peptide,
+            peptide_start, peptide_end,
+            mut_start, mut_end,
+            gene_info,
+            transcript_id,
+            peptide_score, src_seq), _ in\
             scored_peptides.groupby(group_cols):
         n = len(peptide)
         scores = np.zeros(n, dtype=float)
@@ -119,9 +129,8 @@ def build_html_report(scored_epitopes, scored_peptides):
         mask &= scored_epitopes.EpitopeEnd <= peptide_end
 
         rowslice = scored_epitopes[mask]
-        gene_info = None
-        for seq, row in rowslice.iterrows():
-            gene_info = row['info']
+
+        for _, row in rowslice.iterrows():
             epitope_start = int(row['EpitopeStart'])
             assert epitope_start >= 0, \
                 "Expected epitope start %d >= 0" %  epitope_start
@@ -152,7 +161,11 @@ def build_html_report(scored_epitopes, scored_peptides):
         for i in xrange(n):
             letter = peptide[i]
             score = scores[i]
-            letter_td = "<td>%s</td>" % letter
+            if i >= mut_start and i < mut_end:
+                letter_td = \
+                    "<td style='background-color: #773333;'>%s</td>" % letter
+            else:
+                letter_td = "<td>%s</td>" % letter
             letters.append(letter_td)
 
             imm = imm_scores[i]
@@ -178,7 +191,7 @@ def build_html_report(scored_epitopes, scored_peptides):
             table_template % (letters_cols, mhc_color_cols, imm_color_cols)
 
         div = peptide_div_template % \
-            (peptide_score, gene_info, colored_letters_table)
+            (peptide_score, gene_info, transcript_id, colored_letters_table)
         peptide_divs.append(div)
         peptide_scores.append(peptide_score)
 
