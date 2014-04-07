@@ -33,7 +33,9 @@ def get_exons_from_transcript(transcript_id):
     assert len(exons) > 0, \
         "Couldn't find exons for transcript %s" % transcript_id
     fields = [
+        'exon_id',
         'seq_start',
+        'start_exon_id',
         'stable_id_exon',
         'seq_region_start_exon',
         'seq_region_end_exon'
@@ -84,11 +86,33 @@ def get_transcript_index_from_pos(pos, transcript_id,
             pos, transcript_id)
     elif skip_untranslated_region:
         # Adjust for translations (CDS) start region
-        utr_length = int(list(exons['seq_start'])[0]) - 1
+        utr_length = get_utr_length(exons)
         logging.info("UTR length for %s = %d", transcript_id, utr_length)
         result -= utr_length
     return result
 
+def get_utr_length(exons_df):
+    """
+    Gets the length of the 5' UTR from a set of sorted exons from a specifc transcript
+
+    Parameters
+    ----------
+    exons : Pandas dataframe with 'exon_id', 'seq_region_end_exon', 'seq_region_start_exon'
+            Also, 'start_exon_id' marks the exon that starts translation and 'seq_start'
+            is the offset into the first translated exon
+
+
+    Return utr_length : int
+    """
+    utr_length = 0
+    for idx, row in exons_df.iterrows():
+        print row
+        if row['exon_id'] != row['start_exon_id']:
+            utr_length += row['seq_region_end_exon'] - row['seq_region_start_exon'] + 1
+        else:
+            utr_length += row['seq_start'] - 1
+            return utr_length
+    return None
 
 def annotate(
         vcf_df,

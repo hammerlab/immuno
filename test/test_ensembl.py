@@ -122,6 +122,24 @@ def test_get_transcript_index_from_pos():
     transcript = ref_data.get_cdna(transcript_id)
     assert(transcript[idx] == variant['ref'])
 
+def test_get_utr_length_RET():
+
+    transcript_id = "ENST00000355710"
+    exons = ensembl.get_exons_from_transcript(transcript_id)
+    exons = exons.sort(columns=['seq_region_start_exon', 'seq_region_end_exon'])
+
+    utr_length = ensembl.get_utr_length(exons)
+    assert(utr_length == 232)
+
+def test_get_utr_length_CTNNB1():
+
+    transcript_id = "ENST00000405570"
+    exons = ensembl.get_exons_from_transcript(transcript_id)
+    exons = exons.sort(columns=['seq_region_start_exon', 'seq_region_end_exon'])
+
+    utr_length = ensembl.get_utr_length(exons)
+    assert(utr_length == 156)
+
 def test_get_transcript_and_mutate_vcf():
     variant = {
         'chr' : '10',

@@ -45,7 +45,6 @@ SEQ_REGION_HEADER = ['seq_region_id', 'name', 'coord_system_id']
 SEQ_REGION_DATA_URL = \
 "ftp://ftp.ensembl.org/pub/release-75/mysql/homo_sapiens_core_75_37/seq_region.txt.gz"
 
-
 EXON_HEADER = [
     "exon_id", "seq_region_id", "seq_region_start",
     "seq_region_end", "seq_region_strand", "phase", "end_phase",
@@ -53,10 +52,8 @@ EXON_HEADER = [
     "created_date", "modified_date"
 ]
 
-
 EXON_DATA_URL = \
 "ftp://ftp.ensembl.org/pub/release-75/mysql/homo_sapiens_core_75_37/exon.txt.gz"
-
 
 TRANSCRIPT_HEADER = [
     "transcript_id", "gene_id", "analysis_id",
@@ -189,8 +186,10 @@ def download_transcript_metadata(filter_contigs = STANDARD_CONTIGS):
             'seq_region_start_transcript',
             'seq_region_end_transcript',
             'seq_start',
+            'start_exon_id',
             'stable_id_translation',
             'stable_id_exon',
+            'exon_id',
             'seq_region_start_exon',
             'seq_region_end_exon']
         exon_data = exon_w_transcript[exon_cols]
