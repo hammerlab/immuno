@@ -118,7 +118,7 @@ def load_vcf(
         mask = (qual == 'PASS') | (qual == '.')
         vcf_df = vcf_df[mask]
 
-    logging.info("Loaded VCF %s with %d entries", input_file, len(vcf_df))
+    logging.info("Loaded VCF %s with %d entries", input_filename, len(vcf_df))
 
     transcripts_df = annotation.annotate_vcf_transcripts(vcf_df)
 
@@ -131,30 +131,31 @@ def load_vcf(
         row = group.irow(0)
         if transcript_id:
             logging.info("Getting peptide from transcript ID %s", transcript_id)
-            region = peptide_from_transcript_variant(
-                transcript_id, pos, ref, alt,
-                padding = length / 2 + 1)
+            seq, start, stop, annot = \
+                peptide_from_transcript_variant(
+                    transcript_id, pos, ref, alt,
+                    padding = peptide_length - 1)
 
-        if region and region.seq:
-            if '*' in region.seq:
+        if seq:
+            if '*' in seq:
                 logging.warning(
                     "Found stop codon in peptide %s from transcript_id %s",
                     region.seq,
                     transcript_id)
             else:
                 row = deepcopy(row)
-                row['SourceSequence'] = region.seq
+                row['SourceSequence'] = seq
                 # TODO: actually use the  position
                 # to compute the start/stop of the mutated region
-                row['MutationStart'] = region.mutation_start
-                row['MutationEnd'] = region.mutation_start + region.n_inserted
-                row['MutationInfo'] = region.annot
+                row['MutationStart'] = start
+                row['MutationEnd'] = stop
+                row['MutationInfo'] = annot
                 new_rows.append(row)
     peptides = pd.DataFrame.from_records(new_rows)
     # peptides = variants.apply(peptides_from_annotation)
     transcripts_df = transcripts_df.merge(peptides)
     logging.info("Generated %d peptides from %s",
-        len(transcripts_df), input_file)
+        len(transcripts_df), input_filename)
 
     # drop verbose or uninteresting columns from VCF
     for dumb_field in ('description_gene', 'filter', 'qual', 'id', 'name'):

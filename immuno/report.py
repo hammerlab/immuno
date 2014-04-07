@@ -75,17 +75,38 @@ table_template = \
 </table>
 """
 
+peptide_div_template = \
+"""
+<div
+    style="border-bottom: 1px solid gray; margin-bottom: 1em;"
+    class="seq">
+<h3>Peptide Score = %0.4f (%s)</h3>
+%s
+<br>
+</div>
+"""
+
+color_cell = \
+"""
+<td style="background-color: %s;">&nbsp;</td>
+"""
+
 def build_html_report(scored_epitopes, scored_peptides):
     scored_epitopes = scored_epitopes.sort(
         columns=('combined_score',), ascending=False)
 
     # take each source sequence and shade its amino acid letters
     # based on the average score of each epitope containing that letter
-    seq_divs = []
-    seq_scores = []
+    peptide_divs = []
+    peptide_scores = []
 
-    group_cols = ["Peptide", "PeptideStart", "PeptideEnd", "SourceSequence"]
-    for (peptide, peptide_start, peptide_end, src_seq), rows in\
+    group_cols = [
+        "Peptide",
+        "PeptideStart",
+        "PeptideEnd",
+        "Score",
+        "SourceSequence"]
+    for (peptide, peptide_start, peptide_end, peptide_score, src_seq), _ in\
             scored_peptides.groupby(group_cols):
         n = len(peptide)
         scores = np.zeros(n, dtype=float)
@@ -101,9 +122,12 @@ def build_html_report(scored_epitopes, scored_peptides):
         gene_info = None
         for seq, row in rowslice.iterrows():
             gene_info = row['info']
-            epitope_start = int(row['EpitopeStart'] - 1)
-            assert epitope_start >= 0, epitope_start
-            assert epitope_start >= peptide_start, epitope_start
+            epitope_start = int(row['EpitopeStart'])
+            assert epitope_start >= 0, \
+                "Expected epitope start %d >= 0" %  epitope_start
+            assert epitope_start >= peptide_start, \
+                "Expected epitope start %d >= peptide start %d" % \
+                (epitope_start, peptide_start)
             epitope_end = int(row['EpitopeEnd'])
             assert epitope_end > epitope_start, epitope_end
             assert epitope_end <= peptide_end, epitope_end
@@ -142,50 +166,47 @@ def build_html_report(scored_epitopes, scored_peptides):
                 (imm_intensity, imm_intensity/2, imm_intensity/3)
 
 
-            color_cell = \
-            """
-            <td style="background-color: %s;">&nbsp;</td>
-            """
             mhc_color_cell = color_cell %  mhc_rgb
             imm_color_cell = color_cell % imm_rgb
             imm_colors.append(imm_color_cell)
             mhc_colors.append(mhc_color_cell)
 
-        median_score = np.median(scores)
         letters_cols = '\n\t'.join(letters)
         mhc_color_cols = '\n\t'.join(mhc_colors)
         imm_color_cols = '\n\t'.join(imm_colors)
         colored_letters_table = \
             table_template % (letters_cols, mhc_color_cols, imm_color_cols)
 
-        div = """
-            <div
-                style="border-bottom: 1px solid gray; margin-bottom: 1em;"
-                class="seq">
-            <h3>Median Epitope Score = %0.4f (%s)</h3>
-            %s
-            <br>
-            </div>
-            """ % (median_score, gene_info, colored_letters_table)
-        seq_divs.append(div)
-        seq_scores.append(median_score)
+        div = peptide_div_template % \
+            (peptide_score, gene_info, colored_letters_table)
+        peptide_divs.append(div)
+        peptide_scores.append(peptide_score)
 
-    seq_order = reversed(np.argsort(seq_scores))
-    seq_divs_html = "\n".join(seq_divs[i] for i in seq_order)
+    seq_order = reversed(np.argsort(peptide_scores))
+    peptide_divs_html = "\n".join(peptide_divs[i] for i in seq_order)
 
+    epitope_columns = [
+        'Epitope',
+        'info',
+        'percentile_rank',
+        'ann_rank',
+        'ann_ic50',
+        'immunogenicity',
+        'mhc_score', 'imm_score',
+        'combined_score'
+    ]
+
+    optional_columns = [
+        'stable_id_transcript', 'ref', 'alt',  'chr', 'pos', "MutationInfo"
+    ]
+    for col_name in optional_columns:
+        if col_name in scored_epitopes:
+            epitope_columns.append(col_name)
     epitope_table = scored_epitopes.to_html(
         index=False,
         na_rep="-",
-        columns = [
-            'Epitope',
-            'info', 'stable_id_transcript', 'ref', 'alt',  'chr', 'pos',
-            'percentile_rank',
-            'ann_rank',
-            'ann_ic50',
-            'immunogenicity',
-            'mhc_score', 'imm_score',
-            'combined_score'
-        ])
+        columns = epitope_columns)
+
     page = page_template % \
-        (datetime.date.today(), seq_divs_html,  epitope_table)
+        (datetime.date.today(), peptide_divs_html,  epitope_table)
     return page

@@ -17,15 +17,15 @@ from snpeff import load_snpeff
 from maf import load_maf
 from fasta import load_fasta
 
-def load_file(input_filename):
+def load_file(input_filename, peptide_length):
     if input_filename.endswith("eff.vcf"):
-        df = load_snpeff(input_filename, peptide_length = peptide_length)
+        return load_snpeff(input_filename, peptide_length = peptide_length)
     if input_filename.endswith(".vcf"):
-        df = load_vcf(input_filename, peptide_length = peptide_length)
+        return load_vcf(input_filename, peptide_length = peptide_length)
     elif input_filename.endswith(".maf"):
-        df = load_maf(input_filename, peptide_length = peptide_length)
+        return load_maf(input_filename, peptide_length = peptide_length)
     elif input_filename.endswith(".fasta") \
             or input_filename.endswith(".fa"):
-        df = load_fasta(input_filename, peptide_length = peptide_length)
+        return load_fasta(input_filename, peptide_length = peptide_length)
     else:
         assert False, "Unrecognized file type %s" % input_filename
