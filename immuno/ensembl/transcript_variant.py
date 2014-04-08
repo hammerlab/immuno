@@ -68,6 +68,9 @@ def peptide_from_transcript_variant(
             transcript_id)
         return bad_result
     try:
+        forward = annotation.is_forward_strand(transcript_id)
+        ref = ref if forward else annotation.complement(ref)
+        alt = alt if forward else annotation.complement(alt)
         region = mutate_protein_from_transcript(
             transcript,
             idx,

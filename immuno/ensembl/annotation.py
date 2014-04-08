@@ -19,6 +19,10 @@ from annotation_data import EnsemblAnnotationData
 
 data = EnsemblAnnotationData()
 
+_complement = {'A' : 'T', 'C' : 'G', 'T' : 'A', 'G' : 'C'}
+def complement(base):
+    return _complement[base.upper()]
+
 def get_exons_from_transcript(transcript_id):
     """
     Filter exons down to those with this transcript_id
@@ -115,10 +119,7 @@ def get_transcript_index_from_pos(pos, transcript_id,
         logging.info("Transcript strand forward? %s = %d", transcript_id, forward)
         if skip_untranslated_region:
             # Adjust for translations (CDS) start region
-            #if forward:
             utr_length = get_five_prime_utr_length(exons, forward)
-            #else:
-            #    utr_length = get_three_prime_utr_length(exons, forward)
             logging.info("UTR length for %s = %d", transcript_id, utr_length)
             transcript_idx -= utr_length
     return transcript_idx
