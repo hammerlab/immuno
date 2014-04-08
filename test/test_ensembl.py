@@ -30,6 +30,16 @@ from immuno.ensembl.transcript_data import EnsemblReferenceData
 
 ref_data = EnsemblReferenceData()
 
+def test_get_strand_CASP9():
+    genomic_transcript = "ENST00000333868"
+    forward = ensembl.is_forward_strand(genomic_transcript)
+    assert(forward == False)
+
+def test_get_strand_CTNNB1():
+    genomic_transcript = "ENST00000453024"
+    forward = ensembl.is_forward_strand(genomic_transcript)
+    assert(forward == True)
+
 def test_load_CTNNB1_cdna_transcript():
     genomic_transcript = "ENST00000453024"
     transcript = ref_data.get_cdna(genomic_transcript)
@@ -122,23 +132,59 @@ def test_get_transcript_index_from_pos():
     transcript = ref_data.get_cdna(transcript_id)
     assert(transcript[idx] == variant['ref'])
 
-def test_get_utr_length_RET():
+def test_get_5prime_utr_length_RET():
 
     transcript_id = "ENST00000355710"
     exons = ensembl.get_exons_from_transcript(transcript_id)
-    exons = exons.sort(columns=['seq_region_start_exon', 'seq_region_end_exon'])
 
-    utr_length = ensembl.get_utr_length(exons)
+    utr_length = ensembl.get_five_prime_utr_length(exons)
+    print utr_length
     assert(utr_length == 232)
 
-def test_get_utr_length_CTNNB1():
+def test_get_3prime_utr_length_RET():
+
+    transcript_id = "ENST00000355710"
+    exons = ensembl.get_exons_from_transcript(transcript_id)
+ 
+    utr_length = ensembl.get_three_prime_utr_length(exons)
+    print utr_length
+    assert(utr_length == 2082)
+
+def test_get_5prime_utr_length_CTNNB1():
 
     transcript_id = "ENST00000405570"
     exons = ensembl.get_exons_from_transcript(transcript_id)
-    exons = exons.sort(columns=['seq_region_start_exon', 'seq_region_end_exon'])
-
-    utr_length = ensembl.get_utr_length(exons)
+ 
+    utr_length = ensembl.get_five_prime_utr_length(exons)
+    print utr_length
     assert(utr_length == 156)
+
+def test_get_3prime_utr_length_CTNNB1():
+
+    transcript_id = "ENST00000405570"
+    exons = ensembl.get_exons_from_transcript(transcript_id)
+
+    utr_length = ensembl.get_three_prime_utr_length(exons)
+    print utr_length
+    assert(utr_length == 11)
+
+def test_get_5prime_utr_length_reverse_strand_CASP9():
+
+    transcript_id = "ENST00000333868"
+    exons = ensembl.get_exons_from_transcript(transcript_id)
+ 
+    utr_length = ensembl.get_five_prime_utr_length(exons, forward = False)
+    print utr_length
+    assert(utr_length == 95)
+
+def test_get_3prime_utr_length_reverse_strand_CASP9():
+
+    transcript_id = "ENST00000333868"
+    exons = ensembl.get_exons_from_transcript(transcript_id)
+
+    utr_length = ensembl.get_three_prime_utr_length(exons, forward = False)
+    print utr_length
+    assert(utr_length == 673)
 
 def test_get_transcript_and_mutate_vcf():
     variant = {
@@ -208,6 +254,13 @@ def test_interval_search():
     idx = ensembl.get_idx_from_interval(51, intervals)
     assert(idx is None), idx
 
+def test_peptide_from_transcript():
+    """
+    test_peptide_from_transcript:
+
+    """
+    transcript_id = 'ENST00000333868'
+    cds_transcript = ref_data.get_cds(transcript_id)
 
 if __name__ == '__main__':
   from dsltools import testing_helpers

@@ -61,7 +61,6 @@ def peptide_from_transcript_variant(
         return bad_result
     idx = annotation.get_transcript_index_from_pos(pos, transcript_id,
         skip_untranslated_region = True)
-
     if idx is None:
         logging.warning(
             "Couldn't translate gene position %s into transcript index for %s",
@@ -82,7 +81,7 @@ def peptide_from_transcript_variant(
             stop = min(stop, max_length)
         else:
             seq = region.seq
-        return region.seq, start, stop, region.annot
+        return seq, start, stop, region.annot
     except:
         raise
     #except AssertionError, error:

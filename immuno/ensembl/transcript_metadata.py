@@ -175,18 +175,21 @@ def download_transcript_metadata(filter_contigs = STANDARD_CONTIGS):
             gene_transcript,
             on='transcript_id',
             suffixes=('_exon', '_transcript'))
-
+        print exon_w_transcript.columns
         exon_cols = [
             'name',
             'stable_id_gene',
             'description_gene',
             'seq_region_start_gene',
             'seq_region_end_gene',
+            'seq_region_strand_gene',
             'stable_id_transcript',
             'seq_region_start_transcript',
             'seq_region_end_transcript',
             'seq_start',
             'start_exon_id',
+            'seq_end',
+            'end_exon_id',
             'stable_id_translation',
             'stable_id_exon',
             'exon_id',
