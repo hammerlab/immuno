@@ -26,7 +26,7 @@ def test_peptide_from_protein_transcript():
     assert peptide is not None
     assert peptide[109] == 'R', peptide
 
-def test_peptide_from_transcript():
+def test_peptide_from_transcript_variant_CTNNB1():
     """
     test_peptide_from_transcript:
 
@@ -39,7 +39,10 @@ def test_peptide_from_transcript():
     transcript_id = 'ENST00000405570'
     peptide, start, stop, annot = \
         transcript_variant.peptide_from_transcript_variant(
-            transcript_id, 41265571, ref='A', alt='T', 
+            transcript_id,
+            41265571, 
+            ref='A', 
+            alt='T', 
             padding = None, 
             max_length = None)
     assert peptide is not None
@@ -47,6 +50,19 @@ def test_peptide_from_transcript():
     assert n == 781, (n, peptide)
     print(str(peptide))
     assert(peptide[3] == 'H')
+
+def test_peptide_from_transcript_variant_CASP9():
+    transcript_id = 'ENST00000333868'
+    peptide, start, stop, annot = \
+        transcript_variant.peptide_from_transcript_variant(
+            transcript_id, 
+            15820483, 
+            ref='C', 
+            alt='G', 
+            padding = None, 
+            max_length = None)    
+    assert peptide is not None
+    # TODO: actually look up what this variant ought to be
 
 
 if __name__ == '__main__':
