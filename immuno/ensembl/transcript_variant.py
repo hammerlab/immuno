@@ -46,8 +46,8 @@ def peptide_from_protein_transcript_variant(transcript_id, pos, ref, alt):
 
 def peptide_from_transcript_variant(
         transcript_id, pos, ref, alt,
-        padding=31,
-        max_length = 500):
+        padding = None,
+        max_length = None):
 
     transcript = _ensembl.get_cds(transcript_id)
     logging.info(
@@ -78,8 +78,10 @@ def peptide_from_transcript_variant(
         start = region.mutation_start
         stop = start + region.n_inserted
         if len(region.seq) > max_length:
-            mutated = mutated[:max_length]
+            seq = region.seq[:max_length]
             stop = min(stop, max_length)
+        else:
+            seq = region.seq
         return region.seq, start, stop, region.annot
     except:
         raise
