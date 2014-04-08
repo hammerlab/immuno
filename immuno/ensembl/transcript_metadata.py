@@ -19,7 +19,7 @@ import base64
 import logging
 
 import pandas as pd
-from epitopes.download import fetch_data, ensure_dir, build_path
+from epitopes.download import fetch_data, build_path
 
 STANDARD_CONTIGS = set([
     '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14',
@@ -175,7 +175,6 @@ def download_transcript_metadata(filter_contigs = STANDARD_CONTIGS):
             gene_transcript,
             on='transcript_id',
             suffixes=('_exon', '_transcript'))
-        print exon_w_transcript.columns
         exon_cols = [
             'name',
             'stable_id_gene',

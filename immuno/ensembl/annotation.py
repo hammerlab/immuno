@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import logging
-import numpy as np
 
 from annotation_data import EnsemblAnnotationData
 
@@ -102,8 +101,8 @@ def get_transcript_index_from_pos(pos, transcript_id,
     exons = get_exons_from_transcript(transcript_id)
     exons = exons.sort(columns=['seq_region_start_exon', 'seq_region_end_exon'])
     exons['exon_length'] = exons['seq_region_end_exon'] - exons['seq_region_start_exon'] + 1
-    starts = np.array(exons['seq_region_start_exon'])
-    stops = np.array(exons['seq_region_end_exon'])
+    starts = exons['seq_region_start_exon']
+    stops = exons['seq_region_end_exon']
     intervals = zip(starts, stops)
 
     transcript_length = exons['exon_length'].sum()
