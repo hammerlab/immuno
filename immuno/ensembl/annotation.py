@@ -18,6 +18,10 @@ from annotation_data import EnsemblAnnotationData
 
 data = EnsemblAnnotationData()
 
+_complement = {'A' : 'T', 'C' : 'G', 'T' : 'A', 'G' : 'C'}
+def complement(base):
+    return _complement[base.upper()]
+
 def get_exons_from_transcript(transcript_id):
     """
     Filter exons down to those with this transcript_id
@@ -36,6 +40,8 @@ def get_exons_from_transcript(transcript_id):
         'exon_id',
         'seq_start',
         'start_exon_id',
+        'seq_end',
+        'end_exon_id',
         'stable_id_exon',
         'seq_region_start_exon',
         'seq_region_end_exon'
@@ -53,6 +59,24 @@ def get_idx_from_interval(pos, intervals):
         else:
             return None
 
+def get_strand(transcript_id):
+    """
+    Gets the strand of the gene
+
+    Parameters
+    ----------
+    transcript_id :
+        Transcript id, of the from EST#####
+
+    Return strand : int, +1 for forward strand else -1
+    """
+    transcript_data = data.transcript_data
+    transcript_info = transcript_data[transcript_data['stable_id_transcript'] == transcript_id]
+    strand = list(transcript_info['seq_region_strand_gene'])[0]
+    return strand
+
+def is_forward_strand(transcript_id):
+    return get_strand(transcript_id) > 0
 
 def get_transcript_index_from_pos(pos, transcript_id,
         skip_untranslated_region= True):
@@ -76,22 +100,30 @@ def get_transcript_index_from_pos(pos, transcript_id,
     """
     exons = get_exons_from_transcript(transcript_id)
     exons = exons.sort(columns=['seq_region_start_exon', 'seq_region_end_exon'])
+    exons['exon_length'] = exons['seq_region_end_exon'] - exons['seq_region_start_exon'] + 1
     starts = exons['seq_region_start_exon']
     stops = exons['seq_region_end_exon']
     intervals = zip(starts, stops)
-    result = get_idx_from_interval(pos, intervals)
 
-    if result is None:
+    transcript_length = exons['exon_length'].sum()
+
+    transcript_idx = get_idx_from_interval(pos, intervals)
+    if transcript_idx is None:
         logging.warning("Couldn't find position %d in transcript %s",
             pos, transcript_id)
-    elif skip_untranslated_region:
-        # Adjust for translations (CDS) start region
-        utr_length = get_utr_length(exons)
-        logging.info("UTR length for %s = %d", transcript_id, utr_length)
-        result -= utr_length
-    return result
+    else:
+        # Reverse array index if on reverse strand
+        forward = is_forward_strand(transcript_id)
+        transcript_idx = transcript_idx if forward else transcript_length - transcript_idx - 1
+        logging.info("Transcript strand forward? %s = %d", transcript_id, forward)
+        if skip_untranslated_region:
+            # Adjust for translations (CDS) start region
+            utr_length = get_five_prime_utr_length(exons, forward)
+            logging.info("UTR length for %s = %d", transcript_id, utr_length)
+            transcript_idx -= utr_length
+    return transcript_idx
 
-def get_utr_length(exons_df):
+def get_five_prime_utr_length(exons_df, forward = True):
     """
     Gets the length of the 5' UTR from a set of sorted exons from a specifc transcript
 
@@ -101,17 +133,44 @@ def get_utr_length(exons_df):
             Also, 'start_exon_id' marks the exon that starts translation and 'seq_start'
             is the offset into the first translated exon
 
+    forward : bool, default = True, is forward strand or not
 
     Return utr_length : int
     """
+    exons_df = exons_df.sort(columns=['seq_region_start_exon', 'seq_region_end_exon'], ascending=[forward, forward])
     utr_length = 0
     for idx, row in exons_df.iterrows():
-        print row
-        if row['exon_id'] != row['start_exon_id']:
-            utr_length += row['seq_region_end_exon'] - row['seq_region_start_exon'] + 1
-        else:
+        if row['exon_id'] == row['start_exon_id']:
             utr_length += row['seq_start'] - 1
-            return utr_length
+            return utr_length         
+        else:
+            utr_length += row['seq_region_end_exon'] - row['seq_region_start_exon'] + 1
+    return None
+
+def get_three_prime_utr_length(exons_df, forward = True):
+    """
+    Gets the length of the 3' UTR from a set of sorted exons from a specifc transcript
+
+    Parameters
+    ----------
+    exons : Pandas dataframe with 'exon_id', 'seq_region_end_exon', 'seq_region_start_exon'
+            Also, 'end_exon_id' marks the exon that starts translation and 'seq_end'
+            is the offset into the last translated exon
+
+    forward : bool, default = True, is forward strand or not
+
+    Return utr_length : int
+    """
+    reverse = not forward
+    exons_df = exons_df.sort(columns=['seq_region_start_exon', 'seq_region_end_exon'], ascending=[reverse, reverse])
+    utr_length = 0
+    for idx, row in exons_df.iterrows():
+        exon_length = row['seq_region_end_exon'] - row['seq_region_start_exon'] + 1
+        if row['exon_id'] == row['end_exon_id']:
+            utr_length += exon_length - row['seq_end']
+            return utr_length           
+        else:
+            utr_length += exon_length
     return None
 
 def annotate(

@@ -48,7 +48,6 @@ def test_peptide_from_transcript_variant_CTNNB1():
     assert peptide is not None
     n = len(peptide)
     assert n == 781, (n, peptide)
-    print(str(peptide))
     assert(peptide[3] == 'H')
 
 def test_peptide_from_transcript_variant_CASP9():

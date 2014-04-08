@@ -50,10 +50,10 @@ class EnsemblAnnotationData(object):
             transcript_cols = [
                 'name', 'stable_id_gene', 'description_gene',
                 'seq_region_start_gene', 'seq_region_end_gene',
-                'stable_id_transcript', 'seq_region_start_transcript',
-                'seq_region_end_transcript'
+                'seq_region_strand_gene', 'stable_id_transcript', 
+                'seq_region_start_transcript', 'seq_region_end_transcript'
             ]
-            self._transcript_data = self.exon_data[transcript_cols]
+            self._transcript_data = self.exon_data[transcript_cols].drop_duplicates()
         return self._transcript_data
 
     @property
