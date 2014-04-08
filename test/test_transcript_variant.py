@@ -62,6 +62,7 @@ def test_peptide_from_transcript_variant_CASP9():
             padding = None, 
             max_length = None)    
     assert peptide is not None
+    assert len(peptide) == 416
     # TODO: actually look up what this variant ought to be
 
 
