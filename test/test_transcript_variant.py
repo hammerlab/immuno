@@ -39,10 +39,12 @@ def test_peptide_from_transcript():
     transcript_id = 'ENST00000405570'
     peptide, start, stop, annot = \
         transcript_variant.peptide_from_transcript_variant(
-            transcript_id, 41265571, ref='A', alt='T')
+            transcript_id, 41265571, ref='A', alt='T', 
+            padding = None, 
+            max_length = None)
     assert peptide is not None
     n = len(peptide)
-    assert n == 781, n
+    assert n == 781, (n, peptide)
     print(str(peptide))
     assert(peptide[3] == 'H')
 
