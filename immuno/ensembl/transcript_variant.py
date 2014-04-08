@@ -54,23 +54,37 @@ def peptide_from_transcript_variant(
         "CDS transcript length for %s = %d",
         transcript_id,
         len(transcript))
+
     bad_result = None, -1, -1, ""
 
     if not transcript:
         logging.warning("Couldn't find transcript for ID %s", transcript_id)
         return bad_result
+    
     idx = annotation.get_transcript_index_from_pos(pos, transcript_id,
         skip_untranslated_region = True)
+    
     if idx is None:
         logging.warning(
             "Couldn't translate gene position %s into transcript index for %s",
             pos,
             transcript_id)
         return bad_result
+    elif idx >= len(transcript):
+        logging.warning(
+            "Can't get position %d in coding sequence of length %d for transcript %s (%s %s > %s)",
+            idx, 
+            len(transcript),
+            transcript_id,
+            pos, 
+            ref, 
+            alt)
+        return bad_result
     try:
         forward = annotation.is_forward_strand(transcript_id)
         ref = ref if forward else annotation.complement(ref)
         alt = alt if forward else annotation.complement(alt)
+        
         region = mutate_protein_from_transcript(
             transcript,
             idx,
