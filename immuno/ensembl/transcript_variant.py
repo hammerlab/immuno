@@ -49,6 +49,20 @@ def peptide_from_transcript_variant(
         padding = None,
         max_length = None):
 
+    logging.info(
+        "Getting mutated peptide from transcript %s, chromosome pos %d %s > %s", 
+        transcript_id, 
+        pos, 
+        ref, 
+        alt)
+    forward = annotation.is_forward_strand(transcript_id)
+    ref = ref if forward else annotation.complement(ref)
+    alt = alt if forward else annotation.complement(alt)
+    if not forward:
+        logging.info("Backward strand, cDNA change is %d %s > %s", 
+            pos, 
+            ref, 
+            alt)
     transcript = _ensembl.get_cds(transcript_id)
     logging.info(
         "CDS transcript length for %s = %d",
@@ -61,7 +75,9 @@ def peptide_from_transcript_variant(
         logging.warning("Couldn't find transcript for ID %s", transcript_id)
         return bad_result
     
-    idx = annotation.get_transcript_index_from_pos(pos, transcript_id,
+    idx = annotation.get_transcript_index_from_pos(
+        pos, 
+        transcript_id,
         skip_untranslated_region = True)
     
     if idx is None:
@@ -80,11 +96,7 @@ def peptide_from_transcript_variant(
             ref, 
             alt)
         return bad_result
-    try:
-        forward = annotation.is_forward_strand(transcript_id)
-        ref = ref if forward else annotation.complement(ref)
-        alt = alt if forward else annotation.complement(alt)
-        
+    try:        
         region = mutate_protein_from_transcript(
             transcript,
             idx,
