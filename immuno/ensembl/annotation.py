@@ -78,7 +78,9 @@ def get_strand(transcript_id):
 def is_forward_strand(transcript_id):
     return get_strand(transcript_id) > 0
 
-def get_transcript_index_from_pos(pos, transcript_id,
+def get_transcript_index_from_pos(
+        pos, 
+        transcript_id,
         skip_untranslated_region= True):
     """
     Gets the index into to the transcript from genomic position
@@ -118,9 +120,14 @@ def get_transcript_index_from_pos(pos, transcript_id,
         logging.info("Transcript strand forward? %s = %d", transcript_id, forward)
         if skip_untranslated_region:
             # Adjust for translations (CDS) start region
-            utr_length = get_five_prime_utr_length(exons, forward)
-            logging.info("UTR length for %s = %d", transcript_id, utr_length)
-            transcript_idx -= utr_length
+            prefix_utr_length = get_five_prime_utr_length(exons, forward)
+            logging.info("UTR length for %s = %d", transcript_id, prefix_utr_length)
+            transcript_idx -= prefix_utr_length
+        # TODO: check that index is within the mRNA transcript
+        # need to get the length of the coding region from the transcript_id
+        #suffix_utr_length = get_three_prime_utr_length(exons, forward)
+        #assert transcript_idx <= transcript_length + suffix_utr_length
+
     return transcript_idx
 
 def get_five_prime_utr_length(exons_df, forward = True):
