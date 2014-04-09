@@ -175,6 +175,7 @@ def download_transcript_metadata(filter_contigs = STANDARD_CONTIGS):
             gene_transcript,
             on='transcript_id',
             suffixes=('_exon', '_transcript'))
+        print exon_w_transcript.columns
         exon_cols = [
             'name',
             'stable_id_gene',
@@ -192,6 +193,8 @@ def download_transcript_metadata(filter_contigs = STANDARD_CONTIGS):
             'stable_id_translation',
             'stable_id_exon',
             'exon_id',
+            'rank',
+            'phase',
             'seq_region_start_exon',
             'seq_region_end_exon']
         exon_data = exon_w_transcript[exon_cols]

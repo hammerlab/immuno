@@ -64,6 +64,21 @@ def test_peptide_from_transcript_variant_CASP9():
     assert len(peptide) == 416
     # TODO: actually look up what this variant ought to be
 
+def test_peptide_from_transcript_variant_CASP9_ref():
+    transcript_id = 'ENST00000424908'
+    peptide, start, stop, annot = \
+        transcript_variant.peptide_from_transcript_variant(
+            transcript_id, 
+            15820483, 
+            ref='C', 
+            alt='G', 
+            padding = None, 
+            max_length = None)    
+    assert peptide is not None
+    assert len(peptide) == 198
+    assert peptide[0] == 'X'
+    # TODO: actually look up what this variant ought to be
+
 
 if __name__ == '__main__':
   from dsltools import testing_helpers
