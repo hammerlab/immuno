@@ -110,7 +110,7 @@ def get_cds_start_phase(transcript_id):
     start_exon = get_start_exon(transcript_id)
     print start_exon
     if start_exon is not None:
-        return start_exon['phase']
+        return max(start_exon['phase'], 0)  # -1 means no phase (equiv. to zero)
     else:
         return None
 
