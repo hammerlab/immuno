@@ -78,6 +78,42 @@ def get_strand(transcript_id):
 def is_forward_strand(transcript_id):
     return get_strand(transcript_id) > 0
 
+def is_incomplete_cds(transcript_id):
+    """
+    Compute 5 prime incomplete CDS - checks the start_phase of the first exon
+
+    transcript_id :
+        Transcript id, of the from EST#####
+    """
+    start_phase = get_cds_start_phase(transcript_id)
+    if start_phase:
+        return start_phase > 0
+    else:
+        return False
+
+def get_start_exon(transcript_id):
+    exon_data = data.exon_data
+    first_exon_mask = (exon_data['stable_id_transcript'] == transcript_id) & (exon_data['rank'] == 1)
+    start_exon = exon_data[first_exon_mask]
+    if start_exon.empty:
+        return None
+    else:
+        return start_exon.to_dict(outtype = 'records')[0]
+
+def get_cds_start_phase(transcript_id):
+    """
+    Compute CDS start_phase - checks the phase of the first exon
+
+    transcript_id :
+        Transcript id, of the from EST#####
+    """
+    start_exon = get_start_exon(transcript_id)
+    print start_exon
+    if start_exon is not None:
+        return start_exon['phase']
+    else:
+        return None
+
 def get_transcript_index_from_pos(
         pos, 
         transcript_id,
@@ -123,6 +159,13 @@ def get_transcript_index_from_pos(
             prefix_utr_length = get_five_prime_utr_length(exons, forward)
             logging.info("UTR length for %s = %d", transcript_id, prefix_utr_length)
             transcript_idx -= prefix_utr_length
+
+        # Adjust for CDS start phase if first exon is out of phase
+        transcript_phase = get_cds_start_phase(transcript_id)
+        transcript_idx += transcript_phase
+        if transcript_phase > 0:
+            logging.warn("Transcript %s is incomplete", transcript_id)
+
         # TODO: check that index is within the mRNA transcript
         # need to get the length of the coding region from the transcript_id
         #suffix_utr_length = get_three_prime_utr_length(exons, forward)
