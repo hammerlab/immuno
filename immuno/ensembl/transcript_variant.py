@@ -79,7 +79,7 @@ def peptide_from_transcript_variant(
         pos, 
         transcript_id,
         skip_untranslated_region = True)
-    
+
     if idx is None:
         logging.warning(
             "Couldn't translate gene position %s into transcript index for %s",

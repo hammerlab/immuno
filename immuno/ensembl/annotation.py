@@ -108,7 +108,6 @@ def get_cds_start_phase(transcript_id):
         Transcript id, of the from EST#####
     """
     start_exon = get_start_exon(transcript_id)
-    print start_exon
     if start_exon is not None:
         return max(start_exon['phase'], 0)  # -1 means no phase (equiv. to zero)
     else:
@@ -144,8 +143,9 @@ def get_transcript_index_from_pos(
     intervals = zip(starts, stops)
 
     transcript_length = exons['exon_length'].sum()
-
+    logging.info("Full transcript length for %s = %d", transcript_id, transcript_length)
     transcript_idx = get_idx_from_interval(pos, intervals)
+
     if transcript_idx is None:
         logging.warning("Couldn't find position %d in transcript %s",
             pos, transcript_id)
@@ -158,7 +158,12 @@ def get_transcript_index_from_pos(
             # Adjust for translations (CDS) start region
             prefix_utr_length = get_five_prime_utr_length(exons, forward)
             logging.info("UTR length for %s = %d", transcript_id, prefix_utr_length)
-            transcript_idx -= prefix_utr_length
+            if transcript_idx < prefix_utr_length:
+                logging.warn("UTR mutation at cDNA position %d, transcript %s does not apply", 
+                    transcript_idx, transcript_id)
+                return None
+            else:
+                transcript_idx -= prefix_utr_length
 
         # Adjust for CDS start phase if first exon is out of phase
         transcript_phase = get_cds_start_phase(transcript_id)
