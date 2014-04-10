@@ -55,6 +55,7 @@ def peptide_from_transcript_variant(
         pos, 
         ref, 
         alt)
+    
     forward = annotation.is_forward_strand(transcript_id)
     ref = ref if forward else annotation.complement(ref)
     alt = alt if forward else annotation.complement(alt)
@@ -96,6 +97,7 @@ def peptide_from_transcript_variant(
             ref, 
             alt)
         return bad_result
+
     try:        
         region = mutate_protein_from_transcript(
             transcript,
@@ -105,7 +107,7 @@ def peptide_from_transcript_variant(
             padding = padding)
         start = region.mutation_start
         stop = start + region.n_inserted
-        if len(region.seq) > max_length:
+        if max_length and len(region.seq) > max_length:
             seq = region.seq[:max_length]
             stop = min(stop, max_length)
         else:

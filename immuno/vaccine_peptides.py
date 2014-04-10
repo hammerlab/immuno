@@ -91,9 +91,29 @@ def build_peptides_dataframe(
     ]
 
     records = []
-
+    # don't process a protein sequence / longer mutation region twice
+    seen_sequences = set([])
+    # don't process the same vaccine peptide twice
+    seen_peptides = set([])
     for (seq, mut_start, mut_end, mut_info, info, transcript_id), group in\
             epitopes_df.groupby(group_cols):
+        
+        seq_cache_key = (seq, mut_start, mut_end)
+        if seq_cache_key in seen_sequences:
+            logging.info(
+                "Already seen sequence %s (mut_start = %d, mut_end = %d), skipping", 
+                seq,
+                mut_start, 
+                mut_end)
+            continue
+        else:
+            logging.info(
+                "Extracting vaccine peptides from sequence %s (mut_start = %d, mut_end=%d)",
+                seq, 
+                mut_start, 
+                mut_end)
+            seen_sequences.add(seq_cache_key)
+
         first_row = group.irow(0)
 
         # common properties that all the peptides we extract from
@@ -114,14 +134,15 @@ def build_peptides_dataframe(
         elif n >= min_peptide_length:
             window_size = min(n, min_peptide_length)
         else:
-            logging.info("Skipping source sequence %s from %s, shorter than %d",
-                seq, info, min_peptide_length)
+            logging.info("Skipping source sequence %s (length %d) from %s, shorter than %d",
+                seq, len(seq), info, min_peptide_length)
             continue
         for i in xrange(n + 1 - window_size):
 
             peptide_start = i
             peptide_end = i + window_size
             peptide = seq[peptide_start : peptide_end]
+
 
             # where is the mutation relative to this peptide?
             peptide_mut_start = mut_start - peptide_start
@@ -137,14 +158,27 @@ def build_peptides_dataframe(
                     peptide_end)
                 continue
 
+            # if mutation goes outside the window, truncate it
+            peptide_mut_end = min(peptide_mut_end, window_size)
 
             # mutation start in the peptide should be between [0, len)
             # and end should be between [0, len]
-            assert peptide_mut_start >= 0
-            assert peptide_mut_start < window_size
-            assert peptide_mut_end >= 0
-            assert peptide_mut_end <= window_size
-
+            assert peptide_mut_start >= 0, "Expected non-negative start but got %s" % peptide_mut_start
+            assert peptide_mut_start < window_size, "Expected peptide start <= %s but got %s" % (window_size, peptide_mut_start)
+            assert peptide_mut_end >= 0, "Expected non-negative end but got %s" % peptide_mut_end
+            assert peptide_mut_end <= window_size, "Expected peptide end <= %s but got %s" % (window_size, peptide_mut_end)
+            
+            peptide_cache_key = (peptide, peptide_mut_start, peptide_mut_end)
+            if peptide_cache_key in seen_peptides:
+                logging.info(
+                    "Already added peptide %s mut_start = %d, mut_end = %d (from %s)", 
+                    peptide, 
+                    mut_start, 
+                    mut_end, 
+                    info)
+                continue
+            else:
+                seen_peptides.add(peptide_cache_key)
             # copy fields of this record so we can add it to the data frame
             row = dict(base_record)
             row['Peptide'] = peptide
@@ -228,6 +262,7 @@ def build_peptides_dataframe(
                 score = -np.inf
             row['Score'] = score
             records.append(row)
+    assert len(records) > 0, "No vaccine peptides"
     return pd.DataFrame.from_records(records)
 
 

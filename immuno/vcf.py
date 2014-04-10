@@ -129,24 +129,28 @@ def load_vcf(
     for (_, pos, ref, alt, transcript_id), group in \
             transcripts_df.groupby(group_cols):
         row = group.irow(0)
+        padding = peptide_length - 1 
         if transcript_id:
             logging.info("Getting peptide from transcript ID %s", transcript_id)
             seq, start, stop, annot = \
                 peptide_from_transcript_variant(
                     transcript_id, pos, ref, alt,
-                    padding = peptide_length - 1)
-
+                    padding = padding)
+            assert isinstance(start, int), (start, type(start))
+            assert isinstance(stop, int), (stop, type(stop))
         if seq:
             if '*' in seq:
                 logging.warning(
                     "Found stop codon in peptide %s from transcript_id %s",
                     region.seq,
                     transcript_id)
+            elif len(seq) <= padding:
+                logging.info(
+                    "Truncated peptide too short for transcript %s gene position %s %s > %s ", 
+                    transcript_id, pos, ref, alt)
             else:
                 row = deepcopy(row)
                 row['SourceSequence'] = seq
-                # TODO: actually use the  position
-                # to compute the start/stop of the mutated region
                 row['MutationStart'] = start
                 row['MutationEnd'] = stop
                 row['MutationInfo'] = annot
