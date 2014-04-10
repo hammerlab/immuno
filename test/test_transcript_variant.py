@@ -87,9 +87,7 @@ def test_peptide_from_transcript_variant_VWA3A():
             alt='A', 
             padding = None, 
             max_length = None)    
-    assert peptide is not None
-    assert len(peptide) == 286
-    assert(peptide[177] == 'K')
+    assert peptide is None
 
 if __name__ == '__main__':
   from dsltools import testing_helpers
