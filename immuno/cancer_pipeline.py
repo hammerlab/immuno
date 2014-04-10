@@ -15,7 +15,7 @@
 from __future__ import print_function
 import argparse
 import sys
-
+import re
 
 import pandas as pd
 from Bio import SeqIO
@@ -23,7 +23,7 @@ import numpy as np
 
 from common import peptide_substrings
 from immunogenicity import ImmunogenicityRFModel
-from binding import IEDBMHCBinding
+from mhc import IEDBMHCBinding, normalize_hla_allele_name
 from load_file import load_file
 from strings import load_comma_string
 from vaccine_peptides import build_peptides_dataframe
@@ -81,6 +81,17 @@ if __name__ == '__main__':
 
     peptide_length = int(args.peptide_length)
 
+
+    # get rid of gene descriptions if they're in the dataframe
+    if args.hla_file:
+        alleles = [normalize_hla_allele_name(l) for l in open(args.hla_file)]
+    elif args.hla:
+        alleles = [normalize_hla_allele_name(l) for l in args.hla.split(",")]
+    else:
+        alleles = [DEFAULT_ALLELE]
+
+
+
     # stack up the dataframes and later concatenate in case we
     # want both commandline strings (for weird mutations like translocations)
     # and files
@@ -105,13 +116,6 @@ if __name__ == '__main__':
         sys.exit()
     mutated_regions = pd.concat(mutated_region_dfs)
 
-    # get rid of gene descriptions if they're in the dataframe
-    if args.hla_file:
-        alleles = [l.strip().upper() for l in open(args.hla_file)]
-    elif args.hla:
-        alleles = [l.strip().upper() for l in args.hla.split(",")]
-    else:
-        alleles = [DEFAULT_ALLELE]
 
 
 
@@ -132,7 +136,8 @@ if __name__ == '__main__':
     else:
         mhc = IEDBMHCBinding(name = 'mhc', alleles=alleles)
         scored_epitopes = mhc.apply(mutated_regions)
-        # strong binders are considered percentile_rank < 2.0
+
+        assert 'percentile_rank' in scored_epitopes, scored_epitopes.head()
         mhc_percentile = scored_epitopes['percentile_rank']
         mhc_score = (100.0 - mhc_percentile) / 100.0
         scored_epitopes['mhc_score'] = mhc_score

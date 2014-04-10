@@ -21,25 +21,52 @@ import pandas as pd
 
 from pipeline import PipelineElement
 
+
+def normalize_hla_allele_name(hla):
+    """
+    HLA allele names can look like:
+        - HLA-A*03:02
+        - HLA-A02:03
+        - HLA-A:02:03
+        - HLA-A2
+        - A2 
+        - A*03:02
+        - A02:02
+        - A:02:03
+    ...should all be normalized to:
+        HLA-A*03:02:03
+    """
+    hla = hla.strip().upper()
+    match = re.match('(HLA\-)?([A-Z])(\*|:)?([0-9][0-9]?):?([0-9][0-9]?)$', hla)
+    assert match, "Malformed HLA type %s" % hla 
+    (_, gene, _, family, protein) = match.groups()
+    if len(family) == 1:
+        family = "0" + family 
+    if len(protein) == 1:
+        protein = "0" + protein 
+    return "HLA-%s*%s:%s" % (gene, family, protein )
+
 class IEDBMHCBinding(PipelineElement):
 
-  def __init__(self, alleles=[],
+  def __init__(
+        self, 
+        alleles=[],
         name="IEDB-MHC-Binding",
         method='recommended',
-        lengths = [9,10,11],
+        lengths = [9],
         url='http://tools.iedb.org/tools_api/mhci/'):
     self.name = name
     self._method = method
     self._lengths = lengths
     self._url = url
-    self._alleles = ",".join(alleles)
+    self._alleles = alleles
 
   def _get_iedb_request_params(self, sequence):
     params = {
         "method" : self._method,
         "length" : ",".join(str(l) for l in self._lengths),
         "sequence_text" : sequence,
-        "allele" : self._alleles,
+        "allele" : ",".join(self._alleles),
     }
     return params
 
@@ -73,7 +100,9 @@ class IEDBMHCBinding(PipelineElement):
     responses = {}
     for i, peptide in enumerate(data.SourceSequence):
         if peptide not in responses:
-            responses[peptide] = self.query_iedb(peptide, data['info'][i])
+            response = self.query_iedb(peptide, data['info'][i])
+            logging.info("IEDB response: %s", response)
+            responses[peptide] = response 
         else:
             logging.info(
                 "Skipping binding for peptide %s, already queried",
