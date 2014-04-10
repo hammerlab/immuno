@@ -50,9 +50,23 @@ if __name__ == '__main__':
         "--alleles",
         help="comma separated list of allele (default HLA-A*02:01)")
     parser.add_argument(
-        "--output",
+        "--epitopes-output",
         help="output file for dataframe containing scored epitopes",
         required=False)
+    parser.add_argument(
+        "--peptides-output",
+        help="output file for dataframe containing scored vaccine peptides",
+        required=False)
+    parser.add_argument(
+        "--print-epitopes",
+        help="print dataframe with epitope scores",
+        default=False,
+        action="store_true")
+    parser.add_argument(
+        "--print-peptides",
+        default = False, 
+        help="print dataframe with vaccine peptide scores",
+        action="store_true")
     parser.add_argument(
         "--html-report",
         default = "report.html",
@@ -138,14 +152,18 @@ if __name__ == '__main__':
 
     scored_epitopes['combined_score'] = combined_score
     scored_epitopes = scored_epitopes.sort(columns=('combined_score',))
-    if args.output:
-        scored_epitopes.to_csv(args.output, index=False)
-    else:
+    if args.epitopes_output:
+        scored_epitopes.to_csv(args.epitopes_output, index=False)
+    if args.print_epitopes:
         print(scored_epitopes.to_string())
 
     scored_peptides = build_peptides_dataframe(scored_epitopes,
         peptide_length = peptide_length)
 
+    if args.peptides_output:
+        scored_peptides.to_csv(args.peptides_output, index=False)
+    if args.print_peptides:
+        print(scored_peptides.to_string())
     html = build_html_report(scored_epitopes, scored_peptides)
     with open(args.html_report, 'w') as f:
         f.write(html)
