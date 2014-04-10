@@ -92,10 +92,10 @@ if __name__ == '__main__':
     mutated_regions = pd.concat(mutated_region_dfs)
 
     # get rid of gene descriptions if they're in the dataframe
-    if args.allele_file:
-        alleles = [l.strip() for l in open(args.allele_file)]
-    elif args.alleles:
-        alleles = [l.strip() for l in args.alleles.split(",")]
+    if args.hla_file:
+        alleles = [l.strip().upper() for l in open(args.allele_file)]
+    elif args.hla:
+        alleles = [l.strip().upper() for l in args.alleles.split(",")]
     else:
         alleles = [DEFAULT_ALLELE]
 
