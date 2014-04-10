@@ -93,9 +93,9 @@ if __name__ == '__main__':
 
     # get rid of gene descriptions if they're in the dataframe
     if args.hla_file:
-        alleles = [l.strip().upper() for l in open(args.allele_file)]
+        alleles = [l.strip().upper() for l in open(args.hla_file)]
     elif args.hla:
-        alleles = [l.strip().upper() for l in args.alleles.split(",")]
+        alleles = [l.strip().upper() for l in args.hla.split(",")]
     else:
         alleles = [DEFAULT_ALLELE]
 
