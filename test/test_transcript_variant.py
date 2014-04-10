@@ -13,7 +13,6 @@
 # limitations under the License.
 
 from immuno.ensembl import transcript_variant
-import immuno.common
 
 protein_id = "ENSP00000427553"
 protein_sequence = \
@@ -77,8 +76,20 @@ def test_peptide_from_transcript_variant_CASP9_ref():
     assert peptide is not None
     assert len(peptide) == 198
     assert peptide[0] == 'X'
-    # TODO: actually look up what this variant ought to be
 
+def test_peptide_from_transcript_variant_VWA3A():
+    transcript_id = 'ENST00000389397'
+    peptide, start, stop, annot = \
+        transcript_variant.peptide_from_transcript_variant(
+            transcript_id, 
+            22128096, 
+            ref='G', 
+            alt='A', 
+            padding = None, 
+            max_length = None)    
+    assert peptide is not None
+    assert len(peptide) == 286
+    assert(peptide[177] == 'K')
 
 if __name__ == '__main__':
   from dsltools import testing_helpers
