@@ -16,6 +16,7 @@ import urllib2
 import urllib
 from StringIO import StringIO
 import logging
+import re
 
 import pandas as pd
 
@@ -78,7 +79,6 @@ class IEDBMHCBinding(PipelineElement):
       data = urllib.urlencode(request_values)
       req = urllib2.Request(self._url, data)
       response = urllib2.urlopen(req).read()
-
       return pd.read_csv(StringIO(response), sep='\t', na_values=['-'])
     except KeyboardInterrupt:
         raise
@@ -101,7 +101,6 @@ class IEDBMHCBinding(PipelineElement):
     for i, peptide in enumerate(data.SourceSequence):
         if peptide not in responses:
             response = self.query_iedb(peptide, data['info'][i])
-            logging.info("IEDB response: %s", response)
             responses[peptide] = response 
         else:
             logging.info(
