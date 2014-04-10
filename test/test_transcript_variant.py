@@ -86,8 +86,22 @@ def test_peptide_from_transcript_variant_VWA3A():
             ref='G', 
             alt='A', 
             padding = None, 
-            max_length = None)    
+            max_length = None)   
+    # expected mutation in the UTR to yield None
     assert peptide is None
+
+def test_peptide_from_transcript_variant_RET():
+    transcript_id = 'ENST00000340058'
+    peptide, start, stop, annot = \
+        transcript_variant.peptide_from_transcript_variant(
+            transcript_id, 
+            43617416, 
+            ref='T', 
+            alt='C', 
+            padding = None, 
+            max_length = None)    
+    assert peptide is not None
+    print peptide
 
 if __name__ == '__main__':
   from dsltools import testing_helpers
