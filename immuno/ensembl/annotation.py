@@ -72,6 +72,11 @@ def get_strand(transcript_id):
     """
     transcript_data = data.transcript_data
     transcript_info = transcript_data[transcript_data['stable_id_transcript'] == transcript_id]
+
+    if transcript_info.empty:
+        logging.warn("Transcript %s has no sequence information", transcript_id)
+        return 1
+
     strand = list(transcript_info['seq_region_strand_gene'])[0]
     return strand
 
