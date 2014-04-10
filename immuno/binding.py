@@ -96,7 +96,8 @@ class IEDBMHCBinding(PipelineElement):
 
     drop_fields = ('seq_num', 'method')
     for field in drop_fields:
-        result = result.drop(field, axis = 1)
+        if field in result:
+            result = result.drop(field, axis = 1)
     return result
 
 class IEDBMHC1Binding(IEDBMHCBinding):

@@ -44,10 +44,10 @@ if __name__ == '__main__':
         default=31,
         type = int,
         help="length of vaccine peptides (may contain multiple epitopes)")
-    parser.add_argument("--allele-file",
-        help="file with one allele per line")
+    parser.add_argument("--hla-file",
+        help="file with one HLA allele per line")
     parser.add_argument(
-        "--alleles",
+        "--hla",
         help="comma separated list of allele (default HLA-A*02:01)")
     parser.add_argument(
         "--output",
