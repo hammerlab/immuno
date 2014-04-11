@@ -19,8 +19,8 @@ from annotation_data import EnsemblAnnotationData
 data = EnsemblAnnotationData()
 
 _complement = {'A' : 'T', 'C' : 'G', 'T' : 'A', 'G' : 'C'}
-def complement(base):
-    return _complement[base.upper()]
+def complement(sequence):
+    return "".join(_complement[base.upper()] for base in sequence)
 
 def get_exons_from_transcript(transcript_id):
     """
