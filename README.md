@@ -1,14 +1,7 @@
 ## Immunotherapy Pipeline
 
-### Usage
-First you'll have to install the epitopes package.  You can download that from: [https://github.com/hammerlab/epitopes](https://github.com/hammerlab/epitopes/)
 
-```sh
-git clone https://github.com/hammerlab/epitopes.git
-cd epitopes
-python setup.py install
-```
-
+### Usage 
 #### From peptide string
 ```sh
 python cancer_pipeline.py --string EDLTVKIGDFGLATEKSRWSGSHQFEQLS --hla HLA-B*35:01
@@ -36,3 +29,20 @@ If you don't either an `hla` or `hla-file` then the default "HLA:A*02:01" will b
 * `--print-peptides`: Print dataframe with vaccine peptide scores
 * `--html-report`: Path to HTML report containing scored peptides and epitopes
 * `--skip-mhc`: Don't predict MHC binding
+
+
+### Requirements
+First you'll have to install the epitopes package.  You can download that from: [https://github.com/hammerlab/epitopes](https://github.com/hammerlab/epitopes/)
+
+```sh
+git clone https://github.com/hammerlab/epitopes.git
+cd epitopes
+python setup.py install
+```
+
+Additionally, you'll need to install:
+
+* [nose](https://nose.readthedocs.org/en/latest/)
+* [NumPy](http://www.numpy.org/)
+* [pandas](http://pandas.pydata.org/)
+* [BioPython](http://biopython.org/wiki/Main_Page)
