@@ -17,12 +17,13 @@ import pandas as pd
 from immuno.ensembl import transcript_variant
 
 def test_dbnsfp_validation_set():
+
     validation_set = pd.read_csv('dbnsfp_validation_set.csv')
     for idx, row in validation_set.iterrows():
-        yield (validation_transcript_mutation, row)
+        yield (validate_transcript_mutation, row)
 
 
-def validation_transcript_mutation(row):
+def validate_transcript_mutation(row):
     transcript_id = row['ensembl_transcript']
     print row
     peptide, start, stop, annot = \
