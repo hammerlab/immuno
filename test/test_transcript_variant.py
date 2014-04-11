@@ -101,10 +101,21 @@ def test_peptide_from_transcript_variant_RET():
             padding = None, 
             max_length = None)    
     assert peptide is not None
-    print peptide
+
+def test_peptide_from_transcript_variant_PAR():
+
+    transcript_id = 'ENST00000371279'
+    peptide, start, stop, annot = \
+        transcript_variant.peptide_from_transcript_variant(
+            transcript_id, 
+            55224569, 
+            ref='T', 
+            alt='G', 
+            padding = None, 
+            max_length = None)    
+    assert peptide is not None
+
 
 if __name__ == '__main__':
   from dsltools import testing_helpers
   testing_helpers.run_local_tests()
-
-

@@ -57,9 +57,8 @@ def peptide_from_transcript_variant(
         alt)
     
     forward = annotation.is_forward_strand(transcript_id)
-    ref = ref if forward else annotation.complement(ref)[::-1]
-    alt = alt if forward else annotation.complement(alt)[::-1]
-    pos = pos if forward else pos - len(ref) - 1
+    ref = ref if forward else annotation.reverse_complement(ref)
+    alt = alt if forward else annotation.reverse_complement(alt)
     if not forward:
         logging.info("Backward strand, cDNA change is %d %s > %s", 
             pos, 
@@ -81,7 +80,6 @@ def peptide_from_transcript_variant(
         pos, 
         transcript_id,
         skip_untranslated_region = True)
-
     if idx is None:
         logging.warning(
             "Couldn't translate gene position %s into transcript index for %s",
@@ -99,7 +97,8 @@ def peptide_from_transcript_variant(
             alt)
         return bad_result
 
-    try:        
+    try:      
+        idx = idx if forward else idx - len(ref) + 1  
         region = mutate_protein_from_transcript(
             transcript,
             idx,

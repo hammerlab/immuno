@@ -13,14 +13,14 @@
 # limitations under the License.
 
 import logging
+from Bio.Seq import Seq
 
 from annotation_data import EnsemblAnnotationData
 
 data = EnsemblAnnotationData()
 
-_complement = {'A' : 'T', 'C' : 'G', 'T' : 'A', 'G' : 'C'}
-def complement(sequence):
-    return "".join(_complement[base.upper()] for base in sequence)
+def reverse_complement(sequence):
+    return str(Seq(sequence).reverse_complement())
 
 def get_exons_from_transcript(transcript_id):
     """

@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from Bio.Seq import Seq
 import pandas as pd
 from epitopes.mutate import mutate_protein_from_transcript
 
@@ -31,10 +30,10 @@ from immuno.ensembl.transcript_data import EnsemblReferenceData
 ref_data = EnsemblReferenceData()
 
 def test_complement_base():
-    assert ensembl.complement("G") == "C"
+    assert ensembl.reverse_complement("G") == "C"
 
 def test_complement_seq():
-    assert ensembl.complement("TCTCATCCAGGTACCAGCCAATG") == "AGAGTAGGTCCATGGTCGGTTAC"
+    assert ensembl.reverse_complement("TCTCATCCAGGTACCAGCCAATG") == "AGAGTAGGTCCATGGTCGGTTAC"[::-1]
 
 def test_get_strand_CASP9():
     genomic_transcript = "ENST00000333868"
@@ -260,13 +259,25 @@ def test_interval_search():
     idx = ensembl.get_idx_from_interval(51, intervals)
     assert(idx is None), idx
 
-def test_peptide_from_transcript():
+def test_peptide_from_transcript_PARS2():
     """
     test_peptide_from_transcript:
 
     """
-    transcript_id = 'ENST00000333868'
-    cds_transcript = ref_data.get_cds(transcript_id)
+    transcript_id = 'ENST00000371279'
+    variant = {
+        'chr' : '1',
+        'pos' : 55224569,
+        'ref' : 'T',
+        'alt' : 'G'
+    }
+
+    cds_idx = ensembl.get_transcript_index_from_pos(
+        variant['pos'], transcript_id, skip_untranslated_region = True)
+    assert cds_idx is not None
+    assert cds_idx == 265
+
+
 
 if __name__ == '__main__':
   from dsltools import testing_helpers
