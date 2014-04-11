@@ -57,8 +57,9 @@ def peptide_from_transcript_variant(
         alt)
     
     forward = annotation.is_forward_strand(transcript_id)
-    ref = ref if forward else annotation.complement(ref)
-    alt = alt if forward else annotation.complement(alt)
+    ref = ref if forward else annotation.complement(ref)[::-1]
+    alt = alt if forward else annotation.complement(alt)[::-1]
+    pos = pos if forward else pos - len(ref) - 1
     if not forward:
         logging.info("Backward strand, cDNA change is %d %s > %s", 
             pos, 

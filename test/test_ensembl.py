@@ -30,6 +30,12 @@ from immuno.ensembl.transcript_data import EnsemblReferenceData
 
 ref_data = EnsemblReferenceData()
 
+def test_complement_base():
+    assert ensembl.complement("G") == "C"
+
+def test_complement_seq():
+    assert ensembl.complement("TCTCATCCAGGTACCAGCCAATG") == "AGAGTAGGTCCATGGTCGGTTAC"
+
 def test_get_strand_CASP9():
     genomic_transcript = "ENST00000333868"
     forward = ensembl.is_forward_strand(genomic_transcript)
