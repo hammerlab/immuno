@@ -60,10 +60,17 @@ page_template = \
 </style>
 <head><title>Immune Pipeline Results (%s)</title></head>
 <body>
-<h2>Mutation Regions</h2>
+<h2>Vaccine Peptides</h2>
 %s
 <hr>
-<h2>Sorted Scores Results</h2>
+
+<h2>All Peptide Scores</h2>
+<center>
+%s
+</center> 
+<hr>
+
+<h2>All Epitope Scores</h2>
 <center>
 %s
 </center>
@@ -109,7 +116,7 @@ color_cell = \
 <td style="background-color: %s;">&nbsp;</td>
 """
 
-def build_html_report(scored_epitopes, scored_peptides):
+def build_html_report(scored_epitopes, scored_peptides, unique_transcripts = True):
     scored_epitopes = scored_epitopes.sort(
         columns=('combined_score',), ascending=False)
 
@@ -122,6 +129,7 @@ def build_html_report(scored_epitopes, scored_peptides):
     # is 'near' a mutation
     max_epitope_len = scored_epitopes.Epitope.str.len().max()
 
+    seen_transcript_ids = set([])
 
     group_cols = [
         "Peptide",
@@ -142,6 +150,13 @@ def build_html_report(scored_epitopes, scored_peptides):
             transcript_id,
             peptide_score, src_seq
         ), _ in scored_peptides.groupby(group_cols):
+
+        if unique_transcripts:
+            if transcript_id in seen_transcript_ids:
+                continue
+            else:
+                seen_transcript_ids.add(transcript_id)  
+                      
         n = len(peptide)
 
         scores = np.zeros(n, dtype=float)
@@ -251,11 +266,16 @@ def build_html_report(scored_epitopes, scored_peptides):
     for col_name in optional_columns:
         if col_name in scored_epitopes:
             epitope_columns.append(col_name)
+    peptide_table = scored_peptides.to_html(
+        index = False, 
+        na_rep = "-",
+    )
+    
     epitope_table = scored_epitopes.to_html(
         index=False,
         na_rep="-",
         columns = epitope_columns)
 
     page = page_template % \
-        (datetime.date.today(), peptide_divs_html,  epitope_table)
+        (datetime.date.today(), peptide_divs_html, peptide_table, epitope_table)
     return page

@@ -20,7 +20,8 @@ import numpy as np
 def build_peptides_dataframe(
         epitopes_df,
         peptide_length,
-        min_peptide_length = None):
+        min_peptide_length = None,
+        min_peptide_padding = 0):
     """
     Given a dataframe with a 'combined_score' for each short epitope
     create another dataframe of all longer vaccine peptides ranked by the
@@ -52,6 +53,9 @@ def build_peptides_dataframe(
     min_peptide_length : int, optional
         If a SourceSequence is shorter than peptide_length, should we use it?
         Omitting min_peptide_length sets it equal to peptide_length.
+
+    min_peptide_padding : int, optional 
+        How many wildtype residues should be included before or after the mutation start? 
 
     Returns a new dataframe with columns:
         - 'Peptide':  amino acid sequence composed of multiple epitopes
@@ -137,10 +141,9 @@ def build_peptides_dataframe(
             logging.info("Skipping source sequence %s (length %d) from %s, shorter than %d",
                 seq, len(seq), info, min_peptide_length)
             continue
-        for i in xrange(n + 1 - window_size):
 
-            peptide_start = i
-            peptide_end = i + window_size
+        for peptide_start in xrange(min_peptide_padding, n + 1 - window_size - min_peptide_padding):
+            peptide_end = peptide_start + window_size
             peptide = seq[peptide_start : peptide_end]
 
 

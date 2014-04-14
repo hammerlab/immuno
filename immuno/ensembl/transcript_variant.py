@@ -65,6 +65,7 @@ def peptide_from_transcript_variant(
             ref, 
             alt)
     transcript = _ensembl.get_cds(transcript_id)
+    
     logging.info(
         "CDS transcript length for %s = %d",
         transcript_id,

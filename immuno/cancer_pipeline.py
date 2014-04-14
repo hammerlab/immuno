@@ -43,6 +43,10 @@ if __name__ == '__main__':
         default=31,
         type = int,
         help="length of vaccine peptides (may contain multiple epitopes)")
+    parser.add_argument("--min-peptide-padding", 
+        default = 5, 
+        type = int, 
+        help = "minimum number of wildtype residues before or after a mutation")
     parser.add_argument("--hla-file",
         help="file with one HLA allele per line")
     parser.add_argument(
@@ -162,8 +166,9 @@ if __name__ == '__main__':
         print(scored_epitopes.to_string())
 
     scored_peptides = build_peptides_dataframe(scored_epitopes,
-        peptide_length = peptide_length)
-
+        peptide_length = peptide_length, 
+        min_peptide_padding = args.min_peptide_padding)
+    
     if args.peptides_output:
         scored_peptides.to_csv(args.peptides_output, index=False)
     if args.print_peptides:
