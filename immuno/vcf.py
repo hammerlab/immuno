@@ -123,7 +123,7 @@ def load_vcf(
     transcripts_df = annotation.annotate_vcf_transcripts(vcf_df)
 
     logging.info("Annotated VCF has %d entries", len(transcripts_df))
-
+    
     new_rows = []
     group_cols = ['chr','pos', 'ref', 'alt', 'stable_id_transcript']
     for (_, pos, ref, alt, transcript_id), group in \
