@@ -143,7 +143,9 @@ if __name__ == '__main__':
         assert 'percentile_rank' in scored_epitopes, scored_epitopes.head()
         mhc_percentile = scored_epitopes['percentile_rank']
         mhc_score = (100.0 - mhc_percentile) / 100.0
+        mhc_binding_category = mhc_percentile <= 2.0
         scored_epitopes['mhc_score'] = mhc_score
+        scored_epitopes['mhc_binding_category'] = mhc_binding_category
 
     immunogenicity = ImmunogenicityRFModel(name = 'immunogenicity')
     scored_epitopes = immunogenicity.apply(scored_epitopes)
@@ -156,7 +158,7 @@ if __name__ == '__main__':
     if args.skip_mhc:
         combined_score = imm_score
     else:
-        combined_score = (mhc_score + imm_score) / 2.0
+        combined_score = (2*mhc_score + imm_score + mhc_binding_category) / 4.0
 
     scored_epitopes['combined_score'] = combined_score
     scored_epitopes = scored_epitopes.sort(columns=('combined_score',))
