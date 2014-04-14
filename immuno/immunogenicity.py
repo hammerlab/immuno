@@ -19,6 +19,7 @@ from os.path import exists
 from sklearn import ensemble
 import numpy as np
 import pandas as pd
+import scipy.stats 
 
 from epitopes import \
     (cri_tumor_antigens, iedb, features, reduced_alphabet, reference)
@@ -45,7 +46,14 @@ def train(
         return_transformer = True)
     ensemble = BalancedEnsembleClassifier()
     ensemble.fit(X, Y)
-    return vectorizer, ensemble
+
+    reference_peptides = reference.load_peptide_set(peptide_length = 9, nrows = 1000)
+    # filter out stop codons and unknown residues
+    reference_peptides = [p for p in reference_peptides if '*' not in p and 'X' not in p]
+    reference_peptide_vectors = vectorizer.transform(reference_peptides)
+    reference_scores = ensemble.decision_function(reference_peptide_vectors)
+
+    return vectorizer, ensemble, reference_scores 
 
 
 def train_cached(
@@ -70,16 +78,26 @@ def train_cached(
         (assay_group, mhc_class, max_ngram, alphabet)
     vectorizer_filename = vectorizer_base_filename + suffix
 
-    if exists(model_filename) and exists(vectorizer_filename):
+
+    reference_scores_base_filename = \
+        "immunogenicity_reference_scores_assay_%s_mhc_%s_ngram_%s_alphabet_%s" % \
+        (assay_group, mhc_class, max_ngram, alphabet)
+
+    reference_scores_filename = reference_scores_base_filename + suffix
+
+    if exists(model_filename) and exists(vectorizer_filename) and exists(reference_scores_filename):
         logging.debug("Loading cached immunogenicity classifier and vectorizer")
         with open(vectorizer_filename, 'r') as vectorizer_file:
             vectorizer = cPickle.load(vectorizer_file)
 
         with open(model_filename, 'r') as model_file:
             clf = cPickle.load(model_file)
-        return vectorizer, clf
 
-    vectorizer, clf = train()
+        with open(reference_scores_filename, 'r') as scores_file:
+            reference_scores = cPickle.load(scores_file)
+        return vectorizer, clf, reference_scores 
+
+    vectorizer, clf, reference_scores = train()
 
     with open(vectorizer_filename, 'w') as vectorizer_file:
         cPickle.dump(vectorizer, vectorizer_file, cPickle.HIGHEST_PROTOCOL)
@@ -87,7 +105,11 @@ def train_cached(
     with open(model_filename, 'w') as model_file:
         cPickle.dump(clf, model_file, cPickle.HIGHEST_PROTOCOL)
 
-    return vectorizer, clf
+
+    with open(reference_scores_filename, 'w') as scores_file:
+        cPickle.dump(reference_scores, scores_file, cPickle.HIGHEST_PROTOCOL)
+
+    return vectorizer, clf, reference_scores 
 
 class ImmunogenicityRFModel(PipelineElement):
 
@@ -96,9 +118,10 @@ class ImmunogenicityRFModel(PipelineElement):
             classifier = None, vectorizer = None):
         self.name = name
         if classifier is None and vectorizer is None:
-            vectorizer, classifier = train_cached()
+            vectorizer, classifier, reference_scores = train_cached()
         self.vectorizer = vectorizer
         self.classifier = classifier
+        self.reference_scores = reference_scores 
 
 
     def verify(self):
@@ -109,4 +132,9 @@ class ImmunogenicityRFModel(PipelineElement):
             X = self.vectorizer.transform(df.Epitope)
         else:
             X = df.Epitope
-        return self.classifier.decision_function(X)
+        probs = self.classifier.decision_function(X)
+        percentiles = []
+        for prob in probs:
+            prctile = scipy.stats.percentileofscore(self.reference_scores, prob)
+            percentiles.append(prctile)
+        return np.array(percentiles) / 100.0
