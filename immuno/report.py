@@ -60,6 +60,12 @@ page_template = \
 </style>
 <head><title>Immune Pipeline Results (%s)</title></head>
 <body>
+<h2>Input</h2>
+<div><i>%s</i></div>
+<h2>HLA Alleles</h2>
+<ul>
+ %s
+</ul>
 <h2>Vaccine Peptides</h2>
 %s
 <hr>
@@ -86,13 +92,15 @@ table_template = \
 <td  class='row_title'>Sequence</td>
 %s
 </tr>
-<tr>
 
-<td class='row_title'>MHC Binding</td>
+
+<tr>
+<td class='row_title'>MHC Binding Percentile</td>
 %s
 </tr>
-<tr>
 
+
+<tr>
 <td class='row_title'>Immunogenicity</td>
 %s
 </tr>
@@ -116,7 +124,12 @@ color_cell = \
 <td style="background-color: %s;">&nbsp;</td>
 """
 
-def build_html_report(scored_epitopes, scored_peptides, unique_transcripts = True):
+def build_html_report(
+        input_file_or_string, 
+        hla_alleles, 
+        scored_epitopes, 
+        scored_peptides, 
+        unique_transcripts = True):
     scored_epitopes = scored_epitopes.sort(
         columns=('combined_score',), ascending=False)
 
@@ -162,6 +175,7 @@ def build_html_report(scored_epitopes, scored_peptides, unique_transcripts = Tru
         scores = np.zeros(n, dtype=float)
         imm_scores = np.zeros(n, dtype=float)
         mhc_scores = np.zeros(n, dtype=float)
+        mhc_prctile_scores = np.zeros(n, dtype=float)
         score_counts = np.ones(n, dtype=int)
 
         mask = (scored_epitopes.SourceSequence == src_seq)
@@ -189,6 +203,7 @@ def build_html_report(scored_epitopes, scored_peptides, unique_transcripts = Tru
                 imm_scores[start:stop] += row['immunogenicity']
             if 'percentile_rank' in row:
                 mhc_scores[start:stop] += (100 - row['percentile_rank']) / 100.0
+                #mhc_prctile_scores[start:stop] += (row['percentile_rank'] <= 2.0)
             score_counts[start:stop] += 1
 
         # default background for all letters of the sequence is gray
@@ -197,6 +212,7 @@ def build_html_report(scored_epitopes, scored_peptides, unique_transcripts = Tru
         colors = []
         imm_colors = []
         mhc_colors = []
+        #mhc_prctile_colors = []
         scores /= score_counts
         imm_scores /= score_counts
         mhc_scores /= score_counts
@@ -277,5 +293,12 @@ def build_html_report(scored_epitopes, scored_peptides, unique_transcripts = Tru
         columns = epitope_columns)
 
     page = page_template % \
-        (datetime.date.today(), peptide_divs_html, peptide_table, epitope_table)
+        (
+            datetime.date.today(), 
+            input_file_or_string,
+            " ".join("<li>%s</li>" % allele for allele in hla_alleles),
+            peptide_divs_html, 
+            peptide_table,
+            epitope_table
+        )
     return page

@@ -158,7 +158,7 @@ if __name__ == '__main__':
     if args.skip_mhc:
         combined_score = imm_score
     else:
-        combined_score = (2*mhc_score + imm_score + mhc_binding_category) / 4.0
+        combined_score = (mhc_score + imm_score + 2*mhc_binding_category) / 4.0
 
     scored_epitopes['combined_score'] = combined_score
     scored_epitopes = scored_epitopes.sort(columns=('combined_score',))
@@ -175,7 +175,11 @@ if __name__ == '__main__':
         scored_peptides.to_csv(args.peptides_output, index=False)
     if args.print_peptides:
         print(scored_peptides.to_string())
-    html = build_html_report(scored_epitopes, scored_peptides)
+
+    input_names = ";".join(args.input)
+    if args.string:
+        input_names += ";" + args.string
+    html = build_html_report(input_names, alleles, scored_epitopes, scored_peptides)
     with open(args.html_report, 'w') as f:
         f.write(html)
 
