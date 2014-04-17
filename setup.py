@@ -31,7 +31,7 @@ from setuptools import setup
 if __name__ == '__main__':
     setup(
         name='immuno',
-        version="0.1",
+        version="0.2",
         description="Evaluate immunotherapy from given set of variants",
         url="https://github.com/hammerlab/immuno",
         license="http://www.apache.org/licenses/LICENSE-2.0.html",
@@ -49,7 +49,9 @@ if __name__ == '__main__':
             'pandas(>=0.13.1)',
             'scikit.learn(>=0.14.1)',
             'biopython',
-	    'dsltools', 
+	    'dsltools',
+	    'datacache',
+	    'epitopes',
         ],
         long_description=readme,
         packages=['immuno'],
