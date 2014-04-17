@@ -32,16 +32,9 @@ If you don't either an `hla` or `hla-file` then the default "HLA:A*02:01" will b
 
 
 ### Requirements
-First you'll have to install the epitopes package.  You can download that from: [https://github.com/hammerlab/epitopes](https://github.com/hammerlab/epitopes/)
 
-```sh
-git clone https://github.com/hammerlab/epitopes.git
-cd epitopes
-python setup.py install
-```
-
-Additionally, you'll need to install:
-
+* [datacache](https://github.com/hammerlab/datacache)
+* [epitopes](https://github.com/hammerlab/epitopes)
 * [nose](https://nose.readthedocs.org/en/latest/)
 * [NumPy](http://www.numpy.org/)
 * [pandas](http://pandas.pydata.org/)
