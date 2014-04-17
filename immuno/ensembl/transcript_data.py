@@ -18,7 +18,7 @@ import sqlite3
 
 from Bio import SeqIO
 import appdirs
-from epitopes.download import fetch_fasta_db, ensure_dir
+from datacache import fetch_fasta_db, ensure_dir
 
 CDNA_TRANSCRIPT_URL = \
 'ftp://ftp.ensembl.org/pub/release-75/fasta/homo_sapiens/cdna/Homo_sapiens.GRCh37.75.cdna.all.fa.gz'

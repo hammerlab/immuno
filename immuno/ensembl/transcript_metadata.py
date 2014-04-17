@@ -19,7 +19,11 @@ import base64
 import logging
 
 import pandas as pd
-from epitopes.download import fetch_data, build_path
+import datacache 
+from datacache import build_path
+
+def fetch_file(url, decompress = True):
+    return datacache.fetch_file(url, decompress = decompress, subdir = "immuno")
 
 STANDARD_CONTIGS = set([
     '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14',
@@ -107,14 +111,12 @@ def download_transcript_metadata(filter_contigs = STANDARD_CONTIGS):
     logging.info("Transcript metadata path %s", full_path)
 
     if not exists(full_path):
-        GENE_DATA_PATH = fetch_data('gene.txt', GENE_DATA_URL)
-        SEQ_REGION_DATA_PATH = fetch_data('seq_region.txt', SEQ_REGION_DATA_URL)
-        EXON_DATA_PATH = fetch_data('exon.txt', EXON_DATA_URL)
-        TRANSCRIPT_DATA_PATH = fetch_data('transcript.txt', TRANSCRIPT_DATA_URL)
-        TRANSLATION_DATA_PATH = \
-            fetch_data('translation.txt', TRANSLATION_DATA_URL)
-        EXON_TRANSCRIPT_DATA_PATH = \
-            fetch_data('exon_transcript.txt', EXON_TRANSCRIPT_DATA_URL)
+        GENE_DATA_PATH = fetch_file(GENE_DATA_URL)
+        SEQ_REGION_DATA_PATH = fetch_file(SEQ_REGION_DATA_URL)
+        EXON_DATA_PATH = fetch_file(EXON_DATA_URL)
+        TRANSCRIPT_DATA_PATH = fetch_file(TRANSCRIPT_DATA_URL)
+        TRANSLATION_DATA_PATH = fetch_file(TRANSLATION_DATA_URL)
+        EXON_TRANSCRIPT_DATA_PATH = fetch_file(EXON_TRANSCRIPT_DATA_URL)
         seqregion = pd.read_csv(
             SEQ_REGION_DATA_PATH,
             sep='\t',
