@@ -23,3 +23,9 @@ def peptide_substrings(full_peptide, window_length):
     n = len(full_peptide)
     return [full_peptide[i:i+window_length]
             for i in xrange(n + 1 - window_length)]
+
+def squish(x, soft_threshold, dropoff_rate):
+	"""
+	Remap values from [0, inf] to [0,1]
+ 	"""
+	return 1.0 / (1.0 +  np.exp( (x-soft_threshold) / dropoff_rate))

@@ -20,7 +20,7 @@ import pandas as pd
 from Bio import SeqIO
 import numpy as np
 
-from common import peptide_substrings
+from common import peptide_substrings, squish
 from immunogenicity import ImmunogenicityRFModel
 from mhc import IEDBMHCBinding, normalize_hla_allele_name
 from load_file import load_file
@@ -35,49 +35,76 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # must supply either an input file or an amino acid string
     input_group = parser.add_argument_group()
-    input_group.add_argument("--input", action="append", default=[],
+
+    input_group.add_argument("--input", 
+        action="append", default=[],
         help="input file name (i.e. FASTA, MAF, VCF)")
+    
     input_group.add_argument("--string", default = None,
         help="amino acid string")
+    
     parser.add_argument("--peptide-length",
         default=31,
         type = int,
         help="length of vaccine peptides (may contain multiple epitopes)")
+    
     parser.add_argument("--min-peptide-padding", 
         default = 5, 
         type = int, 
         help = "minimum number of wildtype residues before or after a mutation")
+    
     parser.add_argument("--hla-file",
         help="file with one HLA allele per line")
-    parser.add_argument(
-        "--hla",
+
+    parser.add_argument("--hla",
         help="comma separated list of allele (default HLA-A*02:01)")
-    parser.add_argument(
-        "--epitopes-output",
+
+    parser.add_argument("--epitopes-output",
         help="output file for dataframe containing scored epitopes",
         required=False)
-    parser.add_argument(
-        "--peptides-output",
+
+    parser.add_argument("--peptides-output",
         help="output file for dataframe containing scored vaccine peptides",
         required=False)
-    parser.add_argument(
-        "--print-epitopes",
+
+    parser.add_argument("--print-epitopes",
         help="print dataframe with epitope scores",
         default=False,
         action="store_true")
-    parser.add_argument(
-        "--print-peptides",
+    
+    parser.add_argument("--print-peptides",
         default = False, 
         help="print dataframe with vaccine peptide scores",
         action="store_true")
-    parser.add_argument(
-        "--html-report",
+
+    parser.add_argument("--html-report",
         default = "report.html",
         help = "Path to HTML report containing scored peptides and epitopes")
-    parser.add_argument("--skip-mhc",
+    
+    parser.add_argument("--local-mhc",
         default=False,
         action="store_true",
-        help="Don't predict MHC binding")
+        help="Use local model to predict MHC binding (instead of IEDB)")
+    
+    parser.add_argument("--mhc-pecentile-soft-threshold", 
+        default = 2.0, 
+        help = "Percentile rank of MHC binding values which is given score of 0.5")
+    
+    parser.add_argument(
+        "-mhc-percentile-dropoff-rate",
+        default = 0.5, 
+        help = "Rate at which MHC scores drop as a function of percentile exceeding threshold"
+    )
+    
+    parser.add_argument("--mhc-ic50-soft-threshold", 
+        default = 250.0, 
+        help = "Predicted MHC binding IC50 value which is given score of 0.5")
+
+    parser.add_argument("-mhc-ic50-dropoff-rate",
+        default = 100.0,  
+        help = "Rate at which MHC scores drop as a function of IC50 exceeding threshold"
+    )
+    
 
     args = parser.parse_args()
 
@@ -122,7 +149,7 @@ if __name__ == '__main__':
 
 
 
-    if args.skip_mhc:
+    if args.local_mhc:
         records = []
         # if wer'e not running the MHC prediction then we have to manually
         # extract 9mer substrings
@@ -142,10 +169,24 @@ if __name__ == '__main__':
 
         assert 'percentile_rank' in scored_epitopes, scored_epitopes.head()
         mhc_percentile = scored_epitopes['percentile_rank']
-        mhc_score = (100.0 - mhc_percentile) / 100.0
-        mhc_binding_category = mhc_percentile <= 2.0
-        scored_epitopes['mhc_score'] = mhc_score
-        scored_epitopes['mhc_binding_category'] = mhc_binding_category
+            
+        percentile_threshold = args.mhc_pecentile_soft_threshold
+        percentile_dropoff_rate = args.mhc_percentile_dropoff_rate
+        mhc_percentile_score = \
+            squish(mhc_percentile, percentile_threshold, percentile_dropoff_rate)
+
+        assert 'ann_ic50' in scored_epitopes, scored_epitopes.head()
+        ann_ic50 = scored_epitopes['ann_ic50']
+
+        assert 'smm_ic50' in scored_epitopes, scored_epitopes.head()
+        smm_ic50 = scored_epitopes['smm_ic50']
+
+        ic50 = np.fmin(ann_ic50, smm_ic50)
+        ic50_threshold = args.mhc_ic50_soft_threshold
+        ic50_dropoff_rate = args.mhc_ic50_dropoff_rate
+        mhc_ic50_score = squish(ic50, ic50_threshold, ic50_dropoff_rate)
+        mhc_score = np.fmax(mhc_ic50_score, mhc_percentile_score) 
+
 
     immunogenicity = ImmunogenicityRFModel(name = 'immunogenicity')
     scored_epitopes = immunogenicity.apply(scored_epitopes)
@@ -155,8 +196,9 @@ if __name__ == '__main__':
     scored_epitopes['imm_score'] = imm_score
 
 
-    if args.skip_mhc:
-        combined_score = imm_score
+    if args.local_mhc:
+        assert False, "Not implemented"
+        # combined_score = imm_score
     else:
         combined_score = (mhc_score + imm_score + 2*mhc_binding_category) / 4.0
 
