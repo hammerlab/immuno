@@ -162,7 +162,9 @@ if __name__ == '__main__':
                 record['EpitopeStart'] = i
                 record['EpitopeEnd'] = i + epitope_length
                 records.append(record)
-        scored_epitopes = pd.DataFrame.from_records(records)
+        epitopes = pd.DataFrame.from_records(records)
+        mhc = MHC_RandomForest_Ensemble(alleles = alleles)
+
     else:
         mhc = IEDBMHCBinding(name = 'mhc', alleles=alleles)
         scored_epitopes = mhc.apply(mutated_regions)

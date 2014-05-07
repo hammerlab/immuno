@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from os import makedirs
+from os.path import exists, join 
+
 import appdirs
 import logging
 
@@ -29,3 +32,10 @@ def squish(x, soft_threshold, dropoff_rate):
 	Remap values from [0, inf] to [0,1]
  	"""
 	return 1.0 / (1.0 +  np.exp( (x-soft_threshold) / dropoff_rate))
+
+def make_dir(path):
+	if not exists(path):
+		make_dirs(path)
+
+DATA_DIR = appdirs.user_data_dir("immuno")
+MODELS_DIR = make_dir(join(DATA_DIR, "models"))

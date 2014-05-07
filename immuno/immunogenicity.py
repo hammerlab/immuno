@@ -14,7 +14,7 @@
 
 import cPickle
 import logging
-from os.path import exists
+from os.path import exists, join 
 
 from sklearn import ensemble
 import numpy as np
@@ -24,8 +24,8 @@ import scipy.stats
 from epitopes import \
     (cri_tumor_antigens, iedb, features, reduced_alphabet, reference)
 
-from pipeline import PipelineElement
 from balanced_ensemble import BalancedEnsembleClassifier
+from common import MODELS_DIR
 
 def train(
         assay_group = 'cytotoxicity',
@@ -56,6 +56,11 @@ def train(
     return vectorizer, ensemble, reference_scores 
 
 
+def make_path(base_filename, suffix):
+    filename = base_filename + suffix
+    path = join(MODELS_DIR, filename)
+    return path
+
 def train_cached(
         assay_group = 'cytotoxicity',
         mhc_class = 1,
@@ -71,42 +76,41 @@ def train_cached(
     model_base_filename = \
         "immunogenicity_classifier_assay_%s_mhc_%s_ngram_%s_alphabet_%s" % \
         (assay_group, mhc_class, max_ngram, alphabet)
-    model_filename = model_base_filename + suffix
+    model_path = make_path(model_base_filename, suffix)
 
     vectorizer_base_filename = \
         "immunogenicity_vectorizer_assay_%s_mhc_%s_ngram_%s_alphabet_%s" % \
         (assay_group, mhc_class, max_ngram, alphabet)
-    vectorizer_filename = vectorizer_base_filename + suffix
-
+    vectorizer_path = make_path(vectorizer_base_filename, suffix)
 
     reference_scores_base_filename = \
         "immunogenicity_reference_scores_assay_%s_mhc_%s_ngram_%s_alphabet_%s" % \
         (assay_group, mhc_class, max_ngram, alphabet)
 
-    reference_scores_filename = reference_scores_base_filename + suffix
+    reference_scores_path = make_path(reference_scores_base_filename, suffix)
 
-    if exists(model_filename) and exists(vectorizer_filename) and exists(reference_scores_filename):
+    if all(map(exists, [model_path, vectorizer_path, reference_scores_path])):
         logging.debug("Loading cached immunogenicity classifier and vectorizer")
-        with open(vectorizer_filename, 'r') as vectorizer_file:
+        with open(vectorizer_path, 'r') as vectorizer_file:
             vectorizer = cPickle.load(vectorizer_file)
 
-        with open(model_filename, 'r') as model_file:
+        with open(model_path, 'r') as model_file:
             clf = cPickle.load(model_file)
 
-        with open(reference_scores_filename, 'r') as scores_file:
+        with open(reference_scores_path, 'r') as scores_file:
             reference_scores = cPickle.load(scores_file)
         return vectorizer, clf, reference_scores 
 
     vectorizer, clf, reference_scores = train()
 
-    with open(vectorizer_filename, 'w') as vectorizer_file:
+    with open(vectorizer_path, 'w') as vectorizer_file:
         cPickle.dump(vectorizer, vectorizer_file, cPickle.HIGHEST_PROTOCOL)
 
-    with open(model_filename, 'w') as model_file:
+    with open(model_path, 'w') as model_file:
         cPickle.dump(clf, model_file, cPickle.HIGHEST_PROTOCOL)
 
 
-    with open(reference_scores_filename, 'w') as scores_file:
+    with open(reference_scores_path, 'w') as scores_file:
         cPickle.dump(reference_scores, scores_file, cPickle.HIGHEST_PROTOCOL)
 
     return vectorizer, clf, reference_scores 
@@ -114,8 +118,10 @@ def train_cached(
 class ImmunogenicityRFModel(PipelineElement):
 
     def __init__(
-            self, name = "immunogenicity",
-            classifier = None, vectorizer = None):
+            self, 
+            name = "immunogenicity",
+            classifier = None, 
+            vectorizer = None):
         self.name = name
         if classifier is None and vectorizer is None:
             vectorizer, classifier, reference_scores = train_cached()
@@ -123,11 +129,7 @@ class ImmunogenicityRFModel(PipelineElement):
         self.classifier = classifier
         self.reference_scores = reference_scores 
 
-
-    def verify(self):
-        pass
-
-    def _apply(self, df):
+    def apply(self, df):
         if self.vectorizer:
             X = self.vectorizer.transform(df.Epitope)
         else:
@@ -137,4 +139,5 @@ class ImmunogenicityRFModel(PipelineElement):
         for prob in probs:
             prctile = scipy.stats.percentileofscore(self.reference_scores, prob)
             percentiles.append(prctile)
-        return np.array(percentiles) / 100.0
+        df[self.name] = np.array(percentiles) / 100.0
+        return df
