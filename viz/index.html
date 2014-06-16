@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Peptides</title>
+    <meta charset="utf-8">
+    <link type="text/css" rel="stylesheet" media="all" href="style.css" />
+  </head>
+
+  <body>
+    <div id="tooltip">
+      This is a test tooltip. Is this cool? This seems cool.
+      <br/>
+      We cool.
+      <div id="tt-arrow"></div>
+    </div>
+
+
+    <div id="info">
+      <span class="b">Filename</span><span class="i">_peptide_pt_011812359.txt</span><br/>
+      <span class="b">Date Run</span><span class="i">06/14/2014</span><br/>
+      <span class="b">ImmunoID SHA1</span><span class="i">dc03928577b1b2f0b598154aa55f592fcd0dc69f</span>
+    </div>
+
+    <div id="peptides-list">
+      <input type="range" id="threshold" value="90" min="1" max="99">
+      &nbsp;&nbsp;
+      Binding score threshold: <span id="tval">90</span><span class="suffix">th</span> percentile.
+      <span id="close-inspector" title="Close inspector.">&times;</span>
+      <div id="peptides"></div>
+    </div>
+
+    <!-- Includes -->
+
+    <script src="d3.min.js"></script>
+    <script src="underscore-min.js"></script>
+
+    <script src="data.js"></script>
+
+    <script src="peptides.js"></script>
+  </body>
+</html>
