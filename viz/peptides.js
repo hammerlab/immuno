@@ -2,12 +2,11 @@
 'use strict';
 
 // TODO:
-//     1. Show all peptides & epitopes (don't cut off at static height).
-//     2. Epitope info window (fix, make it work).
-//     3. Support slider interaction in inspector view.
-//     4. Support different sorting functions.
-//     5. (?) Display of immungenicity (like binding score bar chart).
-//     6. (?) Hover over score bars for more info.
+//     1. Develop epitope information window.
+//     2. Support different sorting functions.
+//     3. (?) Display of immungenicity (like binding score bar chart).
+//     4. (?) Hover over score bars for more info.
+//     5. (?) Dynamic SVG height to it's not too tall sometimes.
 
 var WIDTH = 1000,
     HEIGHT = 12000,
@@ -139,6 +138,8 @@ function initializePeptideHandlers(peptides) {
 }
 
 function explodeEpitopes(peptides, peptideEl, peptideClickBox, peptideData) {
+  initializeEpitopeThresholdSliderHandler(peptideData.epitopes, peptideEl);
+
   d3.select('#close-inspector')
       .style('display', 'inline')
       .on('click', function() {
@@ -152,7 +153,6 @@ function explodeEpitopes(peptides, peptideEl, peptideClickBox, peptideData) {
             acidIdx = acidX.domain()[d3.bisect(acidX.range(), xPos) - 1],
             epitopes = peptideData.epitopes;
 
-        d3.selectAll('.epitope-info-window').remove();
         highlightAcid(acidIdx, peptideEl, peptideClickBox, peptideData);
 
         epitopes = epitopesOverlapping(acidIdx, epitopes);
@@ -179,6 +179,9 @@ function explodeEpitopes(peptides, peptideEl, peptideClickBox, peptideData) {
 }
 
 function collapseEpitopes(peptides, peptideEl, peptideClickBox) {
+  resetEpitopeInfoWindow();
+  initializeThresholdSliderHandler(peptides.data());
+
   peptides
       .attr('class', 'peptide')
     .transition().duration(800)
@@ -216,6 +219,8 @@ function collapseEpitopes(peptides, peptideEl, peptideClickBox) {
 }
 
 function renderEpitopesWithScores(epitopesList, peptideEl) {
+  resetEpitopeInfoWindow();
+
   var epitopes = d3.select(peptideEl).selectAll('.epitope')
       .data(sortEpitopes(epitopesList, getThreshold()), function(d, i) {
         return [d.start, d.sequence];
@@ -284,6 +289,10 @@ function renderEpitopeSequence(epitopes) {
 
 function renderPassingEpitopeHighlights(epitopes) {
   epitopes
+      .selectAll('.passing-epitope')
+    .remove();
+
+  epitopes
     .filter(function(d) {
         // !... is to ensure we don't keep adding highlight rects to the same
         // epitopes.
@@ -312,55 +321,69 @@ function initializeEpitopeHandlers(epitopes) {
       .attr('height', PEPTIDE_HEIGHT-4)
       .attr('opacity', 0)
       .attr('fill', '#ddd')
-      .on('mouseover', function(d, i) {
-        d3.select(this).transition().attr('opacity', .25);
-      })
-      .on('mouseout', function(d, i) {
-        d3.select(this).transition().attr('opacity', 0);
-      })
       .on('click', function(d, i) {
+        resetEpitopeInfoWindow();
         renderEpitopeInfoWindow(this.parentNode, d);
       });
 }
 
 function renderEpitopeInfoWindow(epitopeEl, epitopeData) {
-  // TODO(ihodes): This needs to be finished.
-  var peptide = d3.select(epitopeEl.parentNode),
-       yOffset = epitopeEl.getCTM().f; // f is the y translate
-                                       // element in the element's
-                                       // transformation matrix.
+  var peptide = d3.select('.selected.peptide'),
+      epitopeShiftGroup = peptide.append('g').attr('id', 'epitope-shift-group'),
+      yOffset = epitopeEl.getCTM().f;
 
-  // Reset existing epitope positions;
-  d3.selectAll('.epitope-info-window').remove();
+  d3.select(epitopeEl).select('.epitope-highlight').transition().attr('opacity', .25);
+
   peptide
     .selectAll('.epitope')
-      .attr('transform', function(d, i) {
-        return 'translate(' + acidX(d.start) + ',' + (i*15 + PEPTIDE_HEIGHT) + ')';
+    .filter(function(d, i) {
+      return this.getCTM().f > yOffset;
+    })
+      .each(function(d, i) {
+        epitopeShiftGroup.node().appendChild(this);
       });
 
-  // Moves down, by the size of the info window, all epitopes which
-  // are rendered at a lower Y position than the epitope clicked on.
-  peptide
-    .selectAll('.epitope')
-      .filter(function(d, i) {
-        return this.getCTM().f > yOffset;
-      })
+  epitopeShiftGroup
       .attr('transform', function(d, i) {
-        return 'translate(' + acidX(d.start) + ','
-          + (this.getCTM().f + EPITOPE_INFO_HEIGHT - 30) + ')';
+        return 'translate(0,' + (PEPTIDE_HEIGHT + EPITOPE_INFO_HEIGHT) + ')';
       });
 
-  // Render epitope info window itself.
   d3.select(epitopeEl)
-      .attr('id', 'selected-epitope')
-    .append('rect')
-      .attr('class', 'epitope-info-window')
-      .attr('y', 0)
-      .attr('x', function(d, i) {
-        return -acidX(d.start) - GENE_WIDTH;
+    .append('g')
+      .attr('id', 'epitope-info-window')
+      .attr('transform', function(d, i) {
+        return 'translate(' + (-acidX(d.start) - GENE_WIDTH) + ', '
+          + PEPTIDE_HEIGHT + ')';
       })
+      .call(renderEpitopeInfoWindowChart);
+}
+
+function resetEpitopeInfoWindow(peptide) {
+  var peptide = d3.select('.selected.peptide'),
+      epitopeShiftGroup = d3.select('#epitope-shift-group');
+  d3.selectAll('.epitope-highlight').attr('opacity', 0)
+  d3.select('#epitope-info-window').remove();
+  epitopeShiftGroup
+      .attr('transform', function() {
+        return 'translate(0, 0)';
+      })
+    .selectAll('.epitope')
+      .each(function(d, i) {
+        peptide.node().appendChild(this);
+      });
+  epitopeShiftGroup.remove();
+}
+
+function renderEpitopeInfoWindowChart(epitopeInfoWindow) {
+  epitopeInfoWindow
+    .append('rect')
       .attr('width', WIDTH+GENE_WIDTH)
       .attr('height', EPITOPE_INFO_HEIGHT);
+
+  epitopeInfoWindow
+    .append('text')
+      .text('information hurr')
+      .attr('fill', 'black');
 }
 
 function highlightAcid(acidIdx, peptideEl, peptideClickBox, peptideData) {
@@ -387,8 +410,25 @@ function highlightAcid(acidIdx, peptideEl, peptideClickBox, peptideData) {
       .attr('opacity', 0.25);
 
   var epitopes = d3.select(peptideEl).selectAll('.epitope')
-      .each(function(){
+      .each(function() {
         this.parentNode.appendChild(this);
+      });
+}
+
+function initializeEpitopeThresholdSliderHandler(epitopes, peptideEl) {
+  d3.select('#threshold')
+      .on('input', function() {
+        d3.select('#tval').text(this.value);
+        d3.select('#controls .suffix').text(ordinalSuffix(this.value));
+      })
+      .on('change', function() {
+        var thresh = parseInt(this.value);
+        d3.select('#tval').text(this.value)
+        d3.select('#controls .suffix').text(ordinalSuffix(this.value));
+
+        epitopes = sortEpitopes(epitopes, thresh);
+
+        renderEpitopesWithScores(epitopes, peptideEl);
       });
 }
 

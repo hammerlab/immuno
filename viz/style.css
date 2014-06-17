@@ -89,7 +89,7 @@ span#close-inspector {
 }
 
 /* Epitope Info */
-.epitope-info-window {
+#epitope-info-window rect {
     fill: white;
 }
 
