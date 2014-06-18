@@ -44,17 +44,16 @@
         % for peptide in peptides.to_records():
           {
             sequence: "${peptide.Peptide}", 
-            length : ${peptide.PeptideEnd - peptide.PeptideEnd},
+            length : ${peptide.PeptideEnd - peptide.PeptideStart},
             mutation : "${peptide.MutationInfo}", 
             gene : "${peptide.GeneInfo}",
             mutStart: ${peptide.PeptideMutationStart}, 
             mutEnd : ${peptide.PeptideMutationEnd},
             epitopes: [
               % for epitope in peptide.epitopes.to_records():
-
                 {
                   start: ${epitope.EpitopeStart}, 
-                  length: ${epitope.EpitopeEnd - epitope.EpitopeEnd}, 
+                  length: ${epitope.EpitopeEnd} - ${epitope.EpitopeStart}, 
                   scores: {
                     'HLA-A*34:01': {percentile: _.random(100), bindingScore: _.random(0, 1000)},
                     'HLA-A*02:01': {percentile: _.random(100), bindingScore: _.random(0, 1000)},
