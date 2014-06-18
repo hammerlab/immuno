@@ -1,3 +1,5 @@
+#!/usr/bin/env python2
+
 # Copyright (c) 2014. Mount Sinai School of Medicine
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
