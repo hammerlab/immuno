@@ -26,6 +26,7 @@ from load_file import load_file
 from strings import load_comma_string
 from vaccine_peptides import build_peptides_dataframe
 from mako.template import Template
+from mako.lookup import TemplateLookup
 
 DEFAULT_ALLELE = 'HLA-A*02:01'
 
@@ -118,8 +119,6 @@ if __name__ == '__main__':
     mutated_regions = pd.concat(mutated_region_dfs)
 
 
-
-
     if args.skip_mhc:
         records = []
         # if wer'e not running the MHC prediction then we have to manually
@@ -147,27 +146,29 @@ if __name__ == '__main__':
 
     if 'mhc_score' in scored_epitopes:
         scored_epitopes = scored_epitopes.sort(['mhc_score'])
-        
+
     if args.epitopes_output:
         scored_epitopes.to_csv(args.epitopes_output, index=False)
     if args.print_epitopes:
         print scored_epitopes.to_string()
 
-    scored_peptides = build_peptides_dataframe(scored_epitopes,
+    peptides = build_peptides_dataframe(scored_epitopes,
         peptide_length = peptide_length, 
         min_peptide_padding = args.min_peptide_padding)
-    
     if args.peptides_output:
-        scored_peptides.to_csv(args.peptides_output, index=False)
+        peptides.to_csv(args.peptides_output, index=False)
     
     if args.print_peptides:
-        print scored_peptides.to_string()
+        print peptides.to_string()
 
     input_names = ";".join(args.input)
     if args.string:
         input_names += ";" + args.string
-    template = Template(filename = 'viz/index.html.template')
-    html = template.render() #(input_names, alleles, scored_epitopes, scored_peptides)
+    template_lookup = TemplateLookup(directories=['.', 'viz'], default_filters=['literal'])
+    template = Template(filename = 'viz/index.html.template', lookup = template_lookup)
+
+    html = template.render(peptides = peptides) #(input_names, alleles, scored_epitopes, scored_peptides)
+    
     with open(args.html_report, 'w') as f:
         f.write(html)
 

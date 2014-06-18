@@ -3,7 +3,7 @@
   <head>
     <title>Peptides</title>
     <meta charset="utf-8">
-    <link type="text/css" rel="stylesheet" media="all" href="style.css" />
+    <link type="text/css" rel="stylesheet" media="all" href="viz/style.css" />
   </head>
 
   <body>
@@ -35,22 +35,42 @@
       <div id="peptides"></div>
     </div>
 
-    <script src="d3.min.js"></script>
-    <script src="underscore-min.js"></script>
-    <script src="data.js"></script>
-    <script src="peptides.js"></script>
+    <script src="viz/d3.min.js"></script>
+    <script src="viz/underscore-min.js"></script>
+    <script src="viz/peptides.js"></script>
     <script>
+ 
       vaccine_peptide_array = [
-        % for peptide in peptides:
+        % for peptide in peptides.to_records():
           {
-            start: ${peptide.start}, 
-            length: ${peptide.length}, 
-            scores: [], 
-            sequence: ${peptide.sequence}, 
-            mutation : ${peptide.mutation}, 
-          }
+            sequence: "${peptide.Peptide}", 
+            length : ${peptide.PeptideEnd - peptide.PeptideEnd},
+            mutation : "${peptide.MutationInfo}", 
+            gene : "${peptide.GeneInfo}",
+            mutStart: ${peptide.PeptideMutationStart}, 
+            mutEnd : ${peptide.PeptideMutationEnd},
+            epitopes: [
+              % for epitope in peptide.epitopes.to_records():
+
+                {
+                  start: ${epitope.EpitopeStart}, 
+                  length: ${epitope.EpitopeEnd - epitope.EpitopeEnd}, 
+                  scores: {
+                    'HLA-A*34:01': {percentile: _.random(100), bindingScore: _.random(0, 1000)},
+                    'HLA-A*02:01': {percentile: _.random(100), bindingScore: _.random(0, 1000)},
+                    'HLA-B*12:09': {percentile: _.random(100), bindingScore: _.random(0, 1000)},
+                    'HLA-B*07:21': {percentile: _.random(100), bindingScore: _.random(0, 1000)},
+                    'HLA-C*19:13': {percentile: _.random(100), bindingScore: _.random(0, 1000)},
+                    'HLA-C*11:11': {percentile: _.random(100), bindingScore: _.random(0, 1000)}
+                  }
+                  , 
+                  sequence: "${epitope.Epitope}",
+                },
+              % endfor 
+            ], 
+          }, 
         % endfor 
-      ]
+      ];
       peptides.run(vaccine_peptide_array);
     </script>
   </body>

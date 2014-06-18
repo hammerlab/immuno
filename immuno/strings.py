@@ -66,5 +66,5 @@ def load_strings(strings, source = 'commandline'):
             'MutationInfo'
         ))
 
-def load_comma_string(s, source = 'commandline'):
+def load_comma_string(s, source = 'literal'):
     return load_strings(s.split(","), source = source)

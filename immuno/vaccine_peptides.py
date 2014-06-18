@@ -148,7 +148,6 @@ def build_peptides_dataframe(
             peptide = seq[peptide_start : peptide_end]
 
 
-            print mut_start, peptide_start 
             # where is the mutation relative to this peptide?
             peptide_mut_start = mut_start - peptide_start
             peptide_mut_end = mut_end - peptide_start
@@ -164,6 +163,7 @@ def build_peptides_dataframe(
                 continue
 
             # if mutation goes outside the window, truncate it
+            peptide_mut_start = max(peptide_mut_start, 0)
             peptide_mut_end = min(peptide_mut_end, window_size)
 
             # mutation start in the peptide should be between [0, len)
@@ -176,10 +176,10 @@ def build_peptides_dataframe(
             peptide_cache_key = (peptide, peptide_mut_start, peptide_mut_end)
             if peptide_cache_key in seen_peptides:
                 logging.info(
-                    "Already added peptide %s mut_start = %d, mut_end = %d (from %s)", 
+                    "Already added peptide %s mutation start = %d, mutation end = %d (from %s)", 
                     peptide, 
-                    mut_start, 
-                    mut_end, 
+                    peptide_mut_start, 
+                    peptide_mut_end, 
                     info)
                 continue
             else:
@@ -235,37 +235,15 @@ def build_peptides_dataframe(
             # contains all but the first epitope.
             #
 
-            # which epitopes are from this sequence which overlap the mutations?
-            mutated_epitope_mask = \
-                (epitopes_df.SourceSequence == seq) & \
-                (epitopes_df.EpitopeStart < mut_end) & \
-                (epitopes_df.EpitopeEnd > mut_start)
-
-            mutated_epitopes = epitopes_df[mutated_epitope_mask]
-            if len(mutated_epitopes) == 0:
-                logging.warning(
-                    "No mutated epitopes in %s (pos=%d:%d, mut=%d:%d)" %\
-                    (peptide, peptide_start, peptide_end, mut_start, mut_end))
-                continue
-            mutated_epitope_score = mutated_epitopes['combined_score'].median()
-            row['MutatedScore'] = mutated_epitope_score
-
-            # self epitopes are those that overlap with the peptide but not
-            # with the mutated epitopes
-            self_epitope_mask = \
+           
+            epitope_mask = \
                 (epitopes_df.SourceSequence == seq) & \
                 (epitopes_df.EpitopeStart < peptide_end) & \
-                (epitopes_df.EpitopeEnd > peptide_start) & \
-                ~mutated_epitope_mask
+                (epitopes_df.EpitopeEnd > peptide_start)
 
-            self_epitopes = epitopes_df[self_epitope_mask]
-            self_epitope_score = self_epitopes['combined_score'].median()
-            row['SelfScore'] = self_epitope_score
-            if self_epitope_score > 0:
-                score = np.log2(mutated_epitope_score / self_epitope_score)
-            else:
-                score = -np.inf
-            row['Score'] = score
+            print epitopes_df[epitope_mask]
+            row['epitopes'] = epitopes_df[epitope_mask]
+
             records.append(row)
     assert len(records) > 0, "No vaccine peptides"
     return pd.DataFrame.from_records(records)
