@@ -14,7 +14,7 @@
 
 import datetime
 import numpy as np
-
+from mako.template import Template 
 page_template = \
 """
 <html>
