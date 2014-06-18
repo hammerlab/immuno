@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
 import argparse
 import sys
 
@@ -26,8 +25,7 @@ from mhc import IEDBMHCBinding, normalize_hla_allele_name
 from load_file import load_file
 from strings import load_comma_string
 from vaccine_peptides import build_peptides_dataframe
-from report import build_html_report
-
+from mako.template import Template
 
 DEFAULT_ALLELE = 'HLA-A*02:01'
 
@@ -115,7 +113,7 @@ if __name__ == '__main__':
 
     if len(mutated_region_dfs) == 0:
         parser.print_help()
-        print("\nERROR: Must supply at least --string or --input")
+        print "\nERROR: Must supply at least --string or --input"
         sys.exit()
     mutated_regions = pd.concat(mutated_region_dfs)
 
@@ -143,29 +141,17 @@ if __name__ == '__main__':
         assert 'percentile_rank' in scored_epitopes, scored_epitopes.head()
         mhc_percentile = scored_epitopes['percentile_rank']
         mhc_score = (100.0 - mhc_percentile) / 100.0
-        mhc_binding_category = mhc_percentile <= 2.0
+        mhc_binding_category = mhc_percentile <= 1.0
         scored_epitopes['mhc_score'] = mhc_score
         scored_epitopes['mhc_binding_category'] = mhc_binding_category
 
-    immunogenicity = ImmunogenicityRFModel(name = 'immunogenicity')
-    scored_epitopes = immunogenicity.apply(scored_epitopes)
-    imm_score = scored_epitopes['immunogenicity']
-
-    # TODO: make the imm score based on percentile in normal human proteins
-    scored_epitopes['imm_score'] = imm_score
-
-
-    if args.skip_mhc:
-        combined_score = imm_score
-    else:
-        combined_score = (mhc_score + imm_score + 2*mhc_binding_category) / 4.0
-
-    scored_epitopes['combined_score'] = combined_score
-    scored_epitopes = scored_epitopes.sort(columns=('combined_score',))
+    if 'mhc_score' in scored_epitopes:
+        scored_epitopes = scored_epitopes.sort(['mhc_score'])
+        
     if args.epitopes_output:
         scored_epitopes.to_csv(args.epitopes_output, index=False)
     if args.print_epitopes:
-        print(scored_epitopes.to_string())
+        print scored_epitopes.to_string()
 
     scored_peptides = build_peptides_dataframe(scored_epitopes,
         peptide_length = peptide_length, 
@@ -173,13 +159,15 @@ if __name__ == '__main__':
     
     if args.peptides_output:
         scored_peptides.to_csv(args.peptides_output, index=False)
+    
     if args.print_peptides:
-        print(scored_peptides.to_string())
+        print scored_peptides.to_string()
 
     input_names = ";".join(args.input)
     if args.string:
         input_names += ";" + args.string
-    html = build_html_report(input_names, alleles, scored_epitopes, scored_peptides)
+    template = Template(filename = 'viz/index.html.template')
+    html = template.render() #(input_names, alleles, scored_epitopes, scored_peptides)
     with open(args.html_report, 'w') as f:
         f.write(html)
 

@@ -22,6 +22,7 @@ def build_peptides_dataframe(
         peptide_length,
         min_peptide_length = None,
         min_peptide_padding = 0):
+
     """
     Given a dataframe with a 'combined_score' for each short epitope
     create another dataframe of all longer vaccine peptides ranked by the
@@ -147,6 +148,7 @@ def build_peptides_dataframe(
             peptide = seq[peptide_start : peptide_end]
 
 
+            print mut_start, peptide_start 
             # where is the mutation relative to this peptide?
             peptide_mut_start = mut_start - peptide_start
             peptide_mut_end = mut_end - peptide_start
