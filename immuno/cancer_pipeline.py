@@ -22,7 +22,6 @@ from Bio import SeqIO
 import numpy as np
 
 from common import peptide_substrings
-from immunogenicity import ImmunogenicityRFModel
 from mhc import IEDBMHCBinding, normalize_hla_allele_name
 from load_file import load_file
 from strings import load_comma_string

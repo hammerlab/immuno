@@ -48,7 +48,7 @@
             mutation : "${peptide.MutationInfo}", 
             gene : "${peptide.GeneInfo}",
             mutStart: ${peptide.PeptideMutationStart}, 
-            mutEnd : ${peptide.PeptideMutationEnd},
+            mutEnd : ${peptide.PeptideMutationStart} + 1, //${peptide.PeptideMutationEnd},
             epitopes: [
               % for epitope in peptide.epitopes.to_records():
                 {
