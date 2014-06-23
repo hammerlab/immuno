@@ -46,10 +46,12 @@ if __name__ == '__main__':
         ],
         install_requires=[
             'numpy>=1.7',
+            'scipy',
             'pandas>=0.13.1',
             'scikit-learn>=0.14.1',
             'biopython',
             'dsltools',
+            'mako',
             'datacache',
             'epitopes',
         ],
