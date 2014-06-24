@@ -56,6 +56,8 @@ def load_strings(strings, source = 'commandline'):
         row['MutationEnd'] = stop
         row['info'] = source
         row['MutationInfo'] = "-"
+        row['stable_id_transcript'] = "-"
+
         rows.append(row)
     return pd.DataFrame.from_records(rows,
         columns = (
@@ -63,7 +65,8 @@ def load_strings(strings, source = 'commandline'):
             'MutationStart',
             'MutationEnd',
             'info',
-            'MutationInfo'
+            'MutationInfo',
+            'stable_id_transcript',
         ))
 
 def load_comma_string(s, source = 'literal'):

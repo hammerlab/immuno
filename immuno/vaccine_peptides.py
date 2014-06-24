@@ -90,6 +90,7 @@ def build_peptides_dataframe(
     for required_field in group_cols:
         if required_field not in epitopes_df:
             epitopes_df[required_field] = '-'
+
     # if we loaded from VCF, these extra fields will be available:
     optional_cols = [
         'chr', 'pos', 'ref', 'alt',
@@ -143,11 +144,11 @@ def build_peptides_dataframe(
                 seq, len(seq), info, min_peptide_length)
             continue
 
-        for peptide_start in xrange(min_peptide_padding, n + 1 - window_size - min_peptide_padding):
+        for peptide_start in xrange(min_peptide_padding, n  - window_size - min_peptide_padding + 1):
+
             peptide_end = peptide_start + window_size
             peptide = seq[peptide_start : peptide_end]
-
-
+            
             # where is the mutation relative to this peptide?
             peptide_mut_start = mut_start - peptide_start
             peptide_mut_end = mut_end - peptide_start
@@ -191,6 +192,8 @@ def build_peptides_dataframe(
             row['PeptideEnd'] = peptide_end
             row['PeptideMutationStart'] = peptide_mut_start
             row['PeptideMutationEnd'] = peptide_mut_end
+
+
 
 
             # To clarify the nomenclature (source seq vs. peptide vs. epitope)
@@ -238,11 +241,11 @@ def build_peptides_dataframe(
            
             epitope_mask = \
                 (epitopes_df.SourceSequence == seq) & \
-                (epitopes_df.EpitopeStart < peptide_end) & \
-                (epitopes_df.EpitopeEnd > peptide_start)
-
-            print epitopes_df[epitope_mask]
-            row['epitopes'] = epitopes_df[epitope_mask]
+                (epitopes_df.EpitopeStart >= peptide_start) & \
+                (epitopes_df.EpitopeEnd <= peptide_end) 
+            epitope_subset = epitopes_df[epitope_mask]
+            print "SUBSET", epitope_subset
+            row['epitopes'] = epitope_subset
 
             records.append(row)
     assert len(records) > 0, "No vaccine peptides"

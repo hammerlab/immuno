@@ -53,16 +53,10 @@
               % for epitope in peptide.epitopes.to_records():
                 {
                   start: ${epitope.EpitopeStart}, 
-                  length: ${epitope.EpitopeEnd} - ${epitope.EpitopeStart}, 
+                  length: ${epitope.EpitopeEnd - epitope.EpitopeStart}, 
                   scores: {
-                    'HLA-A*34:01': {percentile: _.random(100), bindingScore: _.random(0, 1000)},
-                    'HLA-A*02:01': {percentile: _.random(100), bindingScore: _.random(0, 1000)},
-                    'HLA-B*12:09': {percentile: _.random(100), bindingScore: _.random(0, 1000)},
-                    'HLA-B*07:21': {percentile: _.random(100), bindingScore: _.random(0, 1000)},
-                    'HLA-C*19:13': {percentile: _.random(100), bindingScore: _.random(0, 1000)},
-                    'HLA-C*11:11': {percentile: _.random(100), bindingScore: _.random(0, 1000)}
-                  }
-                  , 
+                    "${epitope.Allele}" : { percentile : ${epitope.MHC_PercentileRank}, bindingScore : ${epitope.MHC_IC50} }
+                  }, 
                   sequence: "${epitope.Epitope}",
                 },
               % endfor 

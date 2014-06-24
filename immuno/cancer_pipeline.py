@@ -22,7 +22,7 @@ from Bio import SeqIO
 import numpy as np
 
 from common import peptide_substrings
-from mhc import IEDBMHCBinding, normalize_hla_allele_name
+from mhc_iedb import IEDBMHCBinding, normalize_hla_allele_name
 from load_file import load_file
 from strings import load_comma_string
 from vaccine_peptides import build_peptides_dataframe
@@ -39,41 +39,51 @@ if __name__ == '__main__':
         help="input file name (i.e. FASTA, MAF, VCF)")
     input_group.add_argument("--string", default = None,
         help="amino acid string")
+
     parser.add_argument("--peptide-length",
         default=31,
         type = int,
         help="length of vaccine peptides (may contain multiple epitopes)")
+
     parser.add_argument("--min-peptide-padding", 
-        default = 5, 
+        default = 0, 
         type = int, 
         help = "minimum number of wildtype residues before or after a mutation")
+
     parser.add_argument("--hla-file",
         help="file with one HLA allele per line")
+
     parser.add_argument(
         "--hla",
         help="comma separated list of allele (default HLA-A*02:01)")
+
     parser.add_argument(
         "--epitopes-output",
         help="output file for dataframe containing scored epitopes",
         required=False)
+
     parser.add_argument(
         "--peptides-output",
         help="output file for dataframe containing scored vaccine peptides",
         required=False)
+
     parser.add_argument(
         "--print-epitopes",
         help="print dataframe with epitope scores",
         default=False,
         action="store_true")
+
     parser.add_argument(
         "--print-peptides",
         default = False, 
         help="print dataframe with vaccine peptide scores",
         action="store_true")
+
     parser.add_argument(
         "--html-report",
         default = "report.html",
         help = "Path to HTML report containing scored peptides and epitopes")
+
     parser.add_argument("--skip-mhc",
         default=False,
         action="store_true",
@@ -92,8 +102,6 @@ if __name__ == '__main__':
         alleles = [normalize_hla_allele_name(l) for l in args.hla.split(",")]
     else:
         alleles = [DEFAULT_ALLELE]
-
-
 
     # stack up the dataframes and later concatenate in case we
     # want both commandline strings (for weird mutations like translocations)
@@ -127,29 +135,30 @@ if __name__ == '__main__':
         for _, row in mutated_regions.iterrows():
             seq = row.SourceSequence
             epitope_length = 9
-            for i in xrange(len(seq) - epitope_length):
-                record = dict(row)
+            for i in xrange(len(seq) - epitope_length + 1):
+                record = {}
                 record['Epitope'] = seq[i:i+epitope_length]
                 record['EpitopeStart'] = i
                 record['EpitopeEnd'] = i + epitope_length
+                record['SourceSequence'] = seq
+                record['MutationStart'] = row['MutationStart']
+                record['MutationEnd'] = row['MutationEnd']
+                record['MutationInfo'] = row['MutationInfo']
+                record['info'] = row['info']
+                record['stable_id_transcript'] = row['stable_id_transcript']
                 records.append(record)
         scored_epitopes = pd.DataFrame.from_records(records)
     else:
         mhc = IEDBMHCBinding(name = 'mhc', alleles=alleles)
         scored_epitopes = mhc.apply(mutated_regions)
 
-        assert 'percentile_rank' in scored_epitopes, scored_epitopes.head()
-        mhc_percentile = scored_epitopes['percentile_rank']
-        mhc_score = (100.0 - mhc_percentile) / 100.0
-        mhc_binding_category = mhc_percentile <= 1.0
-        scored_epitopes['mhc_score'] = mhc_score
-        scored_epitopes['mhc_binding_category'] = mhc_binding_category
 
-    if 'mhc_score' in scored_epitopes:
-        scored_epitopes = scored_epitopes.sort(['mhc_score'])
+    if 'MHC_PercentileRank' in scored_epitopes:
+        scored_epitopes = scored_epitopes.sort(['MHC_PercentileRank'])
 
     if args.epitopes_output:
         scored_epitopes.to_csv(args.epitopes_output, index=False)
+        
     if args.print_epitopes:
         print scored_epitopes.to_string()
 
