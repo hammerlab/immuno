@@ -110,7 +110,7 @@ function renderPeptideSequences(peptides) {
     .enter().append('text')
       .text(function(d, i) { return d;})
       .attr('class', function(d, i) {
-        if (i == this.parentNode.__data__.mutStart
+        if (i >= this.parentNode.__data__.mutStart
             && i < this.parentNode.__data__.mutEnd) {
           return 'sequence mutation';
         } else {
