@@ -102,7 +102,6 @@ class IEDBMHCBinding(PipelineElement):
     logging.info("Calling iedb with {} {}, {}".format(
         gene_info, sequence, self._alleles))
     try:
-        print request_values
         data = urllib.urlencode(request_values)
         req = urllib2.Request(self._url, data)
         response = urllib2.urlopen(req).read() 
@@ -173,7 +172,6 @@ class IEDBMHCBinding(PipelineElement):
     del responses['level_0']
     del responses['level_1']
     
-    print responses['EpitopeEnd']
     # IEDB has inclusive end positions, change to exclusive 
     responses['EpitopeEnd'] += 1
 

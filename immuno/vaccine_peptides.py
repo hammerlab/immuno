@@ -244,7 +244,6 @@ def build_peptides_dataframe(
                 (epitopes_df.EpitopeStart >= peptide_start) & \
                 (epitopes_df.EpitopeEnd <= peptide_end) 
             epitope_subset = epitopes_df[epitope_mask]
-            print "SUBSET", epitope_subset
             row['epitopes'] = epitope_subset
 
             records.append(row)
