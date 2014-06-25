@@ -2,11 +2,10 @@
 'use strict';
 
 // TODO:
-//     1. Develop epitope information window.
-//     2. Support different sorting functions.
-//     3. (?) Display of immungenicity (like binding score bar chart).
-//     4. (?) Hover over score bars for more info.
-//     5. (?) Dynamic SVG height to it's not too tall sometimes.
+//     1. Support different sorting functions.
+//     2. (?) Display of immungenicity (like binding score bar chart).
+//     3. (?) Hover over score bars for more info.
+//     4. (?) Dynamic SVG height (pay attention to perceptual diffs then).
 
 var WIDTH = 1000,
     HEIGHT = 12000,
@@ -418,13 +417,14 @@ function highlightAcid(acidIdx, peptideEl, peptideClickBox, peptideData) {
 function initializeEpitopeThresholdSliderHandler(epitopes, peptideEl) {
   d3.select('#threshold')
       .on('input', function() {
-        d3.select('#tval').text(this.value);
-        d3.select('#controls .suffix').text(ordinalSuffix(this.value));
+        var thresh = 100 - parseInt(this.value);
+        d3.select('#tval').text(thresh);
+        d3.select('#suffix').text(ordinalSuffix(thresh));
       })
       .on('change', function() {
-        var thresh = parseInt(this.value);
-        d3.select('#tval').text(this.value)
-        d3.select('#controls .suffix').text(ordinalSuffix(this.value));
+        var thresh = 100 - parseInt(this.value);
+        d3.select('#tval').text(thresh)
+        d3.select('#suffix').text(ordinalSuffix(thresh));
 
         epitopes = sortEpitopes(epitopes, thresh);
 
@@ -435,17 +435,20 @@ function initializeEpitopeThresholdSliderHandler(epitopes, peptideEl) {
 function initializeThresholdSliderHandler(data) {
   d3.select('#threshold')
       .on('input', function() {
-        d3.select('#tval').text(this.value);
-        d3.select('#controls .suffix').text(ordinalSuffix(this.value));
+        var thresh = 100 - parseInt(this.value);
+        d3.select('#tval').text(thresh);
+        d3.select('#suffix').text(ordinalSuffix(thresh));
       })
       .on('change', function() {
-        var thresh = parseInt(this.value);
-        d3.select('#tval').text(this.value)
-        d3.select('#controls .suffix').text(ordinalSuffix(this.value));
+        var thresh = 100 - parseInt(this.value);
+        d3.select('#tval').text(thresh);
+        d3.select('#suffix').text(ordinalSuffix(thresh));
 
         data = data.sort(function(a,b){
           var aScore = peptideBindingScore(a, thresh),
           bScore = peptideBindingScore(b, thresh);
+          a.mutation = aScore;
+          b.mutation = bScore;
           return aScore > bScore ? -1 : 1;
         });
 
@@ -478,7 +481,7 @@ function epitopesOverlapping(idx, epitopes) {
 }
 
 function getThreshold() {
-  return parseInt(d3.select('#threshold').node().value);
+  return 100 - parseInt(d3.select('#threshold').node().value);
 }
 
 // Returns number of passing epitopes (HLA with percentile >= threshhold).
@@ -490,8 +493,8 @@ function getThreshold() {
 
 // Return the number of binding scores above a given percentile threshold.
 function epitopeBindingScore(epitope, threshold) {
-  return _.reduce(epitope.scores, function(acc, score, hla) {
-    if (score.percentile >= threshold)
+  return _.reduce(epitope.scores, function(acc, score) {
+    if (score.percentile <= threshold)
       return acc + 1;
     else
       return acc;
@@ -522,9 +525,10 @@ function passesEpitopeThreshold(epitope, threshold) {
 
 function ordinalSuffix(n) {
   var sn = String(n);
-  if (sn.slice(-2)[0] == '1')
+  if (sn.length > 1 && sn.slice(-2)[0] == '1')
     return 'th';
-  switch (sn[sn.length-1]) {
+
+  switch (sn.slice(-1)) {
     case '1':
       return 'st';
     case '2':
