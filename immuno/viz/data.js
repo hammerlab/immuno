@@ -1,3 +1,9 @@
+var seed = 1;
+Math.random = function() {
+    var x = Math.sin(seed++) * 10000;
+    return x - Math.floor(x);
+}
+
 function randomSample(lst, n) {
   return _.map(_.range(n), function(n) { return _.sample(lst, n, true); });
 }
