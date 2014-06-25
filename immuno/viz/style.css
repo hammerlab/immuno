@@ -93,6 +93,25 @@ span#close-inspector {
     fill: white;
 }
 
+body.epitope-body {
+    color: black;
+    padding-top: 0;
+    margin-top: 0;
+    font-size: 11px;
+}
+
+body.epitope-body table {
+    margin: 0 auto;
+}
+
+body.epitope-body thead {
+    font-weight: bold;
+}
+
+body.epitope-body td {
+    padding: 1px 5px;
+}
+
 /* Tooltip */
 #tooltip, #tt-arrow {
     background: #2d2d2d;

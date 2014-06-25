@@ -375,15 +375,37 @@ function resetEpitopeInfoWindow(peptide) {
 }
 
 function renderEpitopeInfoWindowChart(epitopeInfoWindow) {
-  epitopeInfoWindow
-    .append('rect')
-      .attr('width', WIDTH+GENE_WIDTH)
-      .attr('height', EPITOPE_INFO_HEIGHT);
+  var epitopeData = this.node().__data__,
+      scores = _.reduce(epitopeData.scores, function(acc, v, k) {
+        v.name = k;
+        acc.push(v);
+        return acc;
+      }, []);
 
-  epitopeInfoWindow
-    .append('text')
-      .text('information hurr')
-      .attr('fill', 'black');
+  var scoreBody = epitopeInfoWindow
+    .append('foreignObject')
+      .attr('width', WIDTH+GENE_WIDTH)
+      .attr('height', EPITOPE_INFO_HEIGHT)
+    .append('xhtml:body')
+      .attr('class', 'epitope-body'),
+      tbl = scoreBody.append('table'),
+      header = tbl.append('thead')
+    .append('tr');
+
+  header.append('td').html('HLA Allele');
+  header.append('td').html('Binding Score');
+  header.append('td').html('Percentile');
+
+  var rows = tbl.selectAll('tr')
+      .data(scores)
+    .enter().append('tr');
+
+  rows.append('td')
+      .html(function(d) { return d.name; });
+  rows.append('td')
+      .html(function(d) { return d.bindingScore; });
+  rows.append('td')
+      .html(function(d) { return d.percentile; });
 }
 
 function highlightAcid(acidIdx, peptideEl, peptideClickBox, peptideData) {
