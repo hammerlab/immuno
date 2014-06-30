@@ -11,15 +11,22 @@ var WIDTH = 1000,
     HEIGHT = 12000,
     PEPTIDE_HEIGHT = 20,
     ACID_DIM = 12,
-    GENE_WIDTH = 100,
+    GENE_LETTER_WIDTH = 14,
+    GENE_WIDTH,
     EPITOPE_INFO_HEIGHT = 125,
-    acidX = d3.scale.ordinal().rangeBands([0, WIDTH - GENE_WIDTH]);
+    acidX = d3.scale.ordinal();
 
 
 function main(data) {
-  acidX.domain(d3.range(0, d3.max(data, function(d) {
+  GENE_WIDTH = d3.max(data, function(d) { return d.gene.length; }) * GENE_LETTER_WIDTH;
+
+  acidX
+    .rangeBands([0, WIDTH - GENE_WIDTH])
+    .domain(d3.range(0, d3.max(data, function(d) {
     return d.sequence.length;
   })));
+
+
 
   d3.select('#peptides')
       .append('svg')
