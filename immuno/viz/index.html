@@ -7,13 +7,6 @@
   </head>
 
   <body>
-    <div id="tooltip">
-      This is a test tooltip. Is this cool? This seems cool.
-      <br/>
-      We cool.
-      <div id="tt-arrow"></div>
-    </div>
-
     <div id="info">
       <span class="b">Filename</span>
       <span class="i">_peptide_pt_011812359.txt</span>
@@ -26,10 +19,12 @@
     </div>
 
     <div id="peptides-list">
-      <input type="range" id="threshold" value="92" min="1" max="99">
+      <input type="radio" name="sort-value" value="percentile" checked>Percentile<br>
+      <input type="radio" name="sort-value" value="ic50">IC50
+      <input type="range" id="slider" value="92" min="1" max="99">
       &nbsp;&nbsp;
-      Binding score threshold:
-      <span id="tval">8</span><span id="suffix">th</span> percentile.
+      <span id="slider-type">Binding score percentile</span>:
+      <span id="tval">8</span><span id="suffix">th</span>.
       <span id="close-inspector" title="Close inspector.">&times;</span>
 
       <div id="peptides"></div>

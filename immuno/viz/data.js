@@ -29,12 +29,12 @@ _.flatMap = _.compose(_.flatten, _.map);
 window.DATA = _.map(peptides, function(peptide) {
   peptide.epitopes = _.flatMap(_.range(9, 16), function(epitopeLength) {
     return _.map(_.range(peptide.length-epitopeLength), function(startPosition) {
-      var scores = {'HLA-A*34:01': {percentile: _.random(100), bindingScore: _.random(0, 1000)},
-                    'HLA-A*02:01': {percentile: _.random(100), bindingScore: _.random(0, 1000)},
-                    'HLA-B*12:09': {percentile: _.random(100), bindingScore: _.random(0, 1000)},
-                    'HLA-B*07:21': {percentile: _.random(100), bindingScore: _.random(0, 1000)},
-                    'HLA-C*19:13': {percentile: _.random(100), bindingScore: _.random(0, 1000)},
-                    'HLA-C*11:11': {percentile: _.random(100), bindingScore: _.random(0, 1000)}};
+      var scores = {'HLA-A*34:01': {percentile: _.random(100), bindingScore: _.random(250, 2500)},
+                    'HLA-A*02:01': {percentile: _.random(100), bindingScore: _.random(250, 2500)},
+                    'HLA-B*12:09': {percentile: _.random(100), bindingScore: _.random(250, 2500)},
+                    'HLA-B*07:21': {percentile: _.random(100), bindingScore: _.random(250, 2500)},
+                    'HLA-C*19:13': {percentile: _.random(100), bindingScore: _.random(250, 2500)},
+                    'HLA-C*11:11': {percentile: _.random(100), bindingScore: _.random(250, 2500)}};
       return {start: startPosition, length: epitopeLength, scores: scores, sequence: peptide.sequence.slice(startPosition, startPosition+epitopeLength+1)};
     });
   });

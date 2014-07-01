@@ -111,31 +111,3 @@ body.epitope-body thead {
 body.epitope-body td {
     padding: 1px 5px;
 }
-
-/* Tooltip */
-#tooltip, #tt-arrow {
-    background: #2d2d2d;
-    border-radius: 3px;
-}
-
-#tooltip {
-    display: none;
-    font-size: 12px;
-    padding: 13px;
-    height: 100px;
-    width: 175px;
-    position: absolute;
-    color: #ddd;
-    z-index: initial;
-}
-
-#tt-arrow {
-    height: 30px;
-    width: 30px;
-    overflow: hidden;
-    position: absolute;
-    top: -10px;
-    left: 42%;
-    -webkit-transform: rotate(45deg);
-    z-index: -1;
-}
