@@ -153,6 +153,8 @@ class IEDBMHCBinding(PipelineElement):
                     'allele' : 'Allele', 
                 },
                 inplace=True)
+            response['EpitopeStart'] -= 1
+            response['EpitopeEnd'] -= 1
             responses[peptide] = response 
         else:
             logging.info(

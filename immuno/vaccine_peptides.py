@@ -189,7 +189,7 @@ def build_peptides_dataframe(
             row = dict(base_record)
             row['Peptide'] = peptide
             row['PeptideStart'] = peptide_start
-            row['PeptideEnd'] = peptide_end
+            row['PeptideEnd'] = peptide_end 
             row['PeptideMutationStart'] = peptide_mut_start
             row['PeptideMutationEnd'] = peptide_mut_end
 

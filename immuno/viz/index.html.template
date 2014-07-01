@@ -29,7 +29,7 @@
       <input type="range" id="threshold" value="90" min="1" max="99">
       &nbsp;&nbsp;
       Binding score threshold:
-      <span id="tval">90</span><span class="suffix">th</span> percentile.
+      <span id="tval">8</span><span class="suffix">th</span> percentile.
       <span id="close-inspector" title="Close inspector.">&times;</span>
 
       <div id="peptides"></div>
