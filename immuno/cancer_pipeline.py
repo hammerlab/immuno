@@ -162,14 +162,26 @@ if __name__ == '__main__':
     if args.print_epitopes:
         print scored_epitopes.to_string()
 
-    peptides = build_peptides_dataframe(scored_epitopes,
-        peptide_length = peptide_length, 
-        min_peptide_padding = args.min_peptide_padding)
-    if args.peptides_output:
-        peptides.to_csv(args.peptides_output, index=False)
+    #peptides = build_peptides_dataframe(scored_epitopes,
+    #    peptide_length = peptide_length, 
+    #    min_peptide_padding = args.min_peptide_padding)
+    #if args.peptides_output:
+    #    peptides.to_csv(args.peptides_output, index=False)
     
-    if args.print_peptides:
-        print peptides.to_string()
+    #if args.print_peptides:
+    #    print peptides.to_string()
+    peptides = []
+    for seq, group in scored_epitopes.groupby("SourceSequence"):
+        row = {}
+        row["Peptide"] = seq
+        head = group.to_records()[0]
+        row["MutationStart"] = head.MutationStart
+        row["MutationEnd"] = head.MutationEnd
+        row["MutationInfo"] = head.MutationInfo
+        row["GeneInfo"] = head.info
+        row['TranscriptId'] = head.stable_id_transcript
+        row["Epitopes"] = group
+        peptides.append(row)
 
     input_names = ";".join(args.input)
     if args.string:
