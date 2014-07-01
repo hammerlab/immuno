@@ -3,6 +3,10 @@ body {
     font-family: Helvetica;
 }
 
+#tooltip {
+    display: none;
+}
+
 #controls {
     margin-bottom: 20px;
 }
@@ -92,6 +96,7 @@ span#close-inspector {
 #epitope-info-window rect {
     fill: white;
 }
+
 
 body.epitope-body {
     color: black;

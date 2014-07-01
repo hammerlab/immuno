@@ -10,7 +10,6 @@ var WIDTH = 1000,
     HEIGHT = 12000,
     PEPTIDE_HEIGHT = 20,
     ACID_DIM = 12,
-    EPITOPE_INFO_HEIGHT = 125,  // global
     SLIDER_TYPE = 'percentile', // global
     SLIDER_BINDING_SCORE = 500, // global
     SLIDER_PERCENTILE = 8,      // global
