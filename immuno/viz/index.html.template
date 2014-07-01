@@ -16,10 +16,11 @@
 
     <div id="info">
       <span class="b">Filename</span>
-      <span class="i">_peptide_pt_011812359.txt</span>
+      <span class="i">${vcf_filename}</span>
       <br/>
       <span class="b">Date Run</span>
-      <span class="i">06/14/2014</span>
+      <%! from time import strftime as time %>
+      <span class="i">${"%B %d, %Y" | time}</span>
       <br/>
       <span class="b">ImmunoID SHA1</span>
       <span class="i">dc03928577b1b2f0b598154aa55f592fcd0dc69f</span>

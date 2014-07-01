@@ -62,10 +62,6 @@ if __name__ == '__main__':
         help="output file for dataframe containing scored epitopes",
         required=False)
 
-    parser.add_argument(
-        "--peptides-output",
-        help="output file for dataframe containing scored vaccine peptides",
-        required=False)
 
     parser.add_argument(
         "--print-epitopes",
@@ -88,6 +84,12 @@ if __name__ == '__main__':
         default=False,
         action="store_true",
         help="Don't predict MHC binding")
+
+    parser.add_argument("--all-possible-vaccine-peptides", 
+        default = False,
+        action = "store_true",
+        help="Instead of showing best sliding window, show all possible vaccine peptides"
+    )
 
     args = parser.parse_args()
 
@@ -162,34 +164,36 @@ if __name__ == '__main__':
     if args.print_epitopes:
         print scored_epitopes.to_string()
 
-    #peptides = build_peptides_dataframe(scored_epitopes,
-    #    peptide_length = peptide_length, 
-    #    min_peptide_padding = args.min_peptide_padding)
-    #if args.peptides_output:
-    #    peptides.to_csv(args.peptides_output, index=False)
-    
-    #if args.print_peptides:
-    #    print peptides.to_string()
-    peptides = []
-    for seq, group in scored_epitopes.groupby("SourceSequence"):
-        row = {}
-        row["Peptide"] = seq
-        head = group.to_records()[0]
-        row["MutationStart"] = head.MutationStart
-        row["MutationEnd"] = head.MutationEnd
-        row["MutationInfo"] = head.MutationInfo
-        row["GeneInfo"] = head.info
-        row['TranscriptId'] = head.stable_id_transcript
-        row["Epitopes"] = group
-        peptides.append(row)
 
+    if args.all_possible_vaccine_peptides:
+        peptides = build_peptides_dataframe(scored_epitopes,
+            peptide_length = peptide_length, 
+            min_peptide_padding = args.min_peptide_padding)
+    else:
+        peptides = []
+        for seq, group in scored_epitopes.groupby("SourceSequence"):
+            row = {}
+            row["Peptide"] = seq
+            head = group.to_records()[0]
+            row["MutationStart"] = head.MutationStart
+            row["MutationEnd"] = head.MutationEnd
+            row["MutationInfo"] = head.MutationInfo
+            row["GeneInfo"] = head.info
+            row['TranscriptId'] = head.stable_id_transcript
+            row["Epitopes"] = group
+            peptides.append(row)
+    
+    
+    if args.print_peptides:
+        print peptides
+    
     input_names = ";".join(args.input)
     if args.string:
         input_names += ";" + args.string
     template_lookup = TemplateLookup(directories=['.', 'viz'], default_filters=['literal'])
     template = Template(filename = 'viz/index.html.template', lookup = template_lookup)
 
-    html = template.render(peptides = peptides) #(input_names, alleles, scored_epitopes, scored_peptides)
+    html = template.render(peptides = peptides, vcf_filename = ','.join(args.input) ) #(input_names, alleles, scored_epitopes, scored_peptides)
     
     with open(args.html_report, 'w') as f:
         f.write(html)
