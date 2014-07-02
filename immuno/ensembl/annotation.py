@@ -267,6 +267,7 @@ def annotate_vcf_transcripts(vcf_df):
         'seq_region_end_transcript'
 
     """
+    print "Annotating VCF, initial columns:", vcf_df.columns 
     if 'gene_stable_id' in vcf_df.columns:
         annotated = annotate(vcf_df,
             data.transcript_data,
@@ -275,6 +276,7 @@ def annotate_vcf_transcripts(vcf_df):
             right=['name', 'gene_stable_id'])
     else:
         annotated = annotate(vcf_df, data.transcript_data, _transcript_matches)
+    print "Annotated columns:", annotated.columns 
     return annotated
 
 

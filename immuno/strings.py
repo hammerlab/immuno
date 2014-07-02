@@ -54,9 +54,10 @@ def load_strings(strings, source = 'commandline'):
         row['SourceSequence'] = full_peptide
         row['MutationStart'] = start
         row['MutationEnd'] = stop
-        row['info'] = source
+        row['GeneInfo'] = source
+        row['Gene'] = '-'
         row['MutationInfo'] = "-"
-        row['stable_id_transcript'] = "-"
+        row['TranscriptId'] = "-"
 
         rows.append(row)
     return pd.DataFrame.from_records(rows,
@@ -64,9 +65,10 @@ def load_strings(strings, source = 'commandline'):
             'SourceSequence',
             'MutationStart',
             'MutationEnd',
-            'info',
+            'GeneInfo',
+            'Gene',
             'MutationInfo',
-            'stable_id_transcript',
+            'TranscriptId',
         ))
 
 def load_comma_string(s, source = 'literal'):
