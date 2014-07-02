@@ -6,21 +6,25 @@
 //     2. (?) Hover over score bars for more info.
 //     3. (?) Dynamic SVG height (pay attention to perceptual diffs then).
 
-var WIDTH = 1000,
+var WIDTH = 1200,
     HEIGHT = 12000,
     PEPTIDE_HEIGHT = 20,
     ACID_DIM = 12,
     SLIDER_TYPE = 'percentile', // global
     SLIDER_BINDING_SCORE = 500, // global
-    SLIDER_PERCENTILE = 8,      // global
-    GENE_LETTER_WIDTH = 14,
+    SLIDER_PERCENTILE = 2,      // global
+    GENE_LETTER_WIDTH = 11,
     GENE_WIDTH,
     EPITOPE_INFO_HEIGHT = 125,
+    MIN_PERCENTILE = 1, 
+    MAX_PERCENTILE = 50,
+    MIN_IC50 = 1, 
+    MAX_IC50 = 2500, 
     acidX = d3.scale.ordinal();
 
 
 function main(data) {
-  GENE_WIDTH = d3.max(data, function(d) { return d.gene.length; }) * GENE_LETTER_WIDTH;
+  GENE_WIDTH = d3.max(data, function(d) { return d.description.length; }) * GENE_LETTER_WIDTH;
 
   acidX
     .rangeBands([0, WIDTH - GENE_WIDTH])
@@ -70,8 +74,9 @@ function renderPeptides(data) {
 }
 
 function renderGenes(peptides) {
+  // renders column of gene names on left side of screen 
   peptides.selectAll('.gene')
-      .data(function(d,i) { return [d.gene]; })
+      .data(function(d,i) { return [d.description]; })
     .enter().append('text')
       .attr('class', 'gene')
       .attr('dx', -GENE_WIDTH)
@@ -86,7 +91,9 @@ function renderHighlightEpitopes(peptides) {
         //               in the overview/peptide list; once the list is
         //               exploded, all the epitopes with one MHC allelse above
         //               the score are shown.
-        return epitopesPassing(getSliderAttr(), 3, getSliderValue(), d.epitopes);
+
+        // TODO(alex):  Enabling highlighting by changing 3 to 1 below causes SVG errors. 
+        return strongBindingEpitopes(getSliderAttr(), 3, getSliderValue(), d.epitopes);
       }, _epitope_key_fn);
 
   epitopes
@@ -304,7 +311,7 @@ function renderPassingEpitopeHighlights(epitopes) {
     .filter(function(d) {
         // !... is to ensure we don't keep adding highlight rects to the same
         // epitopes.
-      var alleles = allelesBelow(getSliderAttr(), getSliderValue(), d);
+      var alleles = allelesBelowThreshold(getSliderAttr(), getSliderValue(), d);
       return (alleles > 0) && !d3.select(this).select('.passing-epitope').node();
     })
     .append('rect')
@@ -448,55 +455,59 @@ function highlightAcid(acidIdx, peptideEl, peptideClickBox, peptideData) {
 
 // Helpers for xxxSliderHandlers
 function setSliderText() {
+  // toggle between displaying SLIDER_PERCENTILE and SLIDER_BINDING_SCORE
+  // depending on global value SLIDER_TYPE, which gets set by the 'change'
+  // event of a drop down list. 
+
   if (SLIDER_TYPE === 'percentile') {
     d3.select('#tval').text(SLIDER_PERCENTILE);
     d3.select('#suffix').text(ordinalSuffix(SLIDER_PERCENTILE));
   } else if (SLIDER_TYPE === 'ic50') {
     d3.select('#tval').text(SLIDER_BINDING_SCORE);
-    d3.select('#suffix').text('mMol');
+    d3.select('#suffix').text('nM');
   }
 }
 
 function sortPeptides(peptides, attr, threshold) {
+  // TODO: sort only by epitopes with mutated residues 
   return peptides.sort(function(a,b){
-    var passing = _.partial(peptidesPassingEpitopes, attr, threshold);
-    return passing(a) > passing(b) ? -1 : 1;
+    var numBindingEpitopes = _.partial(numberOfStrongBindingEpitopes, attr, threshold);
+    return numBindingEpitopes(a) > numBindingEpitopes(b) ? -1 : 1;
   });
 }
 
 function initializeEpitopeSliderHandler(epitopes, peptideEl) {
-  d3.select('input[value=percentile]')
-    .on('click', function() {
-      SLIDER_TYPE = 'percentile';
-      d3.select('#slider')
-        .attr('min', 1)
-        .attr('max', 99)
-      .node().value = 100 - SLIDER_PERCENTILE; // attr('value', ..) wasn't working.
-      d3.select('span#slider-type').text('Binding score percentile');
-      setSliderText();
+  d3.select('select')
+    .on('change', function() {
 
-      epitopes = sortEpitopes('percentile', SLIDER_PERCENTILE, epitopes);
-      renderEpitopesWithScores(epitopes, peptideEl);
-    });
+      SLIDER_TYPE = this.options[this.selectedIndex].value;
+      if (SLIDER_TYPE == 'percentile') {
+        d3.select('#slider')
+          .attr('min', MIN_PERCENTILE)
+          .attr('max', MAX_PERCENTILE)
+          .node().value = SLIDER_PERCENTILE; // attr('value', ..) wasn't working.
+        d3.select('span#slider-type').text('');
+        setSliderText();
 
-  d3.select('input[value=ic50]')
-    .on('click', function() {
-      SLIDER_TYPE = 'ic50';
-      d3.select('#slider')
-        .attr('min', 1)
-        .attr('max', 2500)
-      .node().value = SLIDER_BINDING_SCORE; // attr('value', ..) wasn't working.
-      d3.select('span#slider-type').text('Binding score IC50');
-      setSliderText();
+        epitopes = sortEpitopes('percentile', SLIDER_PERCENTILE, epitopes);
+        renderEpitopesWithScores(epitopes, peptideEl);
+      } else {
+        d3.select('#slider')
+          .attr('min', MIN_IC50)
+          .attr('max', MAX_IC50)
+          .node().value = SLIDER_BINDING_SCORE; // attr('value', ..) wasn't working.
+        d3.select('span#slider-type').text('');
+        setSliderText();
 
-      epitopes = sortEpitopes('bindingScore', SLIDER_BINDING_SCORE, epitopes);
-      renderEpitopesWithScores(epitopes, peptideEl);
+        epitopes = sortEpitopes('bindingScore', SLIDER_BINDING_SCORE, epitopes);
+        renderEpitopesWithScores(epitopes, peptideEl);
+      }
     });
 
   d3.select('#slider')
       .on('input', function() {
         if (SLIDER_TYPE === 'percentile') {
-          SLIDER_PERCENTILE = 100 - parseInt(this.value);
+          SLIDER_PERCENTILE = parseInt(this.value);
         } else if (SLIDER_TYPE === 'ic50') {
           SLIDER_BINDING_SCORE = parseInt(this.value);
         }
@@ -504,8 +515,9 @@ function initializeEpitopeSliderHandler(epitopes, peptideEl) {
         setSliderText();
       })
       .on('change', function() {
+       
         if (SLIDER_TYPE === 'percentile') {
-          SLIDER_PERCENTILE = 100 - parseInt(this.value);
+          SLIDER_PERCENTILE = parseInt(this.value);
           epitopes = sortEpitopes('percentile', SLIDER_PERCENTILE, epitopes);
         } else if (SLIDER_TYPE === 'ic50') {
           SLIDER_BINDING_SCORE = parseInt(this.value);
@@ -518,38 +530,37 @@ function initializeEpitopeSliderHandler(epitopes, peptideEl) {
 }
 
 function initializeSliderHandler(peptides) {
-  d3.select('input[value=percentile]')
-    .on('click', function() {
-      SLIDER_TYPE = 'percentile';
-      d3.select('#slider')
-        .attr('min', 1)
-        .attr('max', 99)
-      .node().value = 100 - SLIDER_PERCENTILE; // attr('value', ..) wasn't working.
-      d3.select('span#slider-type').text('Binding score percentile');
-      setSliderText();
+  d3.select('select')
+    .on('change', function() {
 
-      peptides = sortPeptides(peptides, 'percentile', SLIDER_PERCENTILE);
-      renderPeptides(peptides);
-    });
+      SLIDER_TYPE = this.options[this.selectedIndex].value;
+      if (SLIDER_TYPE == 'percentile') {
+        d3.select('#slider')
+          .attr('min', MIN_PERCENTILE)
+          .attr('max', MAX_PERCENTILE)
+        .node().value = SLIDER_PERCENTILE; // attr('value', ..) wasn't working.
+        d3.select('span#slider-type').text('');
+        setSliderText();
 
-  d3.select('input[value=ic50]')
-    .on('click', function() {
-      SLIDER_TYPE = 'ic50';
-      d3.select('#slider')
-        .attr('min', 1)
-        .attr('max', 2500)
-      .node().value = SLIDER_BINDING_SCORE; // attr('value', ..) wasn't working.
-      d3.select('span#slider-type').text('Binding score IC50');
-      setSliderText();
+        peptides = sortPeptides(peptides, 'percentile', SLIDER_PERCENTILE);
+       
+      } else {
+        d3.select('#slider')
+            .attr('min', MIN_IC50)
+            .attr('max', MAX_IC50)
+          .node().value = SLIDER_BINDING_SCORE; // attr('value', ..) wasn't working.
+        d3.select('span#slider-type').text('');
+        setSliderText();
 
-      peptides = sortPeptides(peptides, 'bindingScore', SLIDER_BINDING_SCORE);
+        peptides = sortPeptides(peptides, 'bindingScore', SLIDER_BINDING_SCORE);
+      }
       renderPeptides(peptides);
     });
 
   d3.select('#slider')
       .on('input', function() {
         if (SLIDER_TYPE === 'percentile') {
-          SLIDER_PERCENTILE = 100 - parseInt(this.value);
+          SLIDER_PERCENTILE = parseInt(this.value);
         } else if (SLIDER_TYPE === 'ic50') {
           SLIDER_BINDING_SCORE = parseInt(this.value);
         }
@@ -558,7 +569,7 @@ function initializeSliderHandler(peptides) {
       })
       .on('change', function() {
         if (SLIDER_TYPE === 'percentile') {
-          SLIDER_PERCENTILE = 100 - parseInt(this.value);
+          SLIDER_PERCENTILE = parseInt(this.value);
           peptides = sortPeptides(peptides, 'percentile', SLIDER_PERCENTILE);
         } else if (SLIDER_TYPE === 'ic50') {
           SLIDER_BINDING_SCORE = parseInt(this.value);
@@ -596,36 +607,41 @@ function epitopesOverlapping(idx, epitopes) {
   });
 }
 
-// Returns number of passing epitopes
-function peptidesPassingEpitopes(peptide, attr, threshold) {
+// Returns number of epitopes below binding threshold
+// which overlap the mutation 
+function numberOfStrongBindingEpitopes(attr, threshold, peptide) {
   return _.reduce(peptide.epitopes, function(acc, epitope) {
-    return acc + allelesBelow(epitope, attr, threshold)
+    return acc + allelesBelowThreshold(attr, threshold, epitope)
   }, 0);
 }
 
 // Return the number of alleles epitope has with attr below threshold
-function allelesBelow(attr, threshold, epitope) {
+function allelesBelowThreshold(attr, threshold, epitope) {
   return _.reduce(epitope.scores, function(acc, score) {
-    if (score[attr] < threshold)
-      return acc + 1;
-    else
-      return acc;
+     return score[attr] <= threshold ? acc + 1 : acc; 
   }, 0);
 }
 
 function sortEpitopes(attr, threshold, epitopes) {
-  var qual = _.partial(allelesBelow, attr, threshold);
+  var numberAllelesBelowThreshold = _.partial(allelesBelowThreshold, attr, threshold);
   return epitopes.sort(function(a, b) {
-    return qual(a) > qual(b) ? -1 : 1;
+    var na = numberAllelesBelowThreshold(a);
+    var nb = numberAllelesBelowThreshold(b);
+    // break ties by putting epitopes with equal counts in left-to-right order
+    if (na == nb) {
+      return a.start > b.start ? 1 : -1; 
+    } else { 
+      return na > nb ? -1 : 1;
+    }
   });
 }
 
 // Returns all epitopes with number of alleles below a binding score percentile
 // threshold
-function epitopesPassing(attr, numAbove, threshold, epitopes) {
-  var alleles = _.partial(allelesBelow, attr, threshold);
+function strongBindingEpitopes(attr, numAllelesBinding, threshold, epitopes) {
+  var alleles = _.partial(allelesBelowThreshold, attr, threshold);
   return _.filter(epitopes, function(epitope) {
-    return alleles(epitope) >= numAbove;
+    return alleles(epitope) >= numAllelesBinding;
   });
 }
 

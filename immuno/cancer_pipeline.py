@@ -80,10 +80,10 @@ if __name__ == '__main__':
         default = "report.html",
         help = "Path to HTML report containing scored peptides and epitopes")
 
-    parser.add_argument("--skip-mhc",
+    parser.add_argument("--random-mhc",
         default=False,
         action="store_true",
-        help="Don't predict MHC binding")
+        help="Random values instead for MHC binding prediction")
 
     parser.add_argument("--iedb-mhc",
         default=False,
@@ -135,28 +135,8 @@ if __name__ == '__main__':
     mutated_regions = pd.concat(mutated_region_dfs)
 
 
-    if args.skip_mhc:
-        records = []
-        # if wer'e not running the MHC prediction then we have to manually
-        # extract 9mer substrings
-        for _, row in mutated_regions.iterrows():
-            seq = row.SourceSequence
-            epitope_length = 9
-            for i in xrange(len(seq) - epitope_length + 1):
-                record = {}
-                record['Epitope'] = seq[i:i+epitope_length]
-                record['EpitopeStart'] = i
-                record['EpitopeEnd'] = i + epitope_length
-                record['SourceSequence'] = seq
-                record['MutationStart'] = row['MutationStart']
-                record['MutationEnd'] = row['MutationEnd']
-                record['MutationInfo'] = row['MutationInfo']
-                record['GeneInfo'] = row['GeneInfo']
-                record['TranscriptId'] = row['TranscriptId']
-                record['Gene'] = row['Gene']
-                
-                records.append(record)
-        scored_epitopes = pd.DataFrame.from_records(records)
+    if args.random_mhc:
+        scored_epitopes = mhc_random.generate_scored_epitopes(mutated_regions)
     elif args.iedb_mhc:
         mhc = IEDBMHCBinding(name = 'mhc', alleles=alleles)
         scored_epitopes = mhc.apply(mutated_regions)
@@ -181,19 +161,20 @@ if __name__ == '__main__':
             min_peptide_padding = args.min_peptide_padding)
     else:
         peptides = []
-        for seq, group in scored_epitopes.groupby("SourceSequence"):
+        for (transcript_id, seq), group in scored_epitopes.groupby(["TranscriptId", "SourceSequence"]):
             row = {}
             row["Peptide"] = seq
+            row['TranscriptId'] = transcript_id
             head = group.to_records()[0]
             row["MutationStart"] = head.MutationStart
             row["MutationEnd"] = head.MutationEnd
             row["MutationInfo"] = head.MutationInfo
             row["GeneInfo"] = head.GeneInfo
-            row['TranscriptId'] = head.TranscriptId
+            row['Gene'] = head.Gene
+            row['Description'] = "%s (%s) : %s" % (head.Gene, head.TranscriptId, head.MutationInfo) 
             row["Epitopes"] = group
             peptides.append(row)
         
-    
     if args.print_peptides:
         print peptides
     

@@ -30,12 +30,19 @@
 
 
   <div id="peptides-list">
+      Binding threshold:
+      <input type="range" id="slider" value="2" min="1" max="50">
+      &nbsp;&nbsp;
+      <span id="slider-type"></span>
+      <span id="tval">2</span><span id="suffix">nd</span>&nbsp; 
+      <select name="sort-value">
+          <option selected value="percentile">Percentile</option>
+          <option value="ic50">IC50</option>
+      </select>
+      <!-- 
       <input type="radio" name="sort-value" value="percentile" checked>Percentile<br>
       <input type="radio" name="sort-value" value="ic50">IC50
-      <input type="range" id="slider" value="92" min="1" max="99">
-      &nbsp;&nbsp;
-      <span id="slider-type">Binding score percentile</span>:
-      <span id="tval">8</span><span id="suffix">th</span>.
+      -->
       <span id="close-inspector" title="Close inspector.">&times;</span>
 
       <div id="peptides"></div>
@@ -53,6 +60,8 @@
             length : ${len(peptide['Peptide'])},
             mutation : "${peptide['MutationInfo']}", 
             gene : "${peptide['Gene']}",
+            transcriptId : "${peptide['TranscriptId']}",
+            description : "${peptide['Description']}",
             mutStart: ${peptide['MutationStart']}, 
             mutEnd : ${peptide['MutationEnd']},
             epitopes: [
