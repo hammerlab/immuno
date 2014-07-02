@@ -20,14 +20,15 @@ import sys
 import pandas as pd
 from Bio import SeqIO
 import numpy as np
+from mako.template import Template
+from mako.lookup import TemplateLookup
 
 from common import peptide_substrings
 from mhc_iedb import IEDBMHCBinding, normalize_hla_allele_name
+from mhc_netmhcpan import PanBindingPredictor
 from load_file import load_file
 from strings import load_comma_string
 from vaccine_peptides import build_peptides_dataframe
-from mako.template import Template
-from mako.lookup import TemplateLookup
 
 DEFAULT_ALLELE = 'HLA-A*02:01'
 
@@ -89,6 +90,18 @@ if __name__ == '__main__':
         action="store_true",
         help="Don't predict MHC binding")
 
+
+    parser.add_argument("--iedb-mhc",
+        default=False,
+        action="store_true",
+        help="Use IEDB's web API for MHC binding")
+
+    parser.add_argument("--all-possible-vaccine-peptides", 
+        default = False,
+        action = "store_true",
+        help="Instead of showing best sliding window, show all possible vaccine peptides"
+    )
+
     args = parser.parse_args()
 
 
@@ -144,13 +157,18 @@ if __name__ == '__main__':
                 record['MutationStart'] = row['MutationStart']
                 record['MutationEnd'] = row['MutationEnd']
                 record['MutationInfo'] = row['MutationInfo']
-                record['info'] = row['info']
-                record['stable_id_transcript'] = row['stable_id_transcript']
+                record['GeneInfo'] = row['GeneInfo']
+                record['TranscriptId'] = row['TranscriptId']
+                record['Gene'] = row['Gene']
+                
                 records.append(record)
         scored_epitopes = pd.DataFrame.from_records(records)
-    else:
+    elif args.iedb_mhc:
         mhc = IEDBMHCBinding(name = 'mhc', alleles=alleles)
         scored_epitopes = mhc.apply(mutated_regions)
+    else:
+        predictor = PanBindingPredictor(alleles)
+        scored_epitopes = predictor.predict(mutated_regions)
 
 
     if 'MHC_PercentileRank' in scored_epitopes:
@@ -162,11 +180,25 @@ if __name__ == '__main__':
     if args.print_epitopes:
         print scored_epitopes.to_string()
 
-    peptides = build_peptides_dataframe(scored_epitopes,
-        peptide_length = peptide_length, 
-        min_peptide_padding = args.min_peptide_padding)
-    if args.peptides_output:
-        peptides.to_csv(args.peptides_output, index=False)
+
+    if args.all_possible_vaccine_peptides:
+        peptides = build_peptides_dataframe(scored_epitopes,
+            peptide_length = peptide_length, 
+            min_peptide_padding = args.min_peptide_padding)
+    else:
+        peptides = []
+        for seq, group in scored_epitopes.groupby("SourceSequence"):
+            row = {}
+            row["Peptide"] = seq
+            head = group.to_records()[0]
+            row["MutationStart"] = head.MutationStart
+            row["MutationEnd"] = head.MutationEnd
+            row["MutationInfo"] = head.MutationInfo
+            row["GeneInfo"] = head.GeneInfo
+            row['TranscriptId'] = head.TranscriptId
+            row["Epitopes"] = group
+            peptides.append(row)
+        
     
     if args.print_peptides:
         print peptides.to_string()

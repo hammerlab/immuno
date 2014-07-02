@@ -18,7 +18,7 @@ import logging
 import pandas as pd
 import numpy as np
 
-from ensembl import annotation
+from ensembl import annotation, gene_names 
 from ensembl.transcript_variant import peptide_from_transcript_variant
 
 
@@ -154,15 +154,24 @@ def load_vcf(
                 row['MutationStart'] = start
                 row['MutationEnd'] = stop
                 row['MutationInfo'] = annot
+
+                try:
+                    gene = gene_names.transcript_id_to_gene_name(transcript_id)
+                except:
+                    gene = gene_names.transcript_id_to_gene_id(transcript_id)
+                row['Gene'] = gene
+                print ">>", row 
                 new_rows.append(row)
     peptides = pd.DataFrame.from_records(new_rows)
-    # peptides = variants.apply(peptides_from_annotation)
+    peptides['GeneInfo'] = peptides['info']
+    peptides['TranscriptId'] = peptides['stable_id_transcript'] 
+
     transcripts_df = transcripts_df.merge(peptides)
     logging.info("Generated %d peptides from %s",
         len(transcripts_df), input_filename)
 
     # drop verbose or uninteresting columns from VCF
-    for dumb_field in ('description_gene', 'filter', 'qual', 'id', 'name'):
+    for dumb_field in ('description_gene', 'filter', 'qual', 'id', 'name', 'info', 'stable_id_transcript'):
         if dumb_field in transcripts_df.columns:
             transcripts_df = transcripts_df.drop(dumb_field, axis = 1)
     if log_filename:

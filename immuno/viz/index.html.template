@@ -21,8 +21,10 @@
       <span class="b">Date Run</span>
       <span class="i">06/14/2014</span>
       <br/>
+      <!-- 
       <span class="b">ImmunoID SHA1</span>
       <span class="i">dc03928577b1b2f0b598154aa55f592fcd0dc69f</span>
+      --> 
     </div>
 
     <div id="peptides-list">
@@ -43,12 +45,12 @@
       vaccine_peptide_array = [
         % for peptide in peptides.to_records():
           {
-            sequence: "${peptide.Peptide}", 
-            length : ${peptide.PeptideEnd - peptide.PeptideStart},
-            mutation : "${peptide.MutationInfo}", 
-            gene : "${peptide.GeneInfo}",
-            mutStart: ${peptide.PeptideMutationStart}, 
-            mutEnd : ${peptide.PeptideMutationEnd},
+            sequence: "${peptide['Peptide']}", 
+            length : ${len(peptide['Peptide'])},
+            mutation : "${peptide['MutationInfo']}", 
+            gene : "${peptide['Gene']}",
+            mutStart: ${peptide['MutationStart']}, 
+            mutEnd : ${peptide['MutationEnd']},
             epitopes: [
               % for epitope in peptide.epitopes.to_records():
                 {
