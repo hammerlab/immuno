@@ -42,11 +42,9 @@ class PanBindingPredictor(object):
 
 			output_file = tempfile.NamedTemporaryFile("w", prefix="netMHCpan_output", delete=False)
 			output_file.close()
-
-			print ">", mutation_entry.SourceSequence
+			print "MHC:", mutation_entry.Gene, mutation_entry.TranscriptId, mutation_entry.MutationInfo
 			for allele in self.alleles:
-				print "--", allele 
-				subprocess.check_call(["netMHCpan", "-a", allele.replace("*", ""), "-l", "9", "-xls", "-xlsfile", output_file.name, "-f", input_file.name, ])
+				subprocess.check_output(["netMHCpan", "-a", allele.replace("*", ""), "-l", "9", "-xls", "-xlsfile", output_file.name, "-f", input_file.name, ])
 				epitopes_df = pd.read_csv(output_file.name, sep='\t', skiprows = 1)
 				# columns: Pos    Peptide   ID  1-log50k          nM  Rank
 				for epitope_row in epitopes_df.to_records():

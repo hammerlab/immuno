@@ -21,7 +21,7 @@ def load_file(input_filename, peptide_length):
     if input_filename.endswith("eff.vcf"):
         return load_snpeff(input_filename, peptide_length = peptide_length)
     if input_filename.endswith(".vcf"):
-        return load_vcf(input_filename, peptide_length = peptide_length)
+        return load_vcf(input_filename, min_peptide_length = 9, max_peptide_length = peptide_length)
     elif input_filename.endswith(".maf"):
         return load_maf(input_filename, peptide_length = peptide_length)
     elif input_filename.endswith(".fasta") \

@@ -77,7 +77,8 @@ def parse_vcf(vcf_filename):
 
 def load_vcf(
         input_filename,
-        peptide_length=31,
+        min_peptide_length=9,
+        max_peptide_length = 31, 
         drop_low_quality = True,
         log_filename = 'vcf_csv.log'):
     """
@@ -87,8 +88,8 @@ def load_vcf(
     input_filename : str
         Path to VCF file
 
-    peptide_length : int
-        How long will the vaccine peptides be? Used to determine
+    min_peptide_length : int
+        Shortest possible vaccine peptides be, used to determine
         required padding.
 
     drop_low_quality : bool, optional
@@ -126,10 +127,12 @@ def load_vcf(
     
     new_rows = []
     group_cols = ['chr','pos', 'ref', 'alt', 'stable_id_transcript']
+
+    seen_source_sequences = set([])
     for (_, pos, ref, alt, transcript_id), group in \
             transcripts_df.groupby(group_cols):
         row = group.irow(0)
-        padding = peptide_length - 1 
+        padding = max_peptide_length - 1 
         if transcript_id:
             logging.info("Getting peptide from transcript ID %s", transcript_id)
             seq, start, stop, annot = \
@@ -138,13 +141,21 @@ def load_vcf(
                     padding = padding)
             assert isinstance(start, int), (start, type(start))
             assert isinstance(stop, int), (stop, type(stop))
+        else:
+            logging.info("Skipping ref = %s, alt = %s, pos = %s" % (ref, alt, pos))
         if seq:
+            if seq in seen_source_sequences:
+                logging.info("Skipping %s>%s at %s because already seen sequence %s" % (ref,alt,pos,seq))
+                continue
+            else:
+                seen_source_sequences.add(seq)
+
             if '*' in seq:
                 logging.warning(
                     "Found stop codon in peptide %s from transcript_id %s",
                     region.seq,
                     transcript_id)
-            elif len(seq) <= padding:
+            elif len(seq) < min_peptide_length:
                 logging.info(
                     "Truncated peptide too short for transcript %s gene position %s %s > %s ", 
                     transcript_id, pos, ref, alt)
@@ -159,10 +170,13 @@ def load_vcf(
                     gene = gene_names.transcript_id_to_gene_name(transcript_id)
                 except:
                     gene = gene_names.transcript_id_to_gene_id(transcript_id)
+
                 row['Gene'] = gene
                 print ">>", row 
                 new_rows.append(row)
+    assert len(new_rows) > 0, "No mutations!"
     peptides = pd.DataFrame.from_records(new_rows)
+    print peptides.columns 
     peptides['GeneInfo'] = peptides['info']
     peptides['TranscriptId'] = peptides['stable_id_transcript'] 
 
