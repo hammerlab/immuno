@@ -26,6 +26,7 @@ from mako.lookup import TemplateLookup
 from common import peptide_substrings
 from mhc_iedb import IEDBMHCBinding, normalize_hla_allele_name
 from mhc_netmhcpan import PanBindingPredictor
+import mhc_random 
 from load_file import load_file
 from strings import load_comma_string
 from vaccine_peptides import build_peptides_dataframe
@@ -136,7 +137,7 @@ if __name__ == '__main__':
 
 
     if args.random_mhc:
-        scored_epitopes = mhc_random.generate_scored_epitopes(mutated_regions)
+        scored_epitopes = mhc_random.generate_scored_epitopes(mutated_regions, alleles)
     elif args.iedb_mhc:
         mhc = IEDBMHCBinding(name = 'mhc', alleles=alleles)
         scored_epitopes = mhc.apply(mutated_regions)

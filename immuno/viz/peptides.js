@@ -93,7 +93,7 @@ function renderHighlightEpitopes(peptides) {
         //               the score are shown.
 
         // TODO(alex):  Enabling highlighting by changing 3 to 1 below causes SVG errors. 
-        return strongBindingEpitopes(getSliderAttr(), 3, getSliderValue(), d.epitopes);
+        return strongBindingEpitopes(getSliderAttr(), 1, getSliderValue(), d.epitopes);
       }, _epitope_key_fn);
 
   epitopes
