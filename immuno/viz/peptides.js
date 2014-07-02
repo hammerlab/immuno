@@ -16,10 +16,10 @@ var WIDTH = 1200,
     GENE_LETTER_WIDTH = 11,
     GENE_WIDTH,
     EPITOPE_INFO_HEIGHT = 125,
-    MIN_PERCENTILE = 1, 
+    MIN_PERCENTILE = 1,
     MAX_PERCENTILE = 50,
-    MIN_IC50 = 1, 
-    MAX_IC50 = 2500, 
+    MIN_IC50 = 1,
+    MAX_IC50 = 2500,
     acidX = d3.scale.ordinal();
 
 
@@ -29,10 +29,8 @@ function main(data) {
   acidX
     .rangeBands([0, WIDTH - GENE_WIDTH])
     .domain(d3.range(0, d3.max(data, function(d) {
-    return d.sequence.length;
-  })));
-
-
+      return d.sequence.length;
+    })));
 
   d3.select('#peptides')
       .append('svg')
@@ -42,6 +40,7 @@ function main(data) {
          .attr('transform', 'translate(0,' + PEPTIDE_HEIGHT + ')')
          .attr('id', 'svg');
 
+  data = sortPeptides(data, getSliderAttr(), getSliderValue());
   renderPeptides(data);
   initializeSliderHandler(data);
 }
@@ -74,7 +73,7 @@ function renderPeptides(data) {
 }
 
 function renderGenes(peptides) {
-  // renders column of gene names on left side of screen 
+  // renders column of gene names on left side of screen
   peptides.selectAll('.gene')
       .data(function(d,i) { return [d.description]; })
     .enter().append('text')
@@ -92,8 +91,8 @@ function renderHighlightEpitopes(peptides) {
         //               exploded, all the epitopes with one MHC allelse above
         //               the score are shown.
 
-        // TODO(alex):  Enabling highlighting by changing 3 to 1 below causes SVG errors. 
-        return strongBindingEpitopes(getSliderAttr(), 3, getSliderValue(), d.epitopes);
+        // TODO(alex):  Enabling highlighting by changing 3 to 1 below causes SVG errors.
+        return strongBindingEpitopes(getSliderAttr(), 1, getSliderValue(), d.epitopes);
       }, _epitope_key_fn);
 
   epitopes
@@ -315,9 +314,10 @@ function renderPassingEpitopeHighlights(epitopes) {
       return (alleles > 0) && !d3.select(this).select('.passing-epitope').node();
     })
     .append('rect')
-      .attr('class', 'passing-epitope')
+      .attr('class',
+'passing-epitope')
       .attr('width', function(d, i) {
-        return acidX(d.start + d.length) - acidX(d.start) + ACID_DIM;
+        return acidX(d.start + d.length - 1) - acidX(d.start) + ACID_DIM;
       })
       .attr('height', 16)
       .attr('x', -2)
@@ -457,7 +457,7 @@ function highlightAcid(acidIdx, peptideEl, peptideClickBox, peptideData) {
 function setSliderText() {
   // toggle between displaying SLIDER_PERCENTILE and SLIDER_BINDING_SCORE
   // depending on global value SLIDER_TYPE, which gets set by the 'change'
-  // event of a drop down list. 
+  // event of a drop down list.
 
   if (SLIDER_TYPE === 'percentile') {
     d3.select('#tval').text(SLIDER_PERCENTILE);
@@ -469,7 +469,7 @@ function setSliderText() {
 }
 
 function sortPeptides(peptides, attr, threshold) {
-  // TODO: sort only by epitopes with mutated residues 
+  // TODO: sort only by epitopes with mutated residues
   return peptides.sort(function(a,b){
     var numBindingEpitopes = _.partial(numberOfStrongBindingEpitopes, attr, threshold);
     return numBindingEpitopes(a) > numBindingEpitopes(b) ? -1 : 1;
@@ -515,7 +515,7 @@ function initializeEpitopeSliderHandler(epitopes, peptideEl) {
         setSliderText();
       })
       .on('change', function() {
-       
+
         if (SLIDER_TYPE === 'percentile') {
           SLIDER_PERCENTILE = parseInt(this.value);
           epitopes = sortEpitopes('percentile', SLIDER_PERCENTILE, epitopes);
@@ -543,7 +543,7 @@ function initializeSliderHandler(peptides) {
         setSliderText();
 
         peptides = sortPeptides(peptides, 'percentile', SLIDER_PERCENTILE);
-       
+
       } else {
         d3.select('#slider')
             .attr('min', MIN_IC50)
@@ -607,18 +607,27 @@ function epitopesOverlapping(idx, epitopes) {
   });
 }
 
+function overlapsMutation(mutStart, mutEnd, epitope) {
+  var start = epitope.start,
+      end = epitope.start + epitope.length;
+  return start < mutEnd && end > mutStart;
+}
+
 // Returns number of epitopes below binding threshold
-// which overlap the mutation 
+// which overlap the mutation
 function numberOfStrongBindingEpitopes(attr, threshold, peptide) {
+  var mut = _.partial(overlapsMutation, peptide.mutStart, peptide.mutEnd);
   return _.reduce(peptide.epitopes, function(acc, epitope) {
-    return acc + allelesBelowThreshold(attr, threshold, epitope)
+    if (mut(epitope))
+      return acc + allelesBelowThreshold(attr, threshold, epitope);
+    return acc;
   }, 0);
 }
 
 // Return the number of alleles epitope has with attr below threshold
 function allelesBelowThreshold(attr, threshold, epitope) {
   return _.reduce(epitope.scores, function(acc, score) {
-     return score[attr] <= threshold ? acc + 1 : acc; 
+     return score[attr] <= threshold ? acc + 1 : acc;
   }, 0);
 }
 
@@ -629,8 +638,8 @@ function sortEpitopes(attr, threshold, epitopes) {
     var nb = numberAllelesBelowThreshold(b);
     // break ties by putting epitopes with equal counts in left-to-right order
     if (na == nb) {
-      return a.start > b.start ? 1 : -1; 
-    } else { 
+      return a.start > b.start ? 1 : -1;
+    } else {
       return na > nb ? -1 : 1;
     }
   });
