@@ -31,13 +31,13 @@
 
   <div id="peptides-list">
       Binding threshold:
-      <input type="range" id="slider" value="2" min="1" max="50">
+      <input type="range" id="slider" value="500" min="1" max="2500">
       &nbsp;&nbsp;
       <span id="slider-type"></span>
-      <span id="tval">2</span><span id="suffix">nd</span>&nbsp; 
+      <span id="tval">500</span><span id="suffix">nM</span>&nbsp; 
       <select name="sort-value">
-          <option selected value="percentile">Percentile</option>
-          <option value="ic50">IC50</option>
+          <option selected value="ic50">IC50</option>
+          <option value="percentile">Percentile</option>
       </select>
       <!-- 
       <input type="radio" name="sort-value" value="percentile" checked>Percentile<br>
