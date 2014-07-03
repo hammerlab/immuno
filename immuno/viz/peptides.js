@@ -1,32 +1,27 @@
 (function() {
 'use strict';
 
-// TODO:
-//     1. (?) Display of immungenicity (like binding score bar chart).
-//     2. (?) Hover over score bars for more info.
-//     3. (?) Dynamic SVG height (pay attention to perceptual diffs then).
-
 var WIDTH = 1200,
     HEIGHT = 12000,
     PEPTIDE_HEIGHT = 20,
     ACID_DIM = 12,
-    SLIDER_TYPE = 'ic50', // global
-    SLIDER_BINDING_SCORE = 500, // global
-    SLIDER_PERCENTILE = 2,      // global
-    GENE_LETTER_WIDTH = 11,
+    SLIDER_TYPE = 'ic50',       // global & mutable
+    SLIDER_BINDING_SCORE = 500, // global & mutable
+    SLIDER_PERCENTILE = 2,      // global & mutable
+    GENE_LETTER_WIDTH = 9.5,
     GENE_WIDTH,
     EPITOPE_INFO_HEIGHT = 125,
     MIN_PERCENTILE = 1,
     MAX_PERCENTILE = 50,
     MIN_IC50 = 1,
     MAX_IC50 = 2500,
-    acidX = d3.scale.ordinal();
+    residueXScale = d3.scale.ordinal();
 
 
 function main(data) {
   GENE_WIDTH = d3.max(data, function(d) { return d.description.length; }) * GENE_LETTER_WIDTH;
 
-  acidX
+  residueXScale
     .rangeBands([0, WIDTH - GENE_WIDTH])
     .domain(d3.range(0, d3.max(data, function(d) {
       return d.sequence.length;
@@ -67,7 +62,7 @@ function renderPeptides(data) {
 
   peptides
       .call(renderGenes)
-      .call(renderHighlightEpitopes)
+      .call(createEpitopeContainers)
       .call(renderPeptideSequences)
       .call(initializePeptideHandlers);
 }
@@ -82,7 +77,7 @@ function renderGenes(peptides) {
       .text(function(d) { return d; });
 }
 
-function renderHighlightEpitopes(peptides) {
+function createEpitopeContainers(peptides) {
   var epitopes = peptides.selectAll('.epitope')
       .data(function(d, i) {
         return strongBindingEpitopes(getSliderAttr(), 1, getSliderValue(), d.epitopes);
@@ -91,10 +86,10 @@ function renderHighlightEpitopes(peptides) {
   epitopes
     .enter().append('g')
       .attr('transform', function(d, i) {
-        return 'translate(' + acidX(d.start) + ',0)';
+        return 'translate(' + residueXScale(d.start) + ',0)';
       })
       .attr('class', 'epitope')
-    .call(renderPassingEpitopeHighlights);
+    .call(renderEpitopeHighlights);
 
   epitopes
     .exit()
@@ -128,7 +123,7 @@ function renderPeptideSequences(peptides) {
       .attr('height', ACID_DIM)
       .attr('y', 0)
       .attr('x', function(d, i) {
-        return acidX(i);
+        return residueXScale(i);
       });
 }
 
@@ -156,11 +151,12 @@ function explodeEpitopes(peptides, peptideEl, peptideClickBox, peptideData) {
 
   d3.select(peptideClickBox)
       .on('click', function(d, i) {
-        var xPos = d3.event.x - GENE_WIDTH - 6,
-            acidIdx = acidX.domain()[d3.bisect(acidX.range(), xPos) - 1],
+        // TODO(ihodes): figure out and fix why we need "- 36"
+        var xPos = d3.event.x - GENE_WIDTH - 36,
+            acidIdx = residueXScale.domain()[d3.bisect(residueXScale.range(), xPos) - 1],
             epitopes = peptideData.epitopes;
 
-        highlightAcid(acidIdx, peptideEl, peptideClickBox, peptideData);
+        showResidueGuideline(acidIdx, peptideEl, peptideClickBox, peptideData);
 
         epitopes = epitopesOverlapping(acidIdx, epitopes);
         epitopes = sortEpitopes(getSliderAttr(), getSliderValue(), epitopes);
@@ -182,40 +178,30 @@ function explodeEpitopes(peptides, peptideEl, peptideClickBox, peptideData) {
         return 'translate(' + GENE_WIDTH + ', 5)'
       });
 
+  peptides.attr('class', 'peptide');
+
   renderEpitopesWithScores(peptideData.epitopes, peptideEl);
 }
 
 function collapseEpitopes(peptides, peptideEl, peptideClickBox) {
-  resetEpitopeInfoWindow();
-  initializeSliderHandler(peptides.data());
-
-  peptides
-      .attr('class', 'peptide')
-    .transition().duration(800)
-      .attr('transform', function(d, i) {
-        return 'translate(' + GENE_WIDTH + ',' + (i*PEPTIDE_HEIGHT) + ')';
-      });
-
-  d3.selectAll('.epitope-info-window').remove();
-
-  var scores = d3.selectAll('.ep-score-chart').remove()
-
   var epitopes = d3.select(peptideEl).selectAll('.epitope');
+
+  resetEpitopeInfoWindow(peptideEl);
+  initializeSliderHandler(peptides.data());
+  d3.selectAll('.residue-guideline').remove(); // Remove the horizontal residue
+                                               // guideline.
+
+  epitopes.selectAll('rect').on('click', null);
+
+  d3.selectAll('.ep-score-chart').remove()
   epitopes.transition().duration(500)
       .attr('transform', function(d, i) {
-        return 'translate(' + acidX(d.start) + ', 0)';
+        return 'translate(' + residueXScale(d.start) + ', 0)';
       });
-  epitopes.selectAll('.ep-sequence')
-      .remove();
+  epitopes.selectAll('.ep-sequence').remove();
 
-  renderHighlightEpitopes(peptides);
+  renderPeptides(peptides.data());
 
-  epitopes.selectAll('rect')
-      .on('mouseover', null)
-      .on('mouseout', null)
-      .on('click', null);
-
-  d3.selectAll('.highlight').remove();
   d3.select(peptideClickBox)
       .on('click', function(d, i) {
         explodeEpitopes(peptides, this.parentNode, this, d);
@@ -226,7 +212,7 @@ function collapseEpitopes(peptides, peptideEl, peptideClickBox) {
 }
 
 function renderEpitopesWithScores(epitopesList, peptideEl) {
-  resetEpitopeInfoWindow();
+  resetEpitopeInfoWindow(peptideEl);
 
   var epitopes = d3.select(peptideEl).selectAll('.epitope')
       .data(sortEpitopes(getSliderAttr(), getSliderValue(), epitopesList), function(d, i) {
@@ -237,19 +223,19 @@ function renderEpitopesWithScores(epitopesList, peptideEl) {
     .enter().append('g')
       .attr('class', 'epitope')
       .attr('transform', function(d, i) {
-        return 'translate(' + acidX(d.start) + ',0)';
+        return 'translate(' + residueXScale(d.start) + ',0)';
       });
 
   epitopes
       .call(renderEpitopeSequence)
       .call(renderEpitopeScores)
-      .call(renderPassingEpitopeHighlights)
+      .call(renderEpitopeHighlights)
       .call(initializeEpitopeHandlers);
 
   epitopes
     .transition().duration(800)
       .attr('transform', function(d, i) {
-        return 'translate(' + acidX(d.start) + ',' + (i*15 + PEPTIDE_HEIGHT) + ')';
+        return 'translate(' + residueXScale(d.start) + ',' + (i*15 + PEPTIDE_HEIGHT) + ')';
       });
 
   epitopes
@@ -262,7 +248,7 @@ function renderEpitopeScores(epitopes) {
     .append('g')
       .attr('class', 'ep-score-chart')
       .attr('transform', function(d, i) {
-        return 'translate(' + (-acidX(d.start)-GENE_WIDTH) + ',0)';
+        return 'translate(' + (-residueXScale(d.start) - GENE_WIDTH) + ',0)';
       })
 
   scores.selectAll('scoreBar')
@@ -279,38 +265,55 @@ function renderEpitopeScores(epitopes) {
 }
 
 function renderEpitopeSequence(epitopes) {
+  var peptide = epitopes.node().parentNode.__data__,
+      mutStart = peptide.mutStart,
+      mutEnd = peptide.mutEnd;
+  console.log(mutStart, mutEnd);
   epitopes.selectAll('.ep-sequence')
       .data(function(d) { return d.sequence.split(''); })
     .enter().append('text')
       .text(function(d, i) { return d; })
       .style('font-size', '1.1em')
-      .attr('class', 'ep-sequence')
+      .attr('class', function(d, i) {
+        var idx = this.parentNode.__data__.start + i;
+        console.log(idx);
+        if (idx >= mutStart && idx < mutEnd) {
+          return 'ep-sequence mutation';
+        } else {
+          return 'ep-sequence';
+        }
+      })
       .attr('width', ACID_DIM)
       .attr('height', ACID_DIM)
       .attr('y', 0)
       .attr('x', function(d, i) {
-        return acidX(i);
+        return residueXScale(i);
       });
 
 }
 
-function renderPassingEpitopeHighlights(epitopes) {
+function renderEpitopeHighlights(epitopes) {
   epitopes
-      .selectAll('.passing-epitope')
+      .selectAll('.strong-epitope')
     .remove();
 
   epitopes
     .filter(function(d) {
-        // !... is to ensure we don't keep adding highlight rects to the same
-        // epitopes.
-      var alleles = allelesBelowThreshold(getSliderAttr(), getSliderValue(), d);
-      return (alleles > 0) && !d3.select(this).select('.passing-epitope').node();
+      var alleles = allelesBelowThreshold(getSliderAttr(), getSliderValue(), d),
+          alreadyHighlighted = d3.select(this).select('.strong-epitope').node();
+      return (alleles > 0) && !alreadyHighlighted;
     })
     .append('rect')
-      .attr('class',
-'passing-epitope')
+      .attr('class', function(d, i) {
+        var peptide = this.parentNode.parentNode.__data__,
+            cls = 'strong-epitope';
+
+        if (overlapsMutation(peptide.mutStart, peptide.mutEnd, d))
+          cls += ' overlaps-mutation';
+        return cls;
+      })
       .attr('width', function(d, i) {
-        return acidX(d.start + d.length - 1) - acidX(d.start) + ACID_DIM;
+        return residueXScale(d.start + d.length - 1) - residueXScale(d.start) + ACID_DIM;
       })
       .attr('height', 16)
       .attr('x', -2)
@@ -318,11 +321,12 @@ function renderPassingEpitopeHighlights(epitopes) {
 }
 
 function initializeEpitopeHandlers(epitopes) {
+  var peptide = epitopes.node().parentNode;
   epitopes
     .append('rect')
-      .attr('class', 'epitope-highlight')
+      .attr('class', 'epitope-clickbox')
       .attr('x', function(d, i) {
-        return -acidX(d.start)-GENE_WIDTH;
+        return -residueXScale(d.start)-GENE_WIDTH;
       })
       .attr('y', -PEPTIDE_HEIGHT+8)
       .attr('width', WIDTH+GENE_WIDTH)
@@ -330,17 +334,18 @@ function initializeEpitopeHandlers(epitopes) {
       .attr('opacity', 0)
       .attr('fill', '#ddd')
       .on('click', function(d, i) {
-        resetEpitopeInfoWindow();
+        resetEpitopeInfoWindow(peptide);
         renderEpitopeInfoWindow(this.parentNode, d);
       });
 }
 
 function renderEpitopeInfoWindow(epitopeEl, epitopeData) {
-  var peptide = d3.select('.selected.peptide'),
+  var peptide = d3.select(epitopeEl.parentNode),
+  a= console.log(peptide),
       epitopeShiftGroup = peptide.append('g').attr('id', 'epitope-shift-group'),
       yOffset = epitopeEl.getCTM().f;
 
-  d3.select(epitopeEl).select('.epitope-highlight').transition().attr('opacity', .25);
+  d3.select(epitopeEl).select('.epitope-clickbox').transition().attr('opacity', .25);
 
   peptide
     .selectAll('.epitope')
@@ -360,16 +365,16 @@ function renderEpitopeInfoWindow(epitopeEl, epitopeData) {
     .append('g')
       .attr('id', 'epitope-info-window')
       .attr('transform', function(d, i) {
-        return 'translate(' + (-acidX(d.start) - GENE_WIDTH) + ', '
-          + PEPTIDE_HEIGHT + ')';
+        return 'translate('
+          + (-residueXScale(d.start) - GENE_WIDTH) + ', '
+          + (PEPTIDE_HEIGHT - 18) + ')';
       })
       .call(renderEpitopeInfoWindowChart);
 }
 
 function resetEpitopeInfoWindow(peptide) {
-  var peptide = d3.select('.selected.peptide'),
-      epitopeShiftGroup = d3.select('#epitope-shift-group');
-  d3.selectAll('.epitope-highlight').attr('opacity', 0)
+  var epitopeShiftGroup = d3.select('#epitope-shift-group');
+  d3.selectAll('.epitope-clickbox').attr('opacity', 0)
   d3.select('#epitope-info-window').remove();
   epitopeShiftGroup
       .attr('transform', function() {
@@ -377,7 +382,7 @@ function resetEpitopeInfoWindow(peptide) {
       })
     .selectAll('.epitope')
       .each(function(d, i) {
-        peptide.node().appendChild(this);
+        peptide.appendChild(this);
       });
   epitopeShiftGroup.remove();
 }
@@ -392,19 +397,19 @@ function renderEpitopeInfoWindowChart(epitopeInfoWindow) {
 
   var scoreBody = epitopeInfoWindow
     .append('foreignObject')
-      .attr('width', WIDTH+GENE_WIDTH)
+      .attr('width', WIDTH + GENE_WIDTH)
       .attr('height', EPITOPE_INFO_HEIGHT)
     .append('xhtml:body')
       .attr('class', 'epitope-body'),
       tbl = scoreBody.append('table'),
       header = tbl.append('thead')
-    .append('tr');
+                  .append('tr');
 
   header.append('td').html('HLA Allele');
   header.append('td').html('Binding Score');
   header.append('td').html('Percentile');
 
-  var rows = tbl.selectAll('tr')
+  var rows = tbl.append('tbody').selectAll('tr')
       .data(scores)
     .enter().append('tr');
 
@@ -416,19 +421,16 @@ function renderEpitopeInfoWindowChart(epitopeInfoWindow) {
       .html(function(d) { return d.percentile; });
 }
 
-function highlightAcid(acidIdx, peptideEl, peptideClickBox, peptideData) {
-  d3.selectAll('.highlight')
-    .transition()
-      .attr('opacity', 0)
-      .remove();
+function showResidueGuideline(acidIdx, peptideEl, peptideClickBox, peptideData) {
+  d3.selectAll('.residue-guideline').remove();
 
   d3.select(peptideClickBox.parentNode)
     .append('rect')
-      .attr('x', acidX(acidIdx)-3)
+      .attr('x', residueXScale(acidIdx)-3)
       .attr('y', -ACID_DIM)
       .attr('height', HEIGHT)
       .attr('width', 15)
-      .attr('class', 'highlight')
+      .attr('class', 'residue-guideline')
       .attr('fill', '#adadad')
       .attr('opacity', 0.0)
       .on('click', function() {
