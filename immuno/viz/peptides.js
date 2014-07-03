@@ -268,15 +268,14 @@ function renderEpitopeSequence(epitopes) {
   var peptide = epitopes.node().parentNode.__data__,
       mutStart = peptide.mutStart,
       mutEnd = peptide.mutEnd;
-  console.log(mutStart, mutEnd);
   epitopes.selectAll('.ep-sequence')
       .data(function(d) { return d.sequence.split(''); })
     .enter().append('text')
       .text(function(d, i) { return d; })
       .style('font-size', '1.1em')
       .attr('class', function(d, i) {
+        // this.parentNode is the peptide these epitopes belong to.
         var idx = this.parentNode.__data__.start + i;
-        console.log(idx);
         if (idx >= mutStart && idx < mutEnd) {
           return 'ep-sequence mutation';
         } else {
