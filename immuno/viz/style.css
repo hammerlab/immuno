@@ -12,37 +12,28 @@ body {
     margin-bottom: 20px;
 }
 
+
 .peptide text.sequence {
     font-family: monospace;
     font-size: 1.2em;
 }
 
-#peptide {
-    font-family: monospace;
-    font-size: 1.2em;
-}
-
-.mutation {
-    fill: red;
-    font-weight: 700;
-}
-
-path {
-    stroke: black;
-    stroke-width: 1;
-}
 
 text.gene {
     font-weight: bold;
 }
 
-.epitope {
+.peptide .epitope {
     font-family: monospace;
 }
 
-.epitope rect.passing-epitope {
-    fill: #a5ff30;
+.peptide .epitope rect.strong-epitope {
+    fill: #a2a2a2;
     opacity: 0.22;
+}
+
+.epitope rect.strong-epitope.overlaps-mutation {
+    fill: #fff700;
 }
 
 .epitope .ep-score-chart rect {
@@ -57,6 +48,11 @@ text.gene {
 .peptide.selected > text {
     font-weight: bold;
 }
+
+.peptide .mutation, .epitope .mutation {
+    fill: red;
+}
+
 
 span.b {
     font-weight: bold;
@@ -85,7 +81,7 @@ div#peptides-list {
 }
 
 span#close-inspector {
-    margin-left: 550px;
+    margin-left: 890px;
     display: none;
     font-size: 1.5em;
     color: #4d4d4d;
@@ -96,7 +92,6 @@ span#close-inspector {
 #epitope-info-window rect {
     fill: white;
 }
-
 
 body.epitope-body {
     color: black;
