@@ -162,20 +162,40 @@ if __name__ == '__main__':
             min_peptide_padding = args.min_peptide_padding)
     else:
         peptides = []
-        for (transcript_id, seq), group in scored_epitopes.groupby(["TranscriptId", "SourceSequence"]):
-            row = {}
-            row["Peptide"] = seq
-            row['TranscriptId'] = transcript_id
-            head = group.to_records()[0]
-            row["MutationStart"] = head.MutationStart
-            row["MutationEnd"] = head.MutationEnd
-            row["MutationInfo"] = head.MutationInfo
-            row["GeneInfo"] = head.GeneInfo
-            row['Gene'] = head.Gene
-            row['Description'] = "%s (%s) : %s" % (head.Gene, head.TranscriptId, head.MutationInfo) 
-            row["Epitopes"] = group
-            peptides.append(row)
-        
+        for (transcript_id, seq), transcript_group in scored_epitopes.groupby(["TranscriptId", "SourceSequence"]):
+            peptide_entry = {}
+            peptide_entry["Peptide"] = seq
+            peptide_entry['TranscriptId'] = transcript_id
+            head = transcript_group.to_records()[0]
+            peptide_entry["MutationStart"] = head.MutationStart
+            peptide_entry["MutationEnd"] = head.MutationEnd
+            peptide_entry["MutationInfo"] = head.MutationInfo
+            peptide_entry["GeneInfo"] = head.GeneInfo
+            peptide_entry['Gene'] = head.Gene
+            peptide_entry['Description'] = "%s (%s) : %s" % (head.Gene, head.TranscriptId, head.MutationInfo) 
+            peptide_entry['Epitopes'] = []
+            for (epitope, epitope_start, epitope_end), epitope_group in \
+                    transcript_group.groupby(['Epitope', 'EpitopeStart', 'EpitopeEnd']):
+                epitope_entry = {
+                    'Epitope' : epitope, 
+                    'EpitopeStart' : epitope_start, 
+                    'EpitopeEnd' : epitope_end, 
+                    'MHC_Allele_Scores' : []
+                }
+                seen_alleles = set([])
+                for epitope_allele_row in epitope_group.to_records():
+                    allele = epitope_allele_row['Allele']
+                    assert allele not in seen_alleles, "Repeated entry %s" % epitope_allele_row
+                    seen_alleles.add(allele)
+                    allele_entry = {
+                        'Allele': allele, 
+                        'MHC_PercentileRank' : epitope_allele_row['MHC_PercentileRank'],
+                        'MHC_IC50' : epitope_allele_row['MHC_IC50'],
+                    }
+                    epitope_entry['MHC_Allele_Scores'].append(allele_entry)
+                peptide_entry['Epitopes'].append(epitope_entry)
+            peptides.append(peptide_entry)
+
     if args.print_peptides:
         print peptides
     

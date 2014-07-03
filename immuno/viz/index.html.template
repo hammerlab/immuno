@@ -65,15 +65,17 @@
             mutStart: ${peptide['MutationStart']}, 
             mutEnd : ${peptide['MutationEnd']},
             epitopes: [
-              % for epitope in peptide['Epitopes'].to_records():
+              % for epitope in peptide['Epitopes']:
                 {
                   start: ${epitope['EpitopeStart']}, 
                   length: ${epitope['EpitopeEnd'] - epitope['EpitopeStart']}, 
                   scores: {
-                    "${epitope['Allele']}" : { 
-                        percentile : ${epitope['MHC_PercentileRank']}, 
-                        bindingScore : ${epitope['MHC_IC50']} 
-                  }
+                    % for score in epitope['MHC_Allele_Scores']:
+                      "${score['Allele']}" : { 
+                         percentile : ${score['MHC_PercentileRank']}, 
+                         bindingScore : ${score['MHC_IC50']}
+                      },
+                    % endfor 
                   }, 
                   sequence: "${epitope['Epitope']}",
                 },
