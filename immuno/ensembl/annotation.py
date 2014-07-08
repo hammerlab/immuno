@@ -233,75 +233,35 @@ def get_three_prime_utr_length(exons_df, forward = True):
             utr_length += exon_length
     return None
 
-def annotate(
-        vcf_df,
-        annotation_df,
-        predicate,
-        left_col = 'chr',
-        right_col = 'name'):
-    crossed = vcf_df.merge(
-        annotation_df, left_on=left_col, right_on=right_col, how='left')
-    annotated = crossed[crossed.apply(predicate, axis=1)]
-    return annotated.drop_duplicates()
-
-
-def _transcript_matches(transcript_row):
-    position = transcript_row['pos']
-    contig = transcript_row['chr']
-    return transcript_row['seq_region_start_transcript'] < position \
-            and transcript_row['seq_region_end_transcript'] > position \
-            and transcript_row['name'] == contig
-
 def annotate_vcf_transcripts(vcf_df):
     """
-    Get list of transcript id from position
-
+    Expand each variant in a DataFrame into multiple entries for all transcript_ids 
+    that could contain the mutated position 
     Parameters
     ----------
-    vcf : Pandas dataframe with chr, pos, ref, alt columns
+    vcf_df : Pandas DataFrame with chr, pos, ref, alt columns
 
-    Return df with extra columns:
-        'name', 'stable_id_gene', 'description_gene',
-        'seq_region_start_gene', 'seq_region_end_gene',
-        'stable_id_transcript', 'seq_region_start_transcript',
-        'seq_region_end_transcript'
-
+    Return DataFrame with extra columns:
+        - 'name' 
+        - 'stable_id_gene'
+        - 'description_gene'
+        - 'seq_region_start_gene'
+        - 'seq_region_end_gene'
+        - 'stable_id_transcript'
+        - 'seq_region_start_transcript'
+        - 'seq_region_end_transcript'
     """
-    print "Annotating VCF, initial columns:", vcf_df.columns 
-    if 'gene_stable_id' in vcf_df.columns:
-        annotated = annotate(vcf_df,
-            data.transcript_data,
-            _transcript_matches,
-            left_col=['chr', 'gene_stable_id'],
-            right=['name', 'gene_stable_id'])
-    else:
-        annotated = annotate(vcf_df, data.transcript_data, _transcript_matches)
-    print "Annotated columns:", annotated.columns 
-    return annotated
 
+    genome_annotation_data_df = data.transcript_data
 
-
-def _gene_matches(gene_row):
-    position = gene_row['pos']
-    contig = gene_row['chr']
-    return gene_row['seq_region_start_gene'] <= position \
-            and gene_row['seq_region_end_gene'] > position \
-            and gene_row['name'] == contig
-
-
-def annotate_vcf_genes(vcf_df):
-    """
-    Get list of gene id from position
-
-    Parameters
-    ----------
-    vcf_df : Pandas dataframe
-        Expected to have columns 'chr', 'pos', 'ref', 'alt'
-
-    Return df with extra columns:
-        'name', 'stable_id_gene', 'description_gene',
-        'seq_region_start_gene', 'seq_region_end_gene'
-
-    """
-    return annotate(vcf_df, data.gene_data, _gene_matches)
-
+     # combine each variant entry from `vcf_df` with all possible gene annotations
+    # on the same chromosome from `genome_annotation_data_df`
+    all_possible_transcripts = vcf_df.merge(
+        genome_annotation_data_df, left_on='chr', right_on='name', how='left')
+    print all_possible_transcripts.head()
+    variant_position = all_possible_transcripts['pos']
+    transcript_start = all_possible_transcripts['seq_region_start_transcript']
+    transcript_stop = all_possible_transcripts['seq_region_end_transcript']
+    mask = (variant_position > transcript_start) & (variant_position < transcript_stop)
+    annotated = all_possible_transcripts[mask]
+    return annotated.drop_duplicates()

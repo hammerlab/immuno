@@ -92,8 +92,8 @@ def test_get_gene_from_pos():
         'alt' : 'C'
     }
     vcf = pd.DataFrame.from_records([variant])
-    genes = ensembl.annotate_vcf_genes(vcf)
-    assert( "ENSG00000168036" in set(genes['stable_id_gene']))
+    transcripts_df = ensembl.annotate_vcf_transcripts(vcf)
+    assert( "ENSG00000168036" in set(transcripts_df['stable_id_gene']))
 
 def test_get_transcript_from_pos():
     variant = {

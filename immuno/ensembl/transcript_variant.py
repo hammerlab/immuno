@@ -19,12 +19,13 @@ the mutated residue.
 
 import logging
 
-from epitopes.mutate import mutate_protein_from_transcript, mutate
+from epitopes.mutate import mutate_protein_from_transcript, mutate, gene_mutation_description
 
 from transcript_data import EnsemblReferenceData
 import annotation
 
 _ensembl = EnsemblReferenceData()
+   
 
 def peptide_from_protein_transcript_variant(transcript_id, pos, ref, alt):
     """
@@ -37,10 +38,10 @@ def peptide_from_protein_transcript_variant(transcript_id, pos, ref, alt):
             return str(mutate(transcript, pos, ref, alt))
         except:
             logging.warning(
-                "Failed to mutate transcript %s (ref %s, alt %s at pos %s)",
-                ref,
-                alt,
-                pos)
+                "Failed to mutate transcript %s (%s)", 
+                transcript_id,
+                gene_mutation_description(pos, ref, alt)
+            )
             return None
     return None
 
@@ -48,13 +49,11 @@ def peptide_from_transcript_variant(
         transcript_id, pos, ref, alt,
         padding = None,
         max_length = None):
-
+     
     logging.info(
-        "Getting mutated peptide from transcript %s, chromosome pos %d %s > %s", 
+        "Getting mutated peptide from transcript %s, %s", 
         transcript_id, 
-        pos, 
-        ref, 
-        alt)
+        gene_mutation_description(pos,ref,alt))
     
     forward = annotation.is_forward_strand(transcript_id)
     ref = ref if forward else annotation.reverse_complement(ref)
@@ -88,14 +87,14 @@ def peptide_from_transcript_variant(
             transcript_id)
         return bad_result
     elif idx >= len(transcript):
+       
+        
         logging.warning(
-            "Can't get position %d in coding sequence of length %d for transcript %s (%s %s > %s)",
+            "Can't get position %d in coding sequence of length %d for transcript %s (%s)",
             idx, 
             len(transcript),
             transcript_id,
-            pos, 
-            ref, 
-            alt)
+            gene_mutation_description(pos, ref, alt))
         return bad_result
 
     try:      
@@ -116,13 +115,4 @@ def peptide_from_transcript_variant(
         return seq, start, stop, region.annot
     except:
         raise
-    #except AssertionError, error:
-    #
-    #    logging.warning(
-    #        "Failed to mutate %s (ref %s, alt %s at position %s)",
-    #        transcript_id,
-    #        ref,
-    #        alt,
-    #        pos)
-
-    #   return bad_result
+   
