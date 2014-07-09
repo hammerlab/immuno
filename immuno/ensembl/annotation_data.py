@@ -38,7 +38,7 @@ class EnsemblAnnotationData(object):
         """
         if not hasattr(self, '_exon_data'):
             path = self.transcript_metadata_path
-            self._exon_data = pd.read_csv(path, sep='\t')
+            self._exon_data = pd.read_csv(path, sep='\t', low_memory = False)
         return self._exon_data
 
     @property

@@ -125,7 +125,7 @@ if __name__ == '__main__':
     # load each one into a dataframe
 
     for input_filename in args.input:
-        df = load_file(input_filename, peptide_length)
+        df = load_file(input_filename, max_peptide_length = peptide_length)
         assert df is not None
         mutated_region_dfs.append(df)
 

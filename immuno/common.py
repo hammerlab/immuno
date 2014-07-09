@@ -23,3 +23,11 @@ def peptide_substrings(full_peptide, window_length):
     n = len(full_peptide)
     return [full_peptide[i:i+window_length]
             for i in xrange(n + 1 - window_length)]
+
+def normalize_chromosome_name(c):
+	"""
+	standardize chromosome names by getting rid of any "chr" prefixes such as "chr17" and
+	always naming the mitochondrial DNA "M"
+	"""
+	c = c.lower().replace('chr', '').upper()
+	return "M" if (c == "MT") else c 

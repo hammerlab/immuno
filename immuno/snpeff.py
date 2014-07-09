@@ -15,7 +15,7 @@
 from copy import deepcopy
 import logging
 
-from vcf import parse_vcf
+from vcf import load_vcf
 from snpeff_effect import SnpEffEffect
 
 from ensembl.transcript_variant import peptide_from_transcript_variant
@@ -30,7 +30,7 @@ def _parse_effects(info_field):
     return None
 
 def load_snpeff(snpeff_annotated_file, window=7):
-    data = parse_vcf(snpeff_annotated_file)
+    data = load_vcf(snpeff_annotated_file)
     results = []
     for idx, variant in data.iterrows():
       variant = dict(variant)

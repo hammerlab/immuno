@@ -12,20 +12,159 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging 
+from copy import deepcopy
+
+from epitopes.mutate import gene_mutation_description 
+import pandas as pd
+
+from common import normalize_chromosome_name
+from ensembl import annotation, gene_names
+from ensembl.transcript_variant import peptide_from_transcript_variant
 from vcf import load_vcf
 from snpeff import load_snpeff
 from maf import load_maf
 from fasta import load_fasta
 
-def load_file(input_filename, peptide_length):
-    if input_filename.endswith("eff.vcf"):
-        return load_snpeff(input_filename, peptide_length = peptide_length)
-    if input_filename.endswith(".vcf"):
-        return load_vcf(input_filename, min_peptide_length = 9, max_peptide_length = peptide_length)
-    elif input_filename.endswith(".maf"):
-        return load_maf(input_filename, peptide_length = peptide_length)
-    elif input_filename.endswith(".fasta") \
+
+def load_file(
+        input_filename, 
+        min_peptide_length = 9, 
+        max_peptide_length = 31, 
+        transcript_log_filename = None):
+    """
+    Load mutatated peptides from FASTA, VCF, or MAF file. 
+
+    Parameters
+    --------
+
+    input_filename : str 
+
+    min_peptide_length : int, optional 
+
+    max_peptide_length : int, optional 
+
+    transcript_log_filename : str, optional
+        Write out transcript dataframe to CSV with the given filename 
+
+    Returns a dataframe with columns:
+        - chr : chomosome
+        - pos : position in the chromosome
+        - ref : reference DNA
+        - alt : alternate DNA
+        - info : gene name and entrez gene ID
+        - stable_id_transcript : Ensembl transcript ID
+        - SourceSequence : region of protein around mutation
+        - MutationStart : first amino acid modified
+        - MutationEnd : last mutated amino acid
+        - MutationInfo : annotation i.e. V600E
+    """
+
+    if input_filename.endswith(".fasta") \
             or input_filename.endswith(".fa"):
-        return load_fasta(input_filename, peptide_length = peptide_length)
+        return load_fasta(input_filename, peptide_length = max_peptide_length)
+
+    # VCF and MAF files give us the raw mutations in genomic coordinates
+    if input_filename.endswith(".vcf"):
+        vcf_df = load_vcf(
+            input_filename, 
+            min_peptide_length = min_peptide_length, 
+            max_peptide_length = max_peptide_length)
+    elif input_filename.endswith(".maf"):
+        maf_df = load_maf(input_filename, max_peptide_length = max_peptide_length)
+        # rename columns from MAF file to make them compatible with VCF names 
+        vcf_df = pd.DataFrame({
+            'pos' : maf_df['Start_Position'],
+            'chr' : maf_df['Chromosome'],
+            'id' : maf_df['dbSNP_RS'],
+            'ref' : maf_df['Reference_Allele'].str.replace("-", ""),
+            'alt' : maf_df['Tumor_Seq_Allele1'].str.replace("-", ""),
+            'info' : maf_df['Hugo_Symbol'],
+        })
     else:
         assert False, "Unrecognized file type %s" % input_filename
+
+    assert len(vcf_df)  > 0, "No mutation entries for %s" % input_filename 
+    
+    vcf_df['chr'] = vcf_df.chr.map(normalize_chromosome_name)
+    
+
+    # annotate genomic mutations into all the possible known transcripts they might be on
+    transcripts_df = annotation.annotate_vcf_transcripts(vcf_df)
+
+    assert len(transcripts_df) > 0, "No annotated mutation entries for %s" % input_filename
+    logging.info("Annotated input file %s has %d possible transcripts", input_filename, len(transcripts_df))
+    
+    new_rows = []
+
+    group_cols = ['chr','pos', 'ref', 'alt', 'stable_id_transcript']
+
+    seen_source_sequences = set([])
+    for (_, pos, ref, alt, transcript_id), group in \
+            transcripts_df.groupby(group_cols):
+        row = group.irow(0)
+        padding = max_peptide_length - 1 
+        if transcript_id:
+            logging.info("Getting peptide from transcript ID %s", transcript_id)
+            seq, start, stop, annot = \
+                peptide_from_transcript_variant(
+                    transcript_id, pos, ref, alt,
+                    padding = padding)
+            assert isinstance(start, int), (start, type(start))
+            assert isinstance(stop, int), (stop, type(stop))
+        else:
+            logging.info("Skipping ref = %s, alt = %s, pos = %s" % (ref, alt, pos))
+        if seq:
+            if seq in seen_source_sequences:
+                logging.info("Skipping %s>%s at %s because already seen sequence %s" % (ref,alt,pos,seq))
+                continue
+            else:
+                seen_source_sequences.add(seq)
+
+            if '*' in seq:
+                logging.warning(
+                    "Found stop codon in peptide %s from transcript_id %s",
+                    region.seq,
+                    transcript_id)
+            elif len(seq) < min_peptide_length:
+                logging.info(
+                    "Truncated peptide too short for transcript %s gene position %s '%s' > '%s' ", 
+                    transcript_id, pos, ref, alt)
+            else:
+                row = deepcopy(row)
+                row['SourceSequence'] = seq
+                row['MutationStart'] = start
+                row['MutationEnd'] = stop
+                row['MutationInfo'] = annot
+
+                try:
+                    gene = gene_names.transcript_id_to_gene_name(transcript_id)
+                except:
+                    gene = gene_names.transcript_id_to_gene_id(transcript_id)
+
+                row['Gene'] = gene
+                print ">>"
+                print row 
+                new_rows.append(row)
+    assert len(new_rows) > 0, "No mutations!"
+    peptides = pd.DataFrame.from_records(new_rows)
+    peptides['GeneInfo'] = peptides['info']
+    peptides['TranscriptId'] = peptides['stable_id_transcript'] 
+
+    transcripts_df = transcripts_df.merge(peptides)
+    logging.info("Generated %d peptides from %s",
+        len(transcripts_df), input_filename)
+
+    # drop verbose or uninteresting columns from VCF
+    for dumb_field in ('description_gene', 'filter', 'qual', 'id', 'name', 'info', 'stable_id_transcript'):
+        if dumb_field in transcripts_df.columns:
+            transcripts_df = transcripts_df.drop(dumb_field, axis = 1)
+    if transcript_log_filename:
+        transcripts_df.to_csv(transcript_log_filename, index=False)
+    logging.info("---")
+    logging.info("FILE LOADING SUMMARY")
+    logging.info("---")
+    logging.info("# original mutations: %d", len(vcf_df))
+    logging.info("# mutations with annotations: %d", len(transcripts_df.groupby(['chr', 'pos', 'ref', 'alt'])))
+    logging.info("# transcripts: %d", len(transcripts_df))
+    return transcripts_df
