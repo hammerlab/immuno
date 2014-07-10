@@ -148,7 +148,7 @@ def get_transcript_index_from_pos(
     intervals = zip(starts, stops)
 
     transcript_length = exons['exon_length'].sum()
-    logging.info("Full transcript length for %s = %d", transcript_id, transcript_length)
+    # logging.info("Full transcript length for %s = %d", transcript_id, transcript_length)
     transcript_idx = get_idx_from_interval(pos, intervals)
 
     if transcript_idx is None:
@@ -158,11 +158,11 @@ def get_transcript_index_from_pos(
         # Reverse array index if on reverse strand
         forward = is_forward_strand(transcript_id)
         transcript_idx = transcript_idx if forward else transcript_length - transcript_idx - 1
-        logging.info("Transcript strand forward? %s = %d", transcript_id, forward)
+        # logging.info("Transcript strand forward? %s = %d", transcript_id, forward)
         if skip_untranslated_region:
             # Adjust for translations (CDS) start region
             prefix_utr_length = get_five_prime_utr_length(exons, forward)
-            logging.info("UTR length for %s = %d", transcript_id, prefix_utr_length)
+            # logging.info("UTR length for %s = %d", transcript_id, prefix_utr_length)
             if transcript_idx < prefix_utr_length:
                 logging.warn("UTR mutation at cDNA position %d, transcript %s does not apply", 
                     transcript_idx, transcript_id)

@@ -31,3 +31,17 @@ def normalize_chromosome_name(c):
 	"""
 	c = c.lower().replace('chr', '').upper()
 	return "M" if (c == "MT") else c 
+
+
+VALID_AMINO_ACIDS = set([
+    'A', 'R', 'N', 
+    'D', 'C', 'E', 
+    'Q', 'G', 'H', 
+    'I', 'L', 'K', 
+    'M', 'F', 'P', 
+    'S', 'T', 'W',
+    'Y', 'V'
+])
+
+def is_valid_peptide(pep):
+	return all(residue in VALID_AMINO_ACIDS for residue in pep)

@@ -15,17 +15,16 @@
 import logging 
 from copy import deepcopy
 
-from epitopes.mutate import gene_mutation_description 
+from epitopes.mutate import gene_mutation_description
 import pandas as pd
 
-from common import normalize_chromosome_name
+from common import normalize_chromosome_name, is_valid_peptide
 from ensembl import annotation, gene_names
 from ensembl.transcript_variant import peptide_from_transcript_variant
 from vcf import load_vcf
 from snpeff import load_snpeff
 from maf import load_maf
 from fasta import load_fasta
-
 
 def load_file(
         input_filename, 
@@ -100,12 +99,15 @@ def load_file(
     group_cols = ['chr','pos', 'ref', 'alt', 'stable_id_transcript']
 
     seen_source_sequences = set([])
-    for (_, pos, ref, alt, transcript_id), group in \
+    for (chromosome, pos, ref, alt, transcript_id), group in \
             transcripts_df.groupby(group_cols):
+        logging.info("---")
+        logging.info("GENETIC MUTATION chr%s %s on transcript %s",
+            chromosome, gene_mutation_description(pos, ref, alt), transcript_id)
         row = group.irow(0)
         padding = max_peptide_length - 1 
         if transcript_id:
-            logging.info("Getting peptide from transcript ID %s", transcript_id)
+            # logging.info("Getting peptide from transcript ID %s", transcript_id)
             seq, start, stop, annot = \
                 peptide_from_transcript_variant(
                     transcript_id, pos, ref, alt,
@@ -113,10 +115,10 @@ def load_file(
             assert isinstance(start, int), (start, type(start))
             assert isinstance(stop, int), (stop, type(stop))
         else:
-            logging.info("Skipping ref = %s, alt = %s, pos = %s" % (ref, alt, pos))
+            logging.info("Skipping transcript_id = %s, ref = %s, alt = %s, pos = %s" % (transcript_id, ref, alt, pos))
         if seq:
             if seq in seen_source_sequences:
-                logging.info("Skipping %s>%s at %s because already seen sequence %s" % (ref,alt,pos,seq))
+                logging.info("Skipping %s because already seen sequence %s" % (gene_mutation_description(pos,ref,alt), seq))
                 continue
             else:
                 seen_source_sequences.add(seq)
@@ -124,8 +126,13 @@ def load_file(
             if '*' in seq:
                 logging.warning(
                     "Found stop codon in peptide %s from transcript_id %s",
-                    region.seq,
+                    seq,
                     transcript_id)
+            if not is_valid_peptide(seq):
+                logging.warning(
+                    "Invalid peptide sequence for transcript_id %s: %s",
+                    transcript_id, 
+                    seq)
             elif len(seq) < min_peptide_length:
                 logging.info(
                     "Truncated peptide too short for transcript %s gene position %s '%s' > '%s' ", 
@@ -136,15 +143,13 @@ def load_file(
                 row['MutationStart'] = start
                 row['MutationEnd'] = stop
                 row['MutationInfo'] = annot
-
+                logging.info("PEPTIDE MUTATION: %s", annot)
                 try:
                     gene = gene_names.transcript_id_to_gene_name(transcript_id)
                 except:
                     gene = gene_names.transcript_id_to_gene_id(transcript_id)
 
                 row['Gene'] = gene
-                print ">>"
-                print row 
                 new_rows.append(row)
     assert len(new_rows) > 0, "No mutations!"
     peptides = pd.DataFrame.from_records(new_rows)
