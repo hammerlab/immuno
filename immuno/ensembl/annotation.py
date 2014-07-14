@@ -258,7 +258,6 @@ def annotate_vcf_transcripts(vcf_df):
     # on the same chromosome from `genome_annotation_data_df`
     all_possible_transcripts = vcf_df.merge(
         genome_annotation_data_df, left_on='chr', right_on='name', how='left')
-    print all_possible_transcripts.head()
     variant_position = all_possible_transcripts['pos']
     transcript_start = all_possible_transcripts['seq_region_start_transcript']
     transcript_stop = all_possible_transcripts['seq_region_end_transcript']
