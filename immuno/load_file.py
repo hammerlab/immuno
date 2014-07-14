@@ -14,6 +14,7 @@
 
 import logging 
 from copy import deepcopy
+from collections import OrderedDict 
 
 from epitopes.mutate import gene_mutation_description
 import pandas as pd
@@ -99,58 +100,89 @@ def load_file(
     group_cols = ['chr','pos', 'ref', 'alt', 'stable_id_transcript']
 
     seen_source_sequences = set([])
+
+    # for each genetic variant in the source file, we're going to print a string
+    # describing either the resulting protein variant or whatever error
+    # prevented us from getting a result 
+    variant_report = OrderedDict()
+
     for (chromosome, pos, ref, alt, transcript_id), group in \
             transcripts_df.groupby(group_cols):
-        logging.info("---")
-        logging.info("GENETIC MUTATION chr%s %s on transcript %s",
-            chromosome, gene_mutation_description(pos, ref, alt), transcript_id)
-        row = group.irow(0)
+        
+        mutation_description = "chr%s %s" % (
+            chromosome,
+            gene_mutation_description(pos, ref, alt),  
+        )
+        key = (mutation_description, transcript_id) 
+
+        def skip(msg, *args):
+            msg = msg % args
+            logging.info("Skipping %s on %s: %s" , mutation_description, transcript_id, msg)
+            variant_report[key] = msg
+
+        def error(msg, *args):
+            msg = msg % args
+            logging.warning("Error in %s on %s: %s" , mutation_description, transcript_id, msg)
+            variant_report[key] = msg
+
+        def success(row):
+            new_rows.append(row)
+            msg = "SUCCESS: Gene = %s, Mutation = %s" % (row['Gene'], row['MutationInfo'])
+            variant_report[key] = msg
+
+        logging.info("Processing %s, transcript %s", mutation_description, transcript_id)
+            
+
         padding = max_peptide_length - 1 
         if transcript_id:
-            # logging.info("Getting peptide from transcript ID %s", transcript_id)
             seq, start, stop, annot = \
                 peptide_from_transcript_variant(
                     transcript_id, pos, ref, alt,
                     padding = padding)
+
             assert isinstance(start, int), (start, type(start))
             assert isinstance(stop, int), (stop, type(stop))
         else:
-            logging.info("Skipping transcript_id = %s, ref = %s, alt = %s, pos = %s" % (transcript_id, ref, alt, pos))
-        if seq:
+            error("Skipping due to invalid transcript ID")
+            continue 
+        if not seq:
+            error(annot)
+        else:
             if seq in seen_source_sequences:
-                logging.info("Skipping %s because already seen sequence %s" % (gene_mutation_description(pos,ref,alt), seq))
+                skip("Already seen sequence %s", seq)
                 continue
             else:
                 seen_source_sequences.add(seq)
 
             if '*' in seq:
-                logging.warning(
+                error(
                     "Found stop codon in peptide %s from transcript_id %s",
                     seq,
                     transcript_id)
             if not is_valid_peptide(seq):
-                logging.warning(
+                error(
                     "Invalid peptide sequence for transcript_id %s: %s",
                     transcript_id, 
                     seq)
             elif len(seq) < min_peptide_length:
-                logging.info(
-                    "Truncated peptide too short for transcript %s gene position %s '%s' > '%s' ", 
-                    transcript_id, pos, ref, alt)
+                skip(
+                    "Truncated peptide (len %d) too short for transcript %s", 
+                    len(seq), 
+                    transcript_id)
             else:
-                row = deepcopy(row)
+                row = deepcopy(group.irow(0))
                 row['SourceSequence'] = seq
                 row['MutationStart'] = start
                 row['MutationEnd'] = stop
                 row['MutationInfo'] = annot
-                logging.info("PEPTIDE MUTATION: %s", annot)
                 try:
                     gene = gene_names.transcript_id_to_gene_name(transcript_id)
                 except:
                     gene = gene_names.transcript_id_to_gene_id(transcript_id)
 
                 row['Gene'] = gene
-                new_rows.append(row)
+                success(row)
+
     assert len(new_rows) > 0, "No mutations!"
     peptides = pd.DataFrame.from_records(new_rows)
     peptides['GeneInfo'] = peptides['info']
@@ -166,6 +198,15 @@ def load_file(
             transcripts_df = transcripts_df.drop(dumb_field, axis = 1)
     if transcript_log_filename:
         transcripts_df.to_csv(transcript_log_filename, index=False)
+
+    print "---"
+    last_mutation = None 
+    for (mutation_description, transcript_id), msg in variant_report.iteritems():
+        if mutation_description != last_mutation:
+            print mutation_description
+            last_mutation = mutation_description
+        print "--", transcript_id, ":", msg 
+
     logging.info("---")
     logging.info("FILE LOADING SUMMARY")
     logging.info("---")

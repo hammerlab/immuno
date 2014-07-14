@@ -60,33 +60,29 @@ def peptide_from_transcript_variant(
             gene_mutation_description(pos, ref, alt))
     transcript = _ensembl.get_cds(transcript_id)
     
-    bad_result = None, -1, -1, ""
+    def error_result(msg, *args):
+        logging.warning(msg, *args)
+        return None, -1, -1, msg % args 
 
     if not transcript:
-        logging.warning("Couldn't find transcript for ID %s", transcript_id)
-        return bad_result
-    
+        return error_result("Couldn't find transcript for ID %s", transcript_id)
+
     idx = annotation.get_transcript_index_from_pos(
         pos, 
         transcript_id,
         skip_untranslated_region = True)
     if idx is None:
-        logging.warning(
+        return error_result(
             "Couldn't translate gene position %s into transcript index for %s",
             pos,
             transcript_id)
-        return bad_result
     elif idx >= len(transcript):
-       
-        
-        logging.warning(
+        return error_result(
             "Can't get position %d in coding sequence of length %d for transcript %s (%s)",
             idx, 
             len(transcript),
             transcript_id,
             gene_mutation_description(pos, ref, alt))
-        return bad_result
-
     try:      
         idx = idx if forward else idx - len(ref) + 1  
         region = mutate_protein_from_transcript(
