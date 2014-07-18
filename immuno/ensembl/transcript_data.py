@@ -79,18 +79,14 @@ def _exec_transcript_query(db, table_name, transcript_id):
     query = "select seq from %s where id = ?" % table_name
 
     cursor = db.execute(query, (transcript_id,))
-    results = cursor.fetchmany()
-    if len(results) == 0:
+    result = cursor.fetchone()
+    if result is None:
         logging.warning("No entries found with transcript_id = %s",
             transcript_id)
         return None
     else:
-        assert len(results) == 1, \
-            "Too many entries (%d) with transcript_id = %s" % \
-            (len(results), transcript_id)
-        # get the first result
-        # and return the first element of its tuple
-        return results[0][0]
+        # return the first element of result tuple
+        return result[0]
 
 class EnsemblReferenceData(object):
     """

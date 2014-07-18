@@ -30,8 +30,7 @@ from fasta import load_fasta
 def load_file(
         input_filename, 
         min_peptide_length = 9, 
-        max_peptide_length = 31, 
-        transcript_log_filename = None):
+        max_peptide_length = 31):
     """
     Load mutatated peptides from FASTA, VCF, or MAF file. 
 
@@ -196,21 +195,6 @@ def load_file(
     for dumb_field in ('description_gene', 'filter', 'qual', 'id', 'name', 'info', 'stable_id_transcript'):
         if dumb_field in transcripts_df.columns:
             transcripts_df = transcripts_df.drop(dumb_field, axis = 1)
-    if transcript_log_filename:
-        transcripts_df.to_csv(transcript_log_filename, index=False)
 
-    print "---"
-    last_mutation = None 
-    for (mutation_description, transcript_id), msg in variant_report.iteritems():
-        if mutation_description != last_mutation:
-            print mutation_description
-            last_mutation = mutation_description
-        print "--", transcript_id, ":", msg 
-
-    logging.info("---")
-    logging.info("FILE LOADING SUMMARY")
-    logging.info("---")
-    logging.info("# original mutations: %d", len(vcf_df))
-    logging.info("# mutations with annotations: %d", len(transcripts_df.groupby(['chr', 'pos', 'ref', 'alt'])))
-    logging.info("# transcripts: %d", len(transcripts_df))
-    return transcripts_df
+    
+    return transcripts_df, vcf_df, variant_report 

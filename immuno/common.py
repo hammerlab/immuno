@@ -15,9 +15,6 @@
 import appdirs
 import logging
 
-logging.basicConfig(
-    format="[%(levelname)s %(filename)s:%(lineno)d %(funcName)s] %(message)s",
-    level=logging.DEBUG)
 
 def peptide_substrings(full_peptide, window_length):
     n = len(full_peptide)

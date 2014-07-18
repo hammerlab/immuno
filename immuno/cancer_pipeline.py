@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import argparse
 import sys
 
@@ -59,28 +60,21 @@ if __name__ == '__main__':
         "--hla",
         help="comma separated list of allele (default HLA-A*02:01)")
 
-    parser.add_argument(
-        "--epitopes-output",
+    parser.add_argument("--epitopes-output",
         help="output file for dataframe containing scored epitopes",
         required=False)
 
-    parser.add_argument(
-        "--print-epitopes",
+    parser.add_argument("--print-epitopes",
         help="print dataframe with epitope scores",
         default=False,
         action="store_true")
 
-    parser.add_argument(
-        "--print-peptides",
+    parser.add_argument("--print-peptides",
         default = False, 
         help="print dataframe with vaccine peptide scores",
         action="store_true")
 
-    parser.add_argument(
-        "--html-report",
-        default = "report.html",
-        help = "Path to HTML report containing scored peptides and epitopes")
-
+    
     parser.add_argument("--random-mhc",
         default=False,
         action="store_true",
@@ -91,17 +85,35 @@ if __name__ == '__main__':
         action="store_true",
         help="Use IEDB's web API for MHC binding")
 
+    parser.add_argument("--html-vaccine-report",
+        default = "report.html",
+        help = "Path to HTML report containing scored vaccine peptides")
+
+
     parser.add_argument("--all-possible-vaccine-peptides", 
         default = False,
         action = "store_true",
         help="Instead of showing best sliding window, show all possible vaccine peptides"
     )
 
+    parser.add_argument("--quiet",
+        default = False, 
+        action = "store_true",
+        help = "Suppress verbose output"
+    )
+
+
+
     args = parser.parse_args()
 
+    log_level = logging.WARNING if args.quiet else logging.DEBUG
+    
+    logging.basicConfig(
+        format="[%(levelname)s %(filename)s:%(lineno)d %(funcName)s] %(message)s",
+        level=log_level
+    )
 
     peptide_length = int(args.peptide_length)
-
 
     # get rid of gene descriptions if they're in the dataframe
     if args.hla_file:
@@ -109,7 +121,7 @@ if __name__ == '__main__':
     elif args.hla:
         alleles = [normalize_hla_allele_name(l) for l in args.hla.split(",")]
     else:
-        alleles = [DEFAULT_ALLELE]
+        alleles = [normalize_hla_allele_name(DEFAULT_ALLELE)]
 
     # stack up the dataframes and later concatenate in case we
     # want both commandline strings (for weird mutations like translocations)
@@ -120,21 +132,40 @@ if __name__ == '__main__':
         df = load_comma_string(args.string)
         mutated_region_dfs.append(df)
 
-
     # loop over all the input files and
     # load each one into a dataframe
 
     for input_filename in args.input:
-        df = load_file(input_filename, max_peptide_length = peptide_length)
-        assert df is not None
-        mutated_region_dfs.append(df)
+        transcripts_df, raw_genomic_mutation_df, variant_report = \
+            load_file(input_filename, max_peptide_length = peptide_length)
+        mutated_region_dfs.append(transcripts_df)
 
+        # print each genetic mutation applied to each possible transcript
+        # and either why it failed or what protein mutation resulted
+        if not args.quiet:
+            print 
+            print "MUTATION REPORT FOR", input_filename 
+            print 
+            last_mutation = None 
+            for (mutation_description, transcript_id), msg in variant_report.iteritems():
+                if mutation_description != last_mutation:
+                    print mutation_description
+                    last_mutation = mutation_description
+                print "--", transcript_id, ":", msg 
+
+            logging.info("---")
+            logging.info("FILE LOADING SUMMARY FOR %s", input_filename)
+            logging.info("---")
+            logging.info("# original mutations: %d", len(raw_genomic_mutation_df))
+            logging.info("# mutations with annotations: %d", len(transcripts_df.groupby(['chr', 'pos', 'ref', 'alt'])))
+            logging.info("# transcripts: %d", len(transcripts_df))
+        
     if len(mutated_region_dfs) == 0:
         parser.print_help()
         print "\nERROR: Must supply at least --string or --input"
         sys.exit()
-    mutated_regions = pd.concat(mutated_region_dfs)
 
+    mutated_regions = pd.concat(mutated_region_dfs)
 
     if args.random_mhc:
         scored_epitopes = mhc_random.generate_scored_epitopes(mutated_regions, alleles)
@@ -144,7 +175,6 @@ if __name__ == '__main__':
     else:
         predictor = PanBindingPredictor(alleles)
         scored_epitopes = predictor.predict(mutated_regions)
-
 
     if 'MHC_PercentileRank' in scored_epitopes:
         scored_epitopes = scored_epitopes.sort(['MHC_PercentileRank'])
@@ -207,6 +237,6 @@ if __name__ == '__main__':
 
     html = template.render(peptides = peptides, vcf_filename = ','.join(args.input) ) #(input_names, alleles, scored_epitopes, scored_peptides)
     
-    with open(args.html_report, 'w') as f:
+    with open(args.html_vaccine_report, 'w') as f:
         f.write(html)
 

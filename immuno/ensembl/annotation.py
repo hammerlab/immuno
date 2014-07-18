@@ -32,8 +32,8 @@ def get_exons_from_transcript(transcript_id):
 
     returns Pandas dataframe containing only those exons
     """
-    exon_data = data.exon_data
-    exons = exon_data[exon_data['stable_id_transcript'] == transcript_id]
+    assert transcript_id in data.transcript_exons_dict, "Unknown transcript %s" % transcript_id
+    exons = data.transcript_exons_dict[transcript_id]
     assert len(exons) > 0, \
         "Couldn't find exons for transcript %s" % transcript_id
     fields = [
@@ -70,14 +70,12 @@ def get_strand(transcript_id):
 
     Return strand : int, +1 for forward strand else -1
     """
-    transcript_data = data.transcript_data
-    transcript_info = transcript_data[transcript_data['stable_id_transcript'] == transcript_id]
-
-    if transcript_info.empty:
+    exons = data.transcript_exons_groups.get_group(transcript_id)
+    
+    if len(exons) == 0:
         logging.warn("Transcript %s has no sequence information", transcript_id)
         return 1
-
-    strand = list(transcript_info['seq_region_strand_gene'])[0]
+    strand = list(exons['seq_region_strand_gene'])[0]
     return strand
 
 def is_forward_strand(transcript_id):
@@ -96,10 +94,12 @@ def is_incomplete_cds(transcript_id):
     else:
         return False
 
+
+
 def get_start_exon(transcript_id):
-    exon_data = data.exon_data
-    first_exon_mask = (exon_data['stable_id_transcript'] == transcript_id) & (exon_data['rank'] == 1)
-    start_exon = exon_data[first_exon_mask]
+    start_exons = data.start_exons_dataframe
+    mask = start_exons['stable_id_transcript'] == transcript_id
+    start_exon = start_exons[mask]
     if start_exon.empty:
         return None
     else:
@@ -252,7 +252,7 @@ def annotate_vcf_transcripts(vcf_df):
         - 'seq_region_end_transcript'
     """
 
-    genome_annotation_data_df = data.transcript_data
+    genome_annotation_data_df = data.transcripts_dataframe
 
      # combine each variant entry from `vcf_df` with all possible gene annotations
     # on the same chromosome from `genome_annotation_data_df`
