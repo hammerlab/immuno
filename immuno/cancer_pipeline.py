@@ -235,7 +235,11 @@ if __name__ == '__main__':
     template_lookup = TemplateLookup(directories=['.', 'viz'], default_filters=['literal'])
     template = Template(filename = 'viz/index.html.template', lookup = template_lookup)
 
-    html = template.render(peptides = peptides, vcf_filename = ','.join(args.input) ) #(input_names, alleles, scored_epitopes, scored_peptides)
+    html = template.render(
+        peptides = peptides, 
+        vcf_filename = ','.join(args.input), 
+        hla_alleles = alleles,
+    )
     
     with open(args.html_vaccine_report, 'w') as f:
         f.write(html)

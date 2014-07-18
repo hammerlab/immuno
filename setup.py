@@ -31,7 +31,7 @@ from setuptools import setup
 if __name__ == '__main__':
     setup(
         name='immuno',
-        version="0.2",
+        version="0.3",
         description="Evaluate immunotherapy from given set of variants",
         url="https://github.com/hammerlab/immuno",
         license="http://www.apache.org/licenses/LICENSE-2.0.html",

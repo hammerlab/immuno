@@ -15,12 +15,16 @@
     </div>
 
     <div id="info">
-      <span class="b">Filename</span>
-      <span class="i">${vcf_filename}</span>
+      <b>Date Run</b>
+        <%! from time import strftime as time %>
+        <i>${"%B %d, %Y" | time}</i>
+      
       <br/>
-      <span class="b">Date Run</span>
-      <%! from time import strftime as time %>
-      <span class="i">${"%B %d, %Y" | time}</span>
+      <b>Filename</b>  <i>${vcf_filename}</i>
+      
+      <br/>
+      <b>HLA Alleles</b>  <i>${", ".join(hla_alleles)}</i>
+         
       <br/>
       <!-- 
       <span class="b">ImmunoID SHA1</span>
