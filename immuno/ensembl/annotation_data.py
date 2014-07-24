@@ -14,6 +14,8 @@
 
 
 import pandas as pd
+import datacache
+
 from transcript_metadata import download_transcript_metadata
 
 def cached_property(fn):
@@ -79,7 +81,7 @@ class EnsemblAnnotationData(object):
         """
         transcript_groups = self.transcript_exons_groups
         return dict((k,v) for k,v in transcript_groups)
-        
+
 
     @cached_property
     def start_exons_dataframe(self):

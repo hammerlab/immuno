@@ -30,6 +30,7 @@ from mhc_netmhcpan import PanBindingPredictor
 import mhc_random 
 from load_file import load_file
 from strings import load_comma_string
+import immunogenicity 
 from vaccine_peptides import build_peptides_dataframe
 
 DEFAULT_ALLELE = 'HLA-A*02:01'
