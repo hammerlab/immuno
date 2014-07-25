@@ -14,9 +14,14 @@
 
 
 import pandas as pd
+
 from transcript_metadata import download_transcript_metadata
 
 def cached_property(fn):
+    """
+    Run the given function `fn` the first time this property is accessed, 
+    save the result. 
+    """
     field_name = '_cached_%s' % fn.__name__
     @property
     def _cached_property(self):
@@ -32,9 +37,6 @@ class EnsemblAnnotationData(object):
     Singleton class which allows for lazy loading of
     exon/transcript annotations
     """
-
-    def __init__(self):
-        pass
 
     @cached_property
     def transcript_metadata_path(self):
@@ -79,7 +81,7 @@ class EnsemblAnnotationData(object):
         """
         transcript_groups = self.transcript_exons_groups
         return dict((k,v) for k,v in transcript_groups)
-        
+
 
     @cached_property
     def start_exons_dataframe(self):

@@ -30,6 +30,7 @@ from mhc_netmhcpan import PanBindingPredictor
 import mhc_random 
 from load_file import load_file
 from strings import load_comma_string
+from immunogenicity import ImmunogenicityPredictor
 from vaccine_peptides import build_peptides_dataframe
 
 DEFAULT_ALLELE = 'HLA-A*02:01'
@@ -176,6 +177,10 @@ if __name__ == '__main__':
         predictor = PanBindingPredictor(alleles)
         scored_epitopes = predictor.predict(mutated_regions)
 
+    imm = ImmunogenicityPredictor(alleles = alleles)
+    scored_epitopes = imm.predict(scored_epitopes)
+
+
     if 'MHC_PercentileRank' in scored_epitopes:
         scored_epitopes = scored_epitopes.sort(['MHC_PercentileRank'])
 
@@ -184,7 +189,6 @@ if __name__ == '__main__':
         
     if args.print_epitopes:
         print scored_epitopes.to_string()
-
 
     if args.all_possible_vaccine_peptides:
         peptides = build_peptides_dataframe(scored_epitopes,

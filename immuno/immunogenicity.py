@@ -12,129 +12,114 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import cPickle
 import logging
-from os.path import exists
+from os import environ, listdir 
+from os.path import exists, split, join 
 
-from sklearn import ensemble
-import numpy as np
-import pandas as pd
-import scipy.stats 
+from mhc_common import compact_hla_allele_name
+DEFAULT_PEPTIDE_DIR = environ.get("IMMUNO_THYMIC_PEPTIDES", join(split(__file__)[0], "thymic_peptides"))
 
-from epitopes import \
-    (cri_tumor_antigens, iedb, features, reduced_alphabet, reference)
-
-from pipeline import PipelineElement
-from balanced_ensemble import BalancedEnsembleClassifier
-
-def train(
-        assay_group = 'cytotoxicity',
-        mhc_class = 1,
-        max_ngram = 2,
-        alphabet = 'sdm12'):
-    params_str = "assay='%s', mhc=%s, ngram=%s, alphabet=%s" % \
-        (assay_group, mhc_class, max_ngram, alphabet)
-    logging.info("Training immunogenicity classifier (%s)" % params_str)
-    alphabet_dict = getattr(reduced_alphabet, alphabet)
-    X, Y, vectorizer = iedb.load_tcell_ngrams(
-        assay_group = assay_group,
-        human = True,
-        mhc_class = mhc_class,
-        max_ngram = max_ngram,
-        reduced_alphabet = alphabet_dict,
-        min_count = None,
-        return_transformer = True)
-    ensemble = BalancedEnsembleClassifier()
-    ensemble.fit(X, Y)
-
-    reference_peptides = reference.load_peptide_set(peptide_length = 9, nrows = 1000)
-    # filter out stop codons and unknown residues
-    reference_peptides = [p for p in reference_peptides if '*' not in p and 'X' not in p]
-    reference_peptide_vectors = vectorizer.transform(reference_peptides)
-    reference_scores = ensemble.decision_function(reference_peptide_vectors)
-
-    return vectorizer, ensemble, reference_scores 
+def _load_allele_mapping_dict(path):
+	"""
+	Since some alleles have identical peptide sets as others, we compress
+	the stored data by only retaining one allele from each equivalence class
+	and using a mappings file to figure out which allele is retained. 
+	"""
+	result = {}
+	with open(path, 'r') as f:
+		for line in f.read().split("\n"):
+			if len(line) > 0:
+				k, v = line.split("\t")
+			result[k] = v
+	return result 
 
 
-def train_cached(
-        assay_group = 'cytotoxicity',
-        mhc_class = 1,
-        max_ngram = 2,
-        alphabet = 'sdm12',
-        suffix = '.pickle'):
-    """
-    Trains and caches both a feature transforming vectorizer
-    which turns peptide strings into fixed-length vectors
-    and a classifier which maps vectors to immunogenicity labels
-    """
+class ImmunogenicityPredictor(object):
 
-    model_base_filename = \
-        "immunogenicity_classifier_assay_%s_mhc_%s_ngram_%s_alphabet_%s" % \
-        (assay_group, mhc_class, max_ngram, alphabet)
-    model_filename = model_base_filename + suffix
+	"""
+	Predict whether some T-cell in a person's circulating repertoire could recognize a
+	particular pattern. The subset of the 'self' proteome which binds 
+	to an individual's HLA alleles tells us which T-cells were removed by negative selection. 
+	T-cells inspect peptides more strongly along interior residues (positions 3-8), so we restrict
+	our query only to those positions. 
+	"""
 
-    vectorizer_base_filename = \
-        "immunogenicity_vectorizer_assay_%s_mhc_%s_ngram_%s_alphabet_%s" % \
-        (assay_group, mhc_class, max_ngram, alphabet)
-    vectorizer_filename = vectorizer_base_filename + suffix
+	def __init__(
+			self, 
+			alleles, 
+			data_path = DEFAULT_PEPTIDE_DIR, 
+			binding_threshold = 500, 
+			first_position = 3, 
+			last_position = 8):
+		"""
+		Parameters
+		--------
 
+		alleles : list of strings 
 
-    reference_scores_base_filename = \
-        "immunogenicity_reference_scores_assay_%s_mhc_%s_ngram_%s_alphabet_%s" % \
-        (assay_group, mhc_class, max_ngram, alphabet)
+		data_path : str, optional 
 
-    reference_scores_filename = reference_scores_base_filename + suffix
+		first_position : int, optional 
+			Start position for extracting substring of query peptide (indexed starting from 1)
 
-    if exists(model_filename) and exists(vectorizer_filename) and exists(reference_scores_filename):
-        logging.debug("Loading cached immunogenicity classifier and vectorizer")
-        with open(vectorizer_filename, 'r') as vectorizer_file:
-            vectorizer = cPickle.load(vectorizer_file)
+		last_position : int, optional 
+			Last position for extracting substring of query peptide (indexed starting from 1)
+		"""
 
-        with open(model_filename, 'r') as model_file:
-            clf = cPickle.load(model_file)
+		self.binding_threshold = binding_threshold
+		self.first_position = first_position
+		self.last_position = last_position
+		self.alleles = [compact_hla_allele_name(allele) for allele in alleles]
 
-        with open(reference_scores_filename, 'r') as scores_file:
-            reference_scores = cPickle.load(scores_file)
-        return vectorizer, clf, reference_scores 
+		assert exists(self.data_path), "Directory with thymic peptides (%s) does not exist" % self.data_path
 
-    vectorizer, clf, reference_scores = train()
+		available_alleles = listdir(self.data_path)
+		
+		mappings_file_path = join(self.data_path, 'mappings')
+		if exists(mappings_file_path):
+			self.allele_mappings = _load_allele_mapping_dict(mappings_file_path)
+		else:
+			self.allele_mappings = dict(zip(available_alleles, available_alleles))
+		
+		self.peptide_sets = {}
 
-    with open(vectorizer_filename, 'w') as vectorizer_file:
-        cPickle.dump(vectorizer, vectorizer_file, cPickle.HIGHEST_PROTOCOL)
+		for allele in self.alleles:
+			logging.info("Loading thymic MHC peptide set for HLA allele %s", allele)
+			assert allele in self.allele_mappings, "No MHC peptide set available for HLA allele %s" % (allele,)
 
-    with open(model_filename, 'w') as model_file:
-        cPickle.dump(clf, model_file, cPickle.HIGHEST_PROTOCOL)
+			filename = self.allele_mappings[allele] 
+			assert filename in available_alleles, "No MHC peptide set available for HLA allele %s (filename = %s)" % (allele,filename)
+			
+			with open(join(self.data_path, filename), 'r') as f:
+				peptide_set = set(l for l in f.read().split("\n") if len(l) > 0)
+			self.peptide_sets[allele] = peptide_set
 
+	def predict(self, peptides_df):
+		"""
+		Determine whether 9-mer peptide is immunogenic by checking
 
-    with open(reference_scores_filename, 'w') as scores_file:
-        cPickle.dump(reference_scores, scores_file, cPickle.HIGHEST_PROTOCOL)
+		1) that the epitope binds strongly to a particular MHC allele
+		2) the "core" of the peptide (positions 3-8) don't overlap with any other 
+  		   peptides in the "self"/thymic MHC ligand sets of that HLA allele. 
 
-    return vectorizer, clf, reference_scores 
+  		Returns DataFrame with two extra columns:
+  			- ThymicDeletion: Was this epitope deleted during thymic selection (and thus can't be recognize by T-cells)?
+  			- Immunogenic: Is this epitope a sufficiently strong binder that wasn't deleted during thymic selection? 
+		"""
+		
+		thymic_peptide_sets = self.peptide_sets.values()
+		
+		peptides_df["ThymicDeletion"] = False
+		
+		for i in xrange(len(peptides_df)):
+			row = peptides_df.ix[i]
+			peptide = row.Epitope 
+			allele = compact_hla_allele_name(row.Allele)
+			# positions in the epitope are indexed starting from 1 to match immunology nomenclature
+			substring = peptide[self.first_position - 1 : self.last_position]
+			peptides_df['ThymicDeletion'].ix[i] = substring in self.peptide_sets[allele]
+		
+		peptides_df["Immunogenic"] = ~peptides_df["ThymicDeletion"] &  (peptides_df["MHC_IC50"] <= self.binding_threshold)
 
-class ImmunogenicityRFModel(PipelineElement):
-
-    def __init__(
-            self, name = "immunogenicity",
-            classifier = None, vectorizer = None):
-        self.name = name
-        if classifier is None and vectorizer is None:
-            vectorizer, classifier, reference_scores = train_cached()
-        self.vectorizer = vectorizer
-        self.classifier = classifier
-        self.reference_scores = reference_scores 
-
-
-    def verify(self):
-        pass
-
-    def _apply(self, df):
-        if self.vectorizer:
-            X = self.vectorizer.transform(df.Epitope)
-        else:
-            X = df.Epitope
-        probs = self.classifier.decision_function(X)
-        percentiles = []
-        for prob in probs:
-            prctile = scipy.stats.percentileofscore(self.reference_scores, prob)
-            percentiles.append(prctile)
-        return np.array(percentiles) / 100.0
+		return peptides_df
+	

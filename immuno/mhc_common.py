@@ -26,6 +26,31 @@ def convert_str(obj):
     except:
         return str(obj)
 
+def _parse_substring(hla, pred, max_len = None):
+    """
+    Extract substring of letters for which predicate is True
+    """
+    result = ""
+    pos = 0
+    if max_len is None:
+        max_len = len(hla)
+    else:
+        max_len = min(max_len, len(hla))
+    while pos < max_len and pred(hla[pos]):
+        result += hla[pos]
+        pos +=1 
+    return result, hla[pos:]
+
+def _parse_letters(hla, max_len = None):
+    return _parse_substring(hla, lambda c: c.isalpha(), max_len  = max_len)
+
+def _parse_numbers(hla, max_len = None):
+    return _parse_substring(hla, lambda c: c.isdigit(), max_len = max_len)
+
+def _parse_not_numbers(hla, max_len = None):
+    return _parse_substring(hla, lambda c: not c.isdigit(), max_len = max_len)
+
+
 def normalize_hla_allele_name(hla):
     """
     HLA allele names can look like:
@@ -38,14 +63,46 @@ def normalize_hla_allele_name(hla):
         - A02:02
         - A:02:03
     ...should all be normalized to:
-        HLA-A*03:02:03
+        HLA-A*03:02
     """
-    hla = hla.strip().upper()
-    match = re.match('(HLA\-)?([A-Z])(\*|:)?([0-9][0-9]?):?([0-9][0-9]?)$', hla)
-    assert match, "Malformed HLA type %s" % hla 
-    (_, gene, _, family, protein) = match.groups()
+    original = hla
+    hla = hla.strip()
+    if hla.startswith("HLA-"):
+        hla = hla[4:]
+    
+    # gene name is sequence of letters at start of HLA string 
+    gene, hla = _parse_letters(hla)
+    
+
+    assert len(gene) > 0, "No HLA gene name given in %s" % original
+    assert len(hla) > 0, "Malformed HLA type %s" % original 
+
+    gene = gene.upper()
+
+    # skip initial separator
+    sep, hla = _parse_not_numbers(hla)
+    assert sep in ("", ":", "*"), "Malformed separator %s in HLA type %s" % (sep, original)
+
+    family, hla = _parse_numbers(hla, max_len = 2)
+
+    sep, hla = _parse_not_numbers(hla)
+
+    assert sep in ("", ":"), "Malformed separator %s in HLA type %s" % (sep, original)
+
+    allele, hla = _parse_numbers(hla)
+
+    assert len(hla) == 0, "Unexpected suffix %s in HLA type %s" % (hla, original)
+    
+
     if len(family) == 1:
         family = "0" + family 
-    if len(protein) == 1:
-        protein = "0" + protein 
-    return "HLA-%s*%s:%s" % (gene, family, protein )
+    if len(allele) == 0:
+        allele = "01"
+    elif len(allele) == 1:
+        allele = "0" + allele 
+    return "HLA-%s*%s:%s" % (gene, family, allele )
+
+def compact_hla_allele_name(hla):
+    long_name = normalize_hla_allele_name(hla)
+    # turn HLA-A*02:01 into A0201
+    return long_name[4:].replace("*", "").replace(":", "")
