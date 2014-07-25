@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import cPickle
 import logging
 from os import environ, listdir 
 from os.path import exists, split, join 
@@ -48,7 +47,7 @@ class ImmunogenicityPredictor(object):
 	def __init__(
 			self, 
 			alleles, 
-			data_path = None, 
+			data_path = DEFAULT_PEPTIDE_DIR, 
 			binding_threshold = 500, 
 			first_position = 3, 
 			last_position = 8):
@@ -61,24 +60,16 @@ class ImmunogenicityPredictor(object):
 		data_path : str, optional 
 
 		first_position : int, optional 
-			Start position for extracting substring of query peptide (from 1)
+			Start position for extracting substring of query peptide (indexed starting from 1)
 
 		last_position : int, optional 
-			Last position for extracting substring of query peptide (from 1)
+			Last position for extracting substring of query peptide (indexed starting from 1)
 		"""
 
 		self.binding_threshold = binding_threshold
 		self.first_position = first_position
 		self.last_position = last_position
 		self.alleles = [compact_hla_allele_name(allele) for allele in alleles]
-
-		if data_path is None:
-			self.data_path = DEFAULT_PEPTIDE_DIR
-		else:
-			self.data_path = data_path 
-		
-		if self.data_path.endswith("/"):
-			self.data_path = self.data_path[:-1]
 
 		assert exists(self.data_path), "Directory with thymic peptides (%s) does not exist" % self.data_path
 
@@ -88,7 +79,7 @@ class ImmunogenicityPredictor(object):
 		if exists(mappings_file_path):
 			self.allele_mappings = _load_allele_mapping_dict(mappings_file_path)
 		else:
-			self.allele_mappings = dict(zip(available_alleles))
+			self.allele_mappings = dict(zip(available_alleles, available_alleles))
 		
 		self.peptide_sets = {}
 
@@ -107,9 +98,9 @@ class ImmunogenicityPredictor(object):
 		"""
 		Determine whether 9-mer peptide is immunogenic by checking
 
-		1) that the epitope binds strongly to a particular
+		1) that the epitope binds strongly to a particular MHC allele
 		2) the "core" of the peptide (positions 3-8) don't overlap with any other 
-  		   peptides in the "self"/thymic MHC ligand sets that HLA allele. 
+  		   peptides in the "self"/thymic MHC ligand sets of that HLA allele. 
 
   		Returns DataFrame with two extra columns:
   			- ThymicDeletion: Was this epitope deleted during thymic selection (and thus can't be recognize by T-cells)?
@@ -124,6 +115,7 @@ class ImmunogenicityPredictor(object):
 			row = peptides_df.ix[i]
 			peptide = row.Epitope 
 			allele = compact_hla_allele_name(row.Allele)
+			# positions in the epitope are indexed starting from 1 to match immunology nomenclature
 			substring = peptide[self.first_position - 1 : self.last_position]
 			peptides_df['ThymicDeletion'].ix[i] = substring in self.peptide_sets[allele]
 		
