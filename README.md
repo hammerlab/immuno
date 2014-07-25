@@ -23,13 +23,18 @@ If you don't either an `hla` or `hla-file` then the default "HLA:A*02:01" will b
 * `--hla`: Comma separated list of HLA alleles. 
 * `--hla-file`: Text file containing one HLA allele per line. 
 * `--peptide-length`: Length of vaccine peptide (window around mutation, default 31)
+* `--min-peptide-padding`: Minimum number of wildtype residues before or after a mutation 
+* `--all-possible-vaccine-peptides`: Instead of showing best sliding window, show all possible vaccine peptides
 * `--epitopes-output`: CSV output file for dataframe containing scored epitopes
 * `--peptides-output`: CSV output file for dataframe containing scored vaccine
 * `--print-epitopes`: Print dataframe with epitope scores
 * `--print-peptides`: Print dataframe with vaccine peptide scores
 * `--html-report`: Path to HTML report containing scored peptides and epitopes
+* `--html-vaccine-report`: Path to HTML report containing scored vaccine peptides
+* `--random-mhc`: Random values instead for MHC binding prediction
+* `--iedb-mhc`: Use IEDB's web API for MHC binding
 * `--skip-mhc`: Don't predict MHC binding
-
+* `--quiet`: Suppress verbose output
 
 ### Requirements
 
