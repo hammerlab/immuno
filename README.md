@@ -4,7 +4,7 @@
 ### Usage 
 #### From peptide string
 ```sh
-python cancer_pipeline.py --string EDLTVKIGDFGLATEKSRWSGSHQFEQLS --hla HLA-B*35:01
+python cancer_pipeline.py --string EDLTVKIGDFGLATEKSRWSGSHQFEQLS --hla "HLA-B*35:01"
 ```
 
 #### From input file
