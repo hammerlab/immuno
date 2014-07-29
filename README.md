@@ -24,7 +24,6 @@ If you don't either an `hla` or `hla-file` then the default "HLA:A*02:01" will b
 * `--hla-file`: Text file containing one HLA allele per line. 
 * `--peptide-length`: Length of vaccine peptide (window around mutation, default 31)
 * `--min-peptide-padding`: Minimum number of wildtype residues before or after a mutation 
-* `--all-possible-vaccine-peptides`: Instead of showing best sliding window, show all possible vaccine peptides
 * `--print-epitopes`: Print dataframe with epitope scores
 * `--print-peptides`: Print dataframe with vaccine peptide scores
 * `--epitopes-path`: CSV output file for dataframe containing scored epitopes

@@ -88,8 +88,6 @@ parser.add_argument("--iedb-mhc",
     action="store_true",
     help="Use IEDB's web API for MHC binding")
 
-
-
 parser.add_argument("--epitopes-path",
     help="output file for dataframe containing scored epitopes",
     required=False)
@@ -97,13 +95,6 @@ parser.add_argument("--epitopes-path",
 parser.add_argument("--report-path",
     default = "report.html",
     help = "Path to HTML report containing scored vaccine peptides")
-
-parser.add_argument("--all-possible-vaccine-peptides", 
-    default = False,
-    action = "store_true",
-    help="Instead of showing best sliding window, show all possible vaccine peptides"
-)
-
 
 def print_mutation_report(input_filename, variant_report, raw_genomic_mutation_df, transcripts_df):
     print 
@@ -122,6 +113,97 @@ def print_mutation_report(input_filename, variant_report, raw_genomic_mutation_d
     logging.info("# original mutations: %d", len(raw_genomic_mutation_df))
     logging.info("# mutations with annotations: %d", len(transcripts_df.groupby(['chr', 'pos', 'ref', 'alt'])))
     logging.info("# transcripts: %d", len(transcripts_df))
+
+def group_epitopes(scored_epitopes):
+    """
+    Given a DataFrame with fields:
+      - TranscriptId
+      - SourceSequence
+      - MutationStart
+      - MutationEnd
+      - GeneMutationInfo
+      - PeptideMutationInfo 
+      - Gene
+      - GeneInfo
+      - Epitope
+      - EpitopeStart
+      - EpitopeEnd
+      - MHC_IC50
+      - MHC_PercentileRank
+    
+    Group epitopes under their originating transcript and make nested lists of dictionaries
+    to contain the binding scores for MHC alleles. 
+    
+    Return a list of dictionaries for each mutated transcript with fields:
+      - TranscriptId
+      - SourceSequence
+      - MutationStart
+      - MutationEnd
+      - GeneMutationInfo
+      - PeptideMutationInfo 
+      - Gene
+      - GeneInfo
+      - Epitopes : list of dictionaries
+      
+    Each entry of the 'Epitopes' list contains the following fields:
+      - 'Epitope'
+      - 'EpitopeStart'
+      - 'EpitopeEnd'
+      - 'MHC_AlleleScores' : list of allele-specific entries 
+    
+    Each entry of 'MHC_AlleleScores' the following fields:
+      - 'Allele' 
+      - 'MHC_PercentileRank'
+      - 'MHC_IC50' 
+    """
+    peptides = []
+    for (transcript_id, seq), transcript_group in scored_epitopes.groupby(["TranscriptId", "SourceSequence"]):
+        peptide_entry = {}
+        peptide_entry["Peptide"] = seq
+        peptide_entry['TranscriptId'] = transcript_id
+        head = transcript_group.to_records()[0]
+        peptide_entry["MutationStart"] = head.MutationStart
+        peptide_entry["MutationEnd"] = head.MutationEnd
+        peptide_entry["GeneMutationInfo"] = head.GeneMutationInfo
+        peptide_entry["PeptideMutationInfo"] = head.PeptideMutationInfo
+        peptide_entry["GeneInfo"] = head.GeneInfo
+        peptide_entry['Gene'] = head.Gene
+        peptide_entry['Description'] = "%s (%s) : %s" % (head.Gene, head.TranscriptId, head.PeptideMutationInfo) 
+        peptide_entry['Epitopes'] = []
+        for (epitope, epitope_start, epitope_end), epitope_group in \
+                transcript_group.groupby(['Epitope', 'EpitopeStart', 'EpitopeEnd']):
+            epitope_entry = {
+                'Epitope' : epitope, 
+                'EpitopeStart' : epitope_start, 
+                'EpitopeEnd' : epitope_end, 
+                'MHC_Allele_Scores' : []
+            }
+            seen_alleles = set([])
+            for epitope_allele_row in epitope_group.to_records():
+                allele = epitope_allele_row['Allele']
+                assert allele not in seen_alleles, "Repeated entry %s" % epitope_allele_row
+                seen_alleles.add(allele)
+                allele_entry = {
+                    'Allele': allele, 
+                    'MHC_PercentileRank' : epitope_allele_row['MHC_PercentileRank'],
+                    'MHC_IC50' : epitope_allele_row['MHC_IC50'],
+                }
+                epitope_entry['MHC_Allele_Scores'].append(allele_entry)
+            peptide_entry['Epitopes'].append(epitope_entry)
+        peptides.append(peptide_entry)
+    return peptides
+
+def render_report(input_names, peptides, alleles):
+    template_lookup = TemplateLookup(directories=['.', 'viz'], default_filters=['literal'])
+    template = Template(filename = 'viz/index.html.template', lookup = template_lookup)
+
+    html = template.render(
+        peptides = peptides, 
+        vcf_filename = input_names, 
+        hla_alleles = alleles,
+    )
+    return html 
+    
 
 
 if __name__ == '__main__':
@@ -190,63 +272,18 @@ if __name__ == '__main__':
     if args.print_epitopes:
         print scored_epitopes.to_string()
 
-    if args.all_possible_vaccine_peptides:
-        peptides = build_peptides_dataframe(scored_epitopes,
-            peptide_length = peptide_length, 
-            min_peptide_padding = args.min_peptide_padding)
-    else:
-        peptides = []
-        for (transcript_id, seq), transcript_group in scored_epitopes.groupby(["TranscriptId", "SourceSequence"]):
-            peptide_entry = {}
-            peptide_entry["Peptide"] = seq
-            peptide_entry['TranscriptId'] = transcript_id
-            head = transcript_group.to_records()[0]
-            peptide_entry["MutationStart"] = head.MutationStart
-            peptide_entry["MutationEnd"] = head.MutationEnd
-            peptide_entry["GeneMutationInfo"] = head.GeneMutationInfo
-            peptide_entry["PeptideMutationInfo"] = head.PeptideMutationInfo
-            peptide_entry["GeneInfo"] = head.GeneInfo
-            peptide_entry['Gene'] = head.Gene
-            peptide_entry['Description'] = "%s (%s) : %s" % (head.Gene, head.TranscriptId, head.PeptideMutationInfo) 
-            peptide_entry['Epitopes'] = []
-            for (epitope, epitope_start, epitope_end), epitope_group in \
-                    transcript_group.groupby(['Epitope', 'EpitopeStart', 'EpitopeEnd']):
-                epitope_entry = {
-                    'Epitope' : epitope, 
-                    'EpitopeStart' : epitope_start, 
-                    'EpitopeEnd' : epitope_end, 
-                    'MHC_Allele_Scores' : []
-                }
-                seen_alleles = set([])
-                for epitope_allele_row in epitope_group.to_records():
-                    allele = epitope_allele_row['Allele']
-                    assert allele not in seen_alleles, "Repeated entry %s" % epitope_allele_row
-                    seen_alleles.add(allele)
-                    allele_entry = {
-                        'Allele': allele, 
-                        'MHC_PercentileRank' : epitope_allele_row['MHC_PercentileRank'],
-                        'MHC_IC50' : epitope_allele_row['MHC_IC50'],
-                    }
-                    epitope_entry['MHC_Allele_Scores'].append(allele_entry)
-                peptide_entry['Epitopes'].append(epitope_entry)
-            peptides.append(peptide_entry)
+    peptides = group_epitopes(scored_epitopes)
+   
 
     if args.print_peptides:
         for pep in peptides:
             print pep 
     
+    
     input_names = ";".join(args.input)
     if args.string:
         input_names += ";" + args.string
-    template_lookup = TemplateLookup(directories=['.', 'viz'], default_filters=['literal'])
-    template = Template(filename = 'viz/index.html.template', lookup = template_lookup)
-
-    html = template.render(
-        peptides = peptides, 
-        vcf_filename = ','.join(args.input), 
-        hla_alleles = alleles,
-    )
     
+    html = render_report(input_names, peptides, alleles)
     with open(args.report_path, 'w') as f:
         f.write(html)
-
