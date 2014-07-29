@@ -6,6 +6,7 @@ import logging
 
 import numpy as np
 import pandas as pd 
+from epitopes.mutate import gene_mutation_description
 
 from mhc_common import normalize_hla_allele_name
 
@@ -16,7 +17,7 @@ def create_input_fasta_file(df):
     FASTA IDs to peptide records. 
     """
     input_file = tempfile.NamedTemporaryFile("w", prefix="peptide", delete=False)
-        
+    
     peptide_entries = {}
     records = df.to_records()
     n_records = len(records)
@@ -37,6 +38,52 @@ def create_input_fasta_file(df):
 def bad_binding_score(x):
     return x < 0 or np.isnan(x) or np.isinf(x)
 
+def build_output_rows(epitopes_df, peptide_entries, allele):
+    results = []
+    for identifier, group in epitopes_df.groupby("ID"):
+        assert identifier in peptide_entries, "Bad identifier %s, epitopes = %s" % (identifier, epitopes.head())
+        mutation_entry = peptide_entries[identifier]
+        # columns: Pos    Peptide   ID  1-log50k          nM  Rank
+        for epitope_row in group.to_records():
+            pos = epitope_row['Pos']
+            epitope = epitope_row['Peptide']
+            ic50 = epitope_row['nM']
+            rank = epitope_row['Rank']
+            # if we have a bad IC50 score we might still get a salvageable 
+            # log of the score. Strangely, this is necessary sometimes! 
+            if bad_binding_score(ic50):
+                log_ic50 = epitope_row['1-log50k']
+                ic50 = 50000 ** (-log_ic50 + 1)
+
+            if bad_binding_score(ic50): 
+                logging.warn("Invalid IC50 value %0.4f for %s w/ allele %s" % (ic50, epitope, allele))
+                continue 
+            elif bad_binding_score(rank) or rank > 100:
+                logging.warn("Invalid percentile rank %s for %s w/ allele %s" % (rank, epitope, allele))
+                continue 
+
+            # keep track of original genetic variant that gave rise to this epitope
+            new_row = {}
+            # fields shared by all epitopes from this sequence 
+            new_row['SourceSequence'] = mutation_entry.SourceSequence
+            new_row['MutationStart'] = mutation_entry.MutationStart
+            new_row['MutationEnd'] = mutation_entry.MutationEnd
+            new_row['GeneInfo'] = mutation_entry.GeneInfo
+            new_row['Gene'] = mutation_entry.Gene
+            new_row["GeneMutationInfo"] = mutation_entry.GeneMutationInfo
+            new_row['PeptideMutationInfo'] = mutation_entry.PeptideMutationInfo
+            new_row['TranscriptId'] = mutation_entry.TranscriptId
+
+            # fields specific to this epitope 
+            new_row['Allele'] = allele
+            new_row['EpitopeStart'] = pos 
+            new_row['EpitopeEnd'] = pos + len(epitope)
+            new_row['Epitope'] = epitope 
+            new_row['MHC_IC50'] = ic50
+            new_row['MHC_PercentileRank'] = rank 
+            results.append(new_row) 
+    return results 
+
 class PanBindingPredictor(object):
     def __init__(self, hla_alleles):
         valid_alleles_str = subprocess.check_output(["netMHCpan", "-listMHC"])
@@ -56,10 +103,20 @@ class PanBindingPredictor(object):
 
     def predict(self, df):
         """
-        Given a dataframe of mutated amino acid sequences, run each sequence through NetMHCpan
+        Given a dataframe of mutated amino acid sequences, run each sequence through NetMHCpan. 
+
+        Expects the input DataFrame to have the following fields: 
+            - SourceSequence
+            - MutationStart
+            - MutationEnd
+            - GeneInfo
+            - Gene
+            - GeneMutationInfo
+            - PeptideMutationInfo
+            - TranscriptId
         """
 
-        
+
         input_filename, peptide_entries = create_input_fasta_file(df)
 
         results = []
@@ -72,45 +129,7 @@ class PanBindingPredictor(object):
             epitopes_df = pd.read_csv(output_file.name, sep='\t', skiprows = 1)
             output_file.close()
             os.remove(output_file.name)
-            for identifier, group in epitopes_df.groupby("ID"):
-                assert identifier in peptide_entries, "Bad identifier %s, epitopes = %s" % (identifier, epitopes.head())
-                mutation_entry = peptide_entries[identifier]
-                # columns: Pos    Peptide   ID  1-log50k          nM  Rank
-                for epitope_row in group.to_records():
-                    pos = epitope_row['Pos']
-                    epitope = epitope_row['Peptide']
-                    ic50 = epitope_row['nM']
-                    rank = epitope_row['Rank']
-                    # if we have a bad IC50 score we might still get a salvageable 
-                    # log of the score. Strangely, this is necessary sometimes! 
-                    if bad_binding_score(ic50):
-                        log_ic50 = epitope_row['1-log50k']
-                        ic50 = 50000 ** (-log_ic50 + 1)
-
-                    if bad_binding_score(ic50): 
-                        logging.warn("Invalid IC50 value %0.4f for %s w/ allele %s" % (ic50, epitope, allele))
-                        continue 
-                    elif bad_binding_score(rank) or rank > 100:
-                        logging.warn("Invalid percentile rank %s for %s w/ allele %s" % (rank, epitope, allele))
-                        continue 
-                    new_row = {}
-                    # fields shared by all epitopes from this sequence 
-                    new_row['SourceSequence'] = mutation_entry.SourceSequence
-                    new_row['MutationStart'] = mutation_entry.MutationStart
-                    new_row['MutationEnd'] = mutation_entry.MutationEnd
-                    new_row['GeneInfo'] = mutation_entry.GeneInfo
-                    new_row['Gene'] = mutation_entry.Gene
-                    new_row['MutationInfo'] = mutation_entry.MutationInfo
-                    new_row['TranscriptId'] = mutation_entry.TranscriptId
-
-                    # fields specific to this epitope 
-                    new_row['Allele'] = allele
-                    new_row['EpitopeStart'] = pos 
-                    new_row['EpitopeEnd'] = pos + len(epitope)
-                    new_row['Epitope'] = epitope 
-                    new_row['MHC_IC50'] = ic50
-                    new_row['MHC_PercentileRank'] = rank 
-                    results.append(new_row) 
+            results.extend(build_output_rows(epitopes_df, peptide_entries, allele))
         os.remove(input_filename)
         assert len(results) > 0, "No epitopes from netMHCpan"
         return pd.DataFrame.from_records(results)

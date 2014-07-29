@@ -42,3 +42,11 @@ VALID_AMINO_ACIDS = set([
 
 def is_valid_peptide(pep):
 	return all(residue in VALID_AMINO_ACIDS for residue in pep)
+
+def init_logging(quiet = False):
+    log_level = logging.WARNING if quiet else logging.DEBUG
+       
+    logging.basicConfig(
+        format="[%(levelname)s %(filename)s:%(lineno)d %(funcName)s] %(message)s",
+        level=log_level
+    )
