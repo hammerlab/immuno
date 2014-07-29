@@ -207,7 +207,7 @@ if __name__ == '__main__':
             peptide_entry["PeptideMutationInfo"] = head.PeptideMutationInfo
             peptide_entry["GeneInfo"] = head.GeneInfo
             peptide_entry['Gene'] = head.Gene
-            peptide_entry['Description'] = "%s (%s) : %s" % (head.Gene, head.TranscriptId, head.MutationInfo) 
+            peptide_entry['Description'] = "%s (%s) : %s" % (head.Gene, head.TranscriptId, head.GeneMutationInfo) 
             peptide_entry['Epitopes'] = []
             for (epitope, epitope_start, epitope_end), epitope_group in \
                     transcript_group.groupby(['Epitope', 'EpitopeStart', 'EpitopeEnd']):
