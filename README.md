@@ -4,12 +4,12 @@
 ### Usage 
 #### From peptide string
 ```sh
-python cancer_pipeline.py --string EDLTVKIGDFGLATEKSRWSGSHQFEQLS --hla "HLA-B*35:01"
+python mutation_report.py --string EDLTVKIGDFGLATEKSRWSGSHQFEQLS --hla "HLA-B*35:01"
 ```
 
 #### From input file
 ```sh
-python cancer_pipeline.py --input <.maf, .vcf, .eff.vcf, .fasta> --hla-file <allele-file> 
+python mutation_report.py --input <.maf, .vcf, .fasta> --hla-file <allele-file> 
 
 ```
 
@@ -25,12 +25,10 @@ If you don't either an `hla` or `hla-file` then the default "HLA:A*02:01" will b
 * `--peptide-length`: Length of vaccine peptide (window around mutation, default 31)
 * `--min-peptide-padding`: Minimum number of wildtype residues before or after a mutation 
 * `--all-possible-vaccine-peptides`: Instead of showing best sliding window, show all possible vaccine peptides
-* `--epitopes-output`: CSV output file for dataframe containing scored epitopes
-* `--peptides-output`: CSV output file for dataframe containing scored vaccine
 * `--print-epitopes`: Print dataframe with epitope scores
 * `--print-peptides`: Print dataframe with vaccine peptide scores
-* `--html-report`: Path to HTML report containing scored peptides and epitopes
-* `--html-vaccine-report`: Path to HTML report containing scored vaccine peptides
+* `--epitopes-path`: CSV output file for dataframe containing scored epitopes
+* `--report-path`: Path to HTML report containing scored vaccine peptides and epitopes
 * `--random-mhc`: Random values instead for MHC binding prediction
 * `--iedb-mhc`: Use IEDB's web API for MHC binding
 * `--skip-mhc`: Don't predict MHC binding
@@ -44,3 +42,5 @@ If you don't either an `hla` or `hla-file` then the default "HLA:A*02:01" will b
 * [NumPy](http://www.numpy.org/)
 * [pandas](http://pandas.pydata.org/)
 * [BioPython](http://biopython.org/wiki/Main_Page)
+
+You must either have [netMHCpan](http://www.cbs.dtu.dk/services/NetMHCpan/) installed locally or pass the `iedb-mhc` flag to use a web-based MHC binding predictor. 

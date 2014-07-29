@@ -56,7 +56,8 @@ def load_file(
         - SourceSequence : region of protein around mutation
         - MutationStart : first amino acid modified
         - MutationEnd : last mutated amino acid
-        - MutationInfo : annotation i.e. V600E
+        - GeneMutationInfo : original genetic variant e.g. chr3 g.484899 C>T
+        - PeptideMutationInfo : annotation e.g. V600E
     """
 
     if input_filename.endswith(".fasta") \
@@ -126,11 +127,13 @@ def load_file(
 
         def success(row):
             new_rows.append(row)
-            msg = "SUCCESS: Gene = %s, Mutation = %s" % (row['Gene'], row['MutationInfo'])
+            msg = "SUCCESS: Gene = %s, Mutation = %s" % (row['Gene'], row['PeptideMutationInfo'])
             variant_report[key] = msg
 
         logging.info("Processing %s, transcript %s", mutation_description, transcript_id)
-            
+        
+        if chromosome.upper().startswith("M"):
+            skip("Mitochondrial DNA is insane, don't even bother")
 
         padding = max_peptide_length - 1 
         if transcript_id:
@@ -173,7 +176,11 @@ def load_file(
                 row['SourceSequence'] = seq
                 row['MutationStart'] = start
                 row['MutationEnd'] = stop
-                row['MutationInfo'] = annot
+                gene_mutation_info = "chr%s %s" % (
+                    chromosome, 
+                    gene_mutation_description(pos, ref, alt)) 
+                row['GeneMutationInfo'] = gene_mutation_info
+                row['PeptideMutationInfo'] = annot
                 try:
                     gene = gene_names.transcript_id_to_gene_name(transcript_id)
                 except:

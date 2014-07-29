@@ -56,7 +56,8 @@ def load_strings(strings, source = 'commandline'):
         row['MutationEnd'] = stop
         row['GeneInfo'] = source
         row['Gene'] = '-'
-        row['MutationInfo'] = "-"
+        row['GeneMutationInfo'] = "-"
+        row['PeptideMutationInfo'] = "-"
         row['TranscriptId'] = "-"
 
         rows.append(row)
@@ -67,7 +68,8 @@ def load_strings(strings, source = 'commandline'):
             'MutationEnd',
             'GeneInfo',
             'Gene',
-            'MutationInfo',
+            'GeneMutationInfo',
+            'PeptideMutationInfo',
             'TranscriptId',
         ))
 

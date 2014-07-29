@@ -62,7 +62,7 @@
           {
             sequence: "${peptide['Peptide']}", 
             length : ${len(peptide['Peptide'])},
-            mutation : "${peptide['MutationInfo']}", 
+            mutation : "${peptide['PeptideMutationInfo']}", 
             gene : "${peptide['Gene']}",
             transcriptId : "${peptide['TranscriptId']}",
             description : "${peptide['Description']}",
