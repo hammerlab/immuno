@@ -27,64 +27,46 @@ from snpeff import load_snpeff
 from maf import load_maf
 from fasta import load_fasta
 
-def load_file(
-        input_filename, 
-        min_peptide_length = 9, 
-        max_peptide_length = 31):
+def maf_to_vcf(maf_df):
     """
-    Load mutatated peptides from FASTA, VCF, or MAF file. 
+    Convert DataFrame with columns from MAF file to DataFrame with columns 
+    from VCF 
+    """
+    # rename columns from MAF file to make them compatible with VCF names 
+    ref = maf_df['Reference_Allele'].str.replace("-", "")
+    alt1 = maf_df['Tumor_Seq_Allele1'].str.replace("-", "")
+    vcf_df = pd.DataFrame({
+        'pos' : maf_df['Start_Position'],
+        'chr' : maf_df['Chromosome'],
+        'id' : maf_df['dbSNP_RS'],
+        'ref' : maf_df['Reference_Allele'].str.replace("-", ""),
+        'alt' : alt1, 
+        'info' : maf_df['Hugo_Symbol'],
+    })
+    # use the second tumor allele if the first matches the reference
+    alt2 = maf_df['Tumor_Seq_Allele2'].str.replace("-", "")
+    use_alt2 = alt1 == ref
+    vcf_df['alt'][use_alt2] = alt2[use_alt2]
+    return vcf_df
+
+def expand_transcripts(vcf_df, patient_id, min_peptide_length = 9, max_peptide_length = 31):
+    """
+    Applies genomic variants to all possible transcripts. 
 
     Parameters
     --------
 
-    input_filename : str 
+    vcf_df : DataFrame 
+        Required to have basic variant columns (chr, pos, ref, alt)
 
-    min_peptide_length : int, optional 
+    patient_id : str 
 
-    max_peptide_length : int, optional 
+    min_peptide_length : int 
 
-    transcript_log_filename : str, optional
-        Write out transcript dataframe to CSV with the given filename 
-
-    Returns a dataframe with columns:
-        - chr : chomosome
-        - pos : position in the chromosome
-        - ref : reference DNA
-        - alt : alternate DNA
-        - info : gene name and entrez gene ID
-        - stable_id_transcript : Ensembl transcript ID
-        - SourceSequence : region of protein around mutation
-        - MutationStart : first amino acid modified
-        - MutationEnd : last mutated amino acid
-        - GeneMutationInfo : original genetic variant e.g. chr3 g.484899 C>T
-        - PeptideMutationInfo : annotation e.g. V600E
+    max_peptide_length : int 
     """
 
-    if input_filename.endswith(".fasta") \
-            or input_filename.endswith(".fa"):
-        return load_fasta(input_filename, peptide_length = max_peptide_length)
-
-    # VCF and MAF files give us the raw mutations in genomic coordinates
-    if input_filename.endswith(".vcf"):
-        vcf_df = load_vcf(
-            input_filename, 
-            min_peptide_length = min_peptide_length, 
-            max_peptide_length = max_peptide_length)
-    elif input_filename.endswith(".maf"):
-        maf_df = load_maf(input_filename, max_peptide_length = max_peptide_length)
-        # rename columns from MAF file to make them compatible with VCF names 
-        vcf_df = pd.DataFrame({
-            'pos' : maf_df['Start_Position'],
-            'chr' : maf_df['Chromosome'],
-            'id' : maf_df['dbSNP_RS'],
-            'ref' : maf_df['Reference_Allele'].str.replace("-", ""),
-            'alt' : maf_df['Tumor_Seq_Allele1'].str.replace("-", ""),
-            'info' : maf_df['Hugo_Symbol'],
-        })
-    else:
-        assert False, "Unrecognized file type %s" % input_filename
-
-    assert len(vcf_df)  > 0, "No mutation entries for %s" % input_filename 
+    assert len(vcf_df)  > 0, "No mutation entries for %s" % patient_id 
     
     vcf_df['chr'] = vcf_df.chr.map(normalize_chromosome_name)
     
@@ -92,8 +74,8 @@ def load_file(
     # annotate genomic mutations into all the possible known transcripts they might be on
     transcripts_df = annotation.annotate_vcf_transcripts(vcf_df)
 
-    assert len(transcripts_df) > 0, "No annotated mutation entries for %s" % input_filename
-    logging.info("Annotated input file %s has %d possible transcripts", input_filename, len(transcripts_df))
+    assert len(transcripts_df) > 0, "No annotated mutation entries for %s" % patient_id
+    logging.info("Annotated input %s has %d possible transcripts", patient_id, len(transcripts_df))
     
     new_rows = []
 
@@ -134,14 +116,21 @@ def load_file(
         
         if chromosome.upper().startswith("M"):
             skip("Mitochondrial DNA is insane, don't even bother")
+            continue 
+        elif ref == alt:
+            skip("Not a variant, since ref %s matches alt %s", ref, alt)
+            continue 
 
         padding = max_peptide_length - 1 
         if transcript_id:
-            seq, start, stop, annot = \
-                peptide_from_transcript_variant(
-                    transcript_id, pos, ref, alt,
-                    padding = padding)
-
+            try:
+                seq, start, stop, annot = \
+                    peptide_from_transcript_variant(
+                        transcript_id, pos, ref, alt,
+                        padding = padding)
+            except:
+                error("Failed to apply mutation")
+                continue 
             assert isinstance(start, int), (start, type(start))
             assert isinstance(stop, int), (stop, type(stop))
         else:
@@ -195,13 +184,64 @@ def load_file(
     peptides['TranscriptId'] = peptides['stable_id_transcript'] 
 
     transcripts_df = transcripts_df.merge(peptides)
-    logging.info("Generated %d peptides from %s",
-        len(transcripts_df), input_filename)
+    logging.info("Generated %d peptides from %s", len(transcripts_df), patient_id)
 
     # drop verbose or uninteresting columns from VCF
     for dumb_field in ('description_gene', 'filter', 'qual', 'id', 'name', 'info', 'stable_id_transcript'):
         if dumb_field in transcripts_df.columns:
             transcripts_df = transcripts_df.drop(dumb_field, axis = 1)
-
     
     return transcripts_df, vcf_df, variant_report 
+
+def load_variants(input_filename):
+    """
+    Read the input file into a DataFrame containing (at least) the basic columns of a VCF:
+        - chr 
+        - pos 
+        - ref 
+        - alt 
+    """
+    # VCF and MAF files give us the raw mutations in genomic coordinates
+    if input_filename.endswith(".vcf"):
+        vcf_df = load_vcf(input_filename)
+    elif input_filename.endswith(".maf"):
+        maf_df = load_maf(input_filename)
+        vcf_df = maf_to_vcf(maf_df)
+    else:
+        assert False, "Unrecognized file type %s" % input_filename
+    return vcf_df 
+
+def load_file(input_filename, min_peptide_length = 9, max_peptide_length = 31):
+    """
+    Load mutatated peptides from FASTA, VCF, or MAF file. For the latter two formats, 
+    expand their variants across all annotated transcripts.  
+
+    Parameters
+    --------
+
+    input_filename : str 
+
+    min_peptide_length : int 
+
+    max_peptide_length : int 
+
+    Returns a dataframe with columns:
+        - chr : chomosome
+        - pos : position in the chromosome
+        - ref : reference DNA
+        - alt : alternate DNA
+        - info : gene name and entrez gene ID
+        - stable_id_transcript : Ensembl transcript ID
+        - SourceSequence : region of protein around mutation
+        - MutationStart : first amino acid modified
+        - MutationEnd : last mutated amino acid
+        - GeneMutationInfo : original genetic variant e.g. chr3 g.484899 C>T
+        - PeptideMutationInfo : annotation e.g. V600E
+    """
+
+    if input_filename.endswith(".fasta") \
+            or input_filename.endswith(".fa"):
+        return load_fasta(input_filename, peptide_length = max_peptide_length)
+
+    vcf_df = load_variants(input_filename)
+    return expand_transcripts(vcf_df, input_filename, min_peptide_length = min_peptide_length, max_peptide_length = max_peptide_length)

@@ -20,22 +20,13 @@ import numpy as np
 from ensembl import annotation, gene_names 
 from ensembl.transcript_variant import peptide_from_transcript_variant
 
-def load_vcf(
-        input_filename,
-        min_peptide_length=9,
-        max_peptide_length = 31, 
-        drop_low_quality = True):
+def load_vcf(input_filename, drop_low_quality = True):
     """
     Parameters
     --------
 
     input_filename : str
         Path to VCF file
-
-    min_peptide_length : int
-        Shortest possible vaccine peptides be, used to determine
-        required padding.
-
 
     drop_low_quality : bool, optional
         Keep variants whose 'QUAL' columns doesn't say 'PASS' or '.'

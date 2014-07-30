@@ -44,21 +44,32 @@ MAF_COLUMN_NAMES =  [
     'Match_Norm_Seq_Allele1',
     'Match_Norm_Seq_Allele2',
 ]
-
-def load_maf(
-        filename,
-        max_peptide_length=31,
-        nrows = None):
+def load_maf(filename, nrows = None, verbose = True):
+    """
+    Load the guaranteed columns of a TCGA MAF file into a DataFrame
+    """
     logging.info("Opening %s" % filename)
-    with open(filename) as fd:
-        lines_to_skip = 0
-        while next(fd).startswith('#'):
-            lines_to_skip += 1
-    return pandas.read_csv(
-        filename, 
-            skiprows=lines_to_skip, 
-            sep="\t", 
-            usecols = range(len(MAF_COLUMN_NAMES)),
-            low_memory=False, 
-            names=MAF_COLUMN_NAMES)
 
+    # skip comments and optional header
+    with open(filename) as f:
+        lines_to_skip = 0
+        for line in f:
+            if line.startswith("#") or line.startswith("Hugo_Symbol"):
+                lines_to_skip += 1
+            else:
+                break 
+    df = pandas.read_csv(
+        filename, 
+        skiprows=lines_to_skip, 
+        sep="\t", 
+        usecols = range(len(MAF_COLUMN_NAMES)),
+        low_memory=False, 
+        names=MAF_COLUMN_NAMES)
+    if verbose:
+        print df[['NCBI_Build', 'Variant_Type','Chromosome', 'Start_Position', 'Reference_Allele',
+                  'Tumor_Seq_Allele1', 'Tumor_Seq_Allele2', 'Tumor_Sample_Barcode']]
+    build_37 = df['NCBI_Build'] == 37
+    build_hg19 = df['NCBI_Build'].astype(str) == 'hg19'
+    ok_reference = build_37 | build_hg19
+    assert ok_reference.all(), "Invalid NCBI build '%s' in MAF file %s" % (df[~ok_reference]['NCBI_Build'].ix[0], filename)
+    return df 
