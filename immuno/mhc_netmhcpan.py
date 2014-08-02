@@ -1,5 +1,5 @@
 
-import subprocess 
+from subprocess import Popen, CalledProcessError, check_output, PIPE
 import tempfile
 import os
 import logging
@@ -86,7 +86,7 @@ def build_output_rows(epitopes_df, peptide_entries, allele):
 
 class PanBindingPredictor(object):
     def __init__(self, hla_alleles):
-        valid_alleles_str = subprocess.check_output(["netMHCpan", "-listMHC"])
+        valid_alleles_str = check_output(["netMHCpan", "-listMHC"])
         valid_alleles = set([])
         for line in valid_alleles_str.split("\n"):
             if not line.startswith("#"):
@@ -99,6 +99,9 @@ class PanBindingPredictor(object):
                 print "Skipping %s (not available in NetMHCpan)" % allele
             else:
                 self.alleles.append(allele)
+        # don't run the MHC predictor twice for homozygous alleles,
+        # only run it for unique alleles
+        self.alleles = set(self.alleles)
 
 
     def predict(self, df):
@@ -116,20 +119,61 @@ class PanBindingPredictor(object):
             - TranscriptId
         """
 
-
         input_filename, peptide_entries = create_input_fasta_file(df)
 
-        results = []
-        for allele in self.alleles:
-            output_file = tempfile.NamedTemporaryFile("w", prefix="netMHCpan_output", delete=False)
-            command = ["netMHCpan",  "-xls", "-xlsfile", output_file.name, "-l", "9", "-f", input_filename, "-a", allele.replace("*", "")]
-            print "Calling netMHCpan for %s" % allele 
-            print " ".join(command)
-            subprocess.check_output(command)
-            epitopes_df = pd.read_csv(output_file.name, sep='\t', skiprows = 1)
-            output_file.close()
-            os.remove(output_file.name)
-            results.extend(build_output_rows(epitopes_df, peptide_entries, allele))
-        os.remove(input_filename)
+        output_files = {}
+        processes = {}
+        process_commands = {}
+
+        def cleanup():
+            """
+            Cleanup either when finished or if an exception gets raised by 
+            killing all the running netMHCpan processes and deleting the input 
+            and output files
+            """
+            for p in processes.itervalues():
+                try:
+                    p.kill()
+                except:
+                    pass 
+            
+            for output_file in output_files.itervalues():
+                try:
+                    output_file.close()
+                    os.remove(output_file.name)
+                except:
+                    pass 
+
+            os.remove(input_filename)
+
+
+        try:
+            # map each allele onto a pair of its output file and process which is running netMHCpan
+            for allele in self.alleles:
+                output_file = tempfile.NamedTemporaryFile("w", prefix="netMHCpan_output", delete=False)
+                command = ["netMHCpan",  "-xls", "-xlsfile", output_file.name, "-l", "9", "-f", input_filename, "-a", allele.replace("*", "")]
+                print "Calling netMHCpan for %s" % allele 
+                print " ".join(command)
+                process_commands[allele] = command
+                with open(os.devnull, 'w') as devull:
+                    processes[allele] = Popen(command, stdout = devull)
+                output_files[allele] = output_file
+            
+            # wait for each process to be done and collect results into a list of 
+            # records, lateer we'll concatenate them into a single DataFrame
+            results = []
+            for allele, process in processes.iteritems():
+                output_file = output_files[allele]
+                ret_code = process.wait()
+                if ret_code:
+                    logging.info("%s finished with return code %s", allele, ret_code)
+                    raise CalledProcessError(ret_code, process_commands[allele])
+                epitopes_df = pd.read_csv(output_file.name, sep='\t', skiprows = 1)
+                results.extend(build_output_rows(epitopes_df, peptide_entries, allele))
+        except:
+            cleanup()
+            raise 
+        
+        cleanup()
         assert len(results) > 0, "No epitopes from netMHCpan"
         return pd.DataFrame.from_records(results)

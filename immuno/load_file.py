@@ -128,6 +128,8 @@ def expand_transcripts(vcf_df, patient_id, min_peptide_length = 9, max_peptide_l
                     peptide_from_transcript_variant(
                         transcript_id, pos, ref, alt,
                         padding = padding)
+            except KeyboardInterrupt:
+                raise 
             except:
                 error("Failed to apply mutation")
                 continue 
@@ -150,7 +152,7 @@ def expand_transcripts(vcf_df, patient_id, min_peptide_length = 9, max_peptide_l
                     "Found stop codon in peptide %s from transcript_id %s",
                     seq,
                     transcript_id)
-            if not is_valid_peptide(seq):
+            elif not is_valid_peptide(seq):
                 error(
                     "Invalid peptide sequence for transcript_id %s: %s",
                     transcript_id, 

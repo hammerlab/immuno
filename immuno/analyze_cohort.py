@@ -54,7 +54,7 @@ parser.add_argument("--hla-dir",
     help = "Directory containing HLA allele files (with suffix .hla), if omitted assumed to be same as input-dir")
 
 parser.add_argument("--output",
-    default = None, 
+    default = "analyze_cohort_results.csv", 
     help = "Path to output file")
 
 
@@ -77,7 +77,7 @@ parser.add_argument("--combined-maf",
 
 MUTATION_FILE_EXTENSIONS = [".maf", ".vcf"]
 
-def find_mutation_files(input_dir_string, combined_maf = False, max_peptide_length = 21):
+def find_mutation_files(input_dir_string, combined_maf = False, max_peptide_length = 31):
     """
     Collect all .vcf/.maf file paths in the dir(s) given as a comma-separated string.
     Returns a dictionary mapping patient IDs to DataFrames containing basic
@@ -143,20 +143,26 @@ def find_hla_files(input_dir_string, permissive_hla_parsing = True):
                 hla_types[patient_id] = alleles
     return hla_types
 
-def generate_mutation_counts(mutation_files, hla_types, max_peptide_length = 21):
+def generate_mutation_counts(mutation_files, hla_types, max_peptide_length = 31, output_file = None):
     """
-    Returns dictionary that maps each patient ID to a tuple with three fields:
+    Returns dictionary that maps each patient ID to a tuple with six fields:
+        - total number of mutated epitopes across all transcripts
         - number of mutated genes
         - number of mutated genes with MHC binding mutated epitope
-        - number of mutated genes with immunogenic mutated epitope
+        - number of mutated epitopes which are predicted to bind to an MHC allele 
+        - number of mutated genes with at least one immunogenic mutated epitope
+        - number of mutated epitopes which are predicted to be immunogenic (MHC binder + non-self)
     """
     mutation_counts = OrderedDict()
-    for patient_id, vcf_df in mutation_files.iteritems():
+    n = len(mutation_files)
+    for i, (patient_id, vcf_df) in enumerate(mutation_files.iteritems()):
         hla_allele_names = hla_types[patient_id]
-        logging.info("Processing %s with HLA alleles %s", patient_id, hla_allele_names)
+        logging.info("Processing %s (#%d/%d) with HLA alleles %s", patient_id, i+1, n, hla_allele_names)
         try:
             transcripts_df, raw_genomic_mutation_df, variant_report = \
                 expand_transcripts(vcf_df, patient_id, max_peptide_length = max_peptide_length)
+        except KeyboardInterrupt:
+            raise
         except:
             logging.warning("Failed to apply mutations for %s", patient_id)
             continue 
@@ -175,17 +181,23 @@ def generate_mutation_counts(mutation_files, hla_types, max_peptide_length = 21)
 
         grouped = scored_epitopes.groupby(["Gene", "GeneMutationInfo"])
         n_coding_mutations = len(grouped)
+        n_epitopes = 0
         n_ligand_mutations = 0
+        n_ligands = 0
         n_immunogenic_mutations = 0
+        n_immunogenic_epitopes = 0
         for (gene, mut), group in grouped:
-            start_mask = group.EpitopeStart <= group.MutationEnd
-            stop_mask = group.EpitopeEnd >= group.MutationStart 
+            start_mask = group.EpitopeStart < group.MutationEnd
+            stop_mask = group.EpitopeEnd > group.MutationStart 
             mutated_epitopes = group[start_mask & stop_mask]
             # we might have duplicate epitopes from multiple transcripts, so drop them
             mutated_epitopes = mutated_epitopes.groupby(['Epitope']).first()
+            n_epitopes += len(mutated_epitopes)
             ligands = mutated_epitopes[mutated_epitopes.MHC_IC50 <= args.binding_threshold]
+            n_ligands += len(ligands)
             n_ligand_mutations += len(ligands) > 0 
             immunogenic_epitopes = ligands[~ligands.ThymicDeletion]
+            n_immunogenic_epitopes += len(immunogenic_epitopes)
             n_immunogenic_mutations += len(immunogenic_epitopes) > 0
             logging.info("%s %s: epitopes %s, ligands %d, imm %d", 
                     gene,
@@ -193,7 +205,19 @@ def generate_mutation_counts(mutation_files, hla_types, max_peptide_length = 21)
                     len(mutated_epitopes),
                     len(ligands),
                     len(immunogenic_epitopes))
-        mutation_counts[patient_id] = (n_coding_mutations, n_ligand_mutations, n_immunogenic_mutations)
+        result_tuple = (
+            n_coding_mutations, 
+            n_epitopes,
+            n_ligand_mutations, 
+            n_ligands, 
+            n_immunogenic_mutations,
+            n_immunogenic_epitopes,
+        )
+        if output_file:
+            data_string = ",".join(str(d) for d in result_tuple)
+            output_file.write("%s,%s\n" % (patient_id, data_string))
+            output_file.flush()
+        mutation_counts[patient_id] = result_tuple
     return mutation_counts
 
 if __name__ == "__main__":
@@ -211,35 +235,38 @@ if __name__ == "__main__":
     # make sure we have HLA types for each patient
     for patient_id in mutation_files.iterkeys():
         if patient_id not in hla_types:
-            logging.warning("Missing HLA types for %s", patient_id)
             missing.add(patient_id)
-    logging.info("Missing HLA types for %d / %d patients", len(missing), len(mutation_files))
+    if len(missing) > 0:
+        logging.warning("Missing HLA types for %s", list(missing))
 
+    logging.info("Total missing HLA types: %d / %d patients", len(missing), len(mutation_files))
+    
     for patient_id in missing:
-        del mutation_files[patient_id]
+            del mutation_files[patient_id]
+    
 
-    mutation_counts = generate_mutation_counts(mutation_files, hla_types)
-    
-    if args.output:
-        output_file = open(args.output, 'w')
-    else:
-        output_file = None
-    
+
+    output_file = open(args.output, 'w')
+    mutation_counts = generate_mutation_counts(mutation_files, hla_types, output_file = output_file)
+    output_file.close()
+
     print
     print "SUMMARY"    
-    for patient_id, (n_coding_mutations, n_ligand_mutations, n_immunogenic_mutations) in mutation_counts.iteritems():
-        print "%s: # mutations %d, # mutations with ligands %d, # immunogenic mutations %d" % (
+    for patient_id, fields in mutation_counts.iteritems():
+        (
+          n_coding_mutations, n_epitopes, 
+          n_ligand_mutations, n_ligands, 
+          n_immunogenic_mutations, n_immunogenic_epitopes
+        ) = fields
+        print \
+            "%s: # mutations %d (%d epitopes), # mutations with ligands %d (%d epitopes), # immunogenic mutations %d (%d epitopes)" % (
             patient_id, 
             n_coding_mutations, 
+            n_epitopes,
             n_ligand_mutations, 
-            n_immunogenic_mutations
+            n_ligands,
+            n_immunogenic_mutations,
+            n_immunogenic_epitopes
         )
-        if output_file:
-            output_file.write("%s,%d,%d,%d\n" % (patient_id, 
-                n_coding_mutations, 
-                n_ligand_mutations, 
-                n_immunogenic_mutations)
-            )
-    if output_file:
-        output_file.close()
-        
+
+    

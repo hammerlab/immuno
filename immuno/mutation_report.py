@@ -98,7 +98,7 @@ parser.add_argument("--report-path",
 
 def print_mutation_report(input_filename, variant_report, raw_genomic_mutation_df, transcripts_df):
     print 
-    print "MUTATION LOADING REPORT FOR", input_filename 
+    print "MUTATION REPORT FOR", input_filename 
     print 
     last_mutation = None 
     for (mutation_description, transcript_id), msg in variant_report.iteritems():

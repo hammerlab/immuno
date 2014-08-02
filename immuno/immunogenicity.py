@@ -69,7 +69,7 @@ class ImmunogenicityPredictor(object):
         self.binding_threshold = binding_threshold
         self.first_position = first_position
         self.last_position = last_position
-        self.alleles = [compact_hla_allele_name(allele) for allele in alleles]
+        self.alleles = set([compact_hla_allele_name(allele) for allele in alleles])
         self.data_path = data_path
 
         assert exists(self.data_path), "Directory with thymic peptides (%s) does not exist" % self.data_path
