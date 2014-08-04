@@ -70,12 +70,15 @@ def get_strand(transcript_id):
 
     Return strand : int, +1 for forward strand else -1
     """
-    exons = data.transcript_exons_groups.get_group(transcript_id)
-    
+    try:
+        exons = data.transcript_exons_dict[transcript_id]
+    except KeyError:
+        exons = []
+
     if len(exons) == 0:
         logging.warn("Transcript %s has no sequence information", transcript_id)
         return 1
-    strand = list(exons['seq_region_strand_gene'])[0]
+    strand = exons['seq_region_strand_gene'].iget(0)
     return strand
 
 def is_forward_strand(transcript_id):

@@ -67,21 +67,34 @@ class EnsemblAnnotationData(object):
         return pd.read_csv(path, sep='\t', low_memory = False)
         
     @cached_property
-    def transcript_exons_groups(self):
-        """
-        Mapping from stable_id_transcript to groupby objects of the exons dataframe
-        """
-        exons_df = self.exons_dataframe
-        return exons_df.groupby('stable_id_transcript', sort = False)
-    
-    @cached_property
     def transcript_exons_dict(self):
         """
-        Mapping from stable_id_transcript to groupby objects of the exons dataframe
+        Mapping from stable_id_transcript to DataFrame of that transcript's exons
         """
-        transcript_groups = self.transcript_exons_groups
-        return dict((k,v) for k,v in transcript_groups)
+        class DelayedDict(object):
+            def __init__(self, exons_df):
+                self.exons_df = exons_df
+                self.groupby_object = exons_df.groupby(['stable_id_transcript'])
+                self.group_indices = self.groupby_object.groups 
+                self._d = {}
 
+            def __getitem__(self, transcript_id):
+                # have we retrieved this transcript_id before?
+                if transcript_id in self._d:
+                    return self._d[transcript_id]
+                # is this transcript in the original exons DataFrame?    
+                if transcript_id not in self.group_indices:
+                    raise KeyError(transcript_id)
+                # which rows had the given transcript id?
+                indices = self.group_indices[transcript_id]
+                subset = self.exons_df.ix[indices]
+                self._d[transcript_id] = subset 
+                return subset 
+
+            def __contains__(self, transcript_id):
+                return transcript_id in self.group_indices
+
+        return DelayedDict(self.exons_dataframe)
 
     @cached_property
     def start_exons_dataframe(self):

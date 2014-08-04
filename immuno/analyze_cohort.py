@@ -30,7 +30,7 @@ Example usage:
 import argparse 
 import logging
 from os import listdir
-from os.path import join, split, splitext
+from os.path import join, split, splitext, abspath
 from collections import OrderedDict
 
 from common import init_logging
@@ -43,15 +43,19 @@ from mutation_report import print_mutation_report
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--input-dir",
-      type = str, 
-      required = True, 
+group = parser.add_mutually_exclusive_group(required=True)
+group.add_argument("--input-dir", 
+    type = str,  
     help="Directory containing MAF or VCF input files")
+
+group.add_argument("--input-file",
+    type = str, 
+    help="Single MAF or VCF input file")
 
 parser.add_argument("--hla-dir",
     type = str, 
     default = None, 
-    help = "Directory containing HLA allele files (with suffix .hla), if omitted assumed to be same as input-dir")
+    help = "Directory containing HLA allele files (with suffix .hla)")
 
 parser.add_argument("--output",
     default = "analyze_cohort_results.csv", 
@@ -77,37 +81,38 @@ parser.add_argument("--combined-maf",
 
 MUTATION_FILE_EXTENSIONS = [".maf", ".vcf"]
 
-def find_mutation_files(input_dir_string, combined_maf = False, max_peptide_length = 31):
+def find_mutation_files(input_files,  combined_maf = False, max_peptide_length = 31):
     """
-    Collect all .vcf/.maf file paths in the dir(s) given as a comma-separated string.
+    Collect all .vcf/.maf file paths in the `input_filenames` list. 
+
     Returns a dictionary mapping patient IDs to DataFrames containing basic
     variant information (chr, pos, ref, alt). The patient IDs will be each filename 
     without its extension, unless the argument combined_maf is True. In this case, 
     patient IDs are derived from the tumor barcode column in each MAF file. 
     """
     mutation_files = OrderedDict()
-    for dirpath in input_dir_string.split(","):
-        for filename in listdir(dirpath):
-            path = join(dirpath, filename)
-            base, ext = splitext(filename)
-            if ext in MUTATION_FILE_EXTENSIONS:
-                logging.info("Reading mutation file %s", path)
-                if ext.endswith('maf') and combined_maf:
-                    maf_df = load_maf(path)
-                    file_patients = {}
-                    for patient_id, group_df in maf_df.groupby(['Tumor_Sample_Barcode']):
-                        vcf_df = maf_to_vcf(group_df)
-                        file_patients[patient_id] = vcf_df 
-                else:
-                    patient_id = base 
-                    vcf_df = load_variants(path)
-                    file_patients = {patient_id : vcf_df}
+    
+    for path in input_filenames:
+        dirpath, flename = split(path)
+        base, ext = splitext(filename)
+        if ext in MUTATION_FILE_EXTENSIONS:
+            logging.info("Reading mutation file %s", path)
+            if ext.endswith('maf') and combined_maf:
+                maf_df = load_maf(path)
+                file_patients = {}
+                for patient_id, group_df in maf_df.groupby(['Tumor_Sample_Barcode']):
+                    vcf_df = maf_to_vcf(group_df)
+                    file_patients[patient_id] = vcf_df 
+            else:
+                patient_id = base 
+                vcf_df = load_variants(path)
+                file_patients = {patient_id : vcf_df}
 
-                for patient_id, vcf_df in file_patients.iteritems():
-                    patient_id = "-".join(patient_id.split("-")[:3])
-                    assert patient_id not in mutation_files, \
-                        "Already processed patient %s before file %s" % (patient_id, path)
-                    mutation_files[patient_id] = vcf_df
+            for patient_id, vcf_df in file_patients.iteritems():
+                patient_id = "-".join(patient_id.split("-")[:3])
+                assert patient_id not in mutation_files, \
+                    "Already processed patient %s before file %s" % (patient_id, path)
+                mutation_files[patient_id] = vcf_df
     return mutation_files
 
 def find_hla_files(input_dir_string, permissive_hla_parsing = True):
@@ -170,13 +175,13 @@ def generate_mutation_counts(mutation_files, hla_types, max_peptide_length = 31,
         # and either why it failed or what protein mutation resulted
         if not args.quiet:
             print_mutation_report(patient_id, variant_report, raw_genomic_mutation_df, transcripts_df)
-
+        logging.info("Calling MHC binding predictor for %s (#%d/%d)", patient_id, i+1, n)
         mhc = PanBindingPredictor(hla_allele_names)
+        scored_epitopes = mhc.predict(transcripts_df, mutation_window_size = 9)
+
         imm = ImmunogenicityPredictor(
             alleles = hla_allele_names, 
             binding_threshold = args.binding_threshold)
-
-        scored_epitopes = mhc.predict(transcripts_df)
         scored_epitopes = imm.predict(scored_epitopes)
 
         grouped = scored_epitopes.groupby(["Gene", "GeneMutationInfo"])
@@ -224,11 +229,22 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     init_logging(args.quiet)
-    mutation_files = find_mutation_files(args.input_dir, args.combined_maf)
+
+    input_filenames = []
+    if args.input_file:
+        for filename in args.input_file.split(","):
+            input_filenames.append(abspath(filename))
+    if args.input_dir:
+        for dirpath in args.input_dir.split(","):
+            for filename in listdir(dirpath):
+                path = join(dirpath, filename)
+                input_filenames.append(path)
+    mutation_files = find_mutation_files(input_filenames, args.combined_maf)
 
     # if no HLA input dir is specified then assume .hla files in the same dir
     # as the .maf/.vcf files 
     hla_dir_arg = args.hla_dir if args.hla_dir else args.input_dir
+    assert hla_dir_arg, "Specify HLA directory via --hla-dir argument"
     hla_types = find_hla_files(hla_dir_arg)
     
     missing = set([])
@@ -242,9 +258,8 @@ if __name__ == "__main__":
     logging.info("Total missing HLA types: %d / %d patients", len(missing), len(mutation_files))
     
     for patient_id in missing:
-            del mutation_files[patient_id]
+        del mutation_files[patient_id]
     
-
 
     output_file = open(args.output, 'w')
     mutation_counts = generate_mutation_counts(mutation_files, hla_types, output_file = output_file)
