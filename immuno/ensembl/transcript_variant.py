@@ -54,10 +54,6 @@ def peptide_from_transcript_variant(
     forward = annotation.is_forward_strand(transcript_id)
     ref = ref if forward else annotation.reverse_complement(ref)
     alt = alt if forward else annotation.reverse_complement(alt)
-    if not forward:
-        logging.info("Backward strand, transcript_id = %s, cDNA change is %s", 
-            transcript_id, 
-            gene_mutation_description(pos, ref, alt))
     transcript = _ensembl.get_cds(transcript_id)
     
     def error_result(msg, *args):

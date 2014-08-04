@@ -3,6 +3,7 @@ from subprocess import Popen, CalledProcessError, check_output, PIPE
 import tempfile
 import os
 import logging
+import time 
 
 import numpy as np
 import pandas as pd 
@@ -10,9 +11,11 @@ from epitopes.mutate import gene_mutation_description
 
 from mhc_common import normalize_hla_allele_name
 
-def create_input_fasta_file(df):
+def create_input_fasta_file(df, mutation_window_size = None):
     """
-    Turn peptide entries from a dataframe into a FASTA file. 
+    Turn peptide entries from a dataframe into a FASTA file. If mutation_window_size is 
+    an integer >0 then only use subsequence around mutated residues. 
+
     Return the name of closed file which has to be manually deleted, and a dictionary from 
     FASTA IDs to peptide records. 
     """
@@ -25,8 +28,13 @@ def create_input_fasta_file(df):
     # put the entries into a dictionary so we can read out the results later
     for i, mutation_entry in enumerate(records):
         seq =  mutation_entry['SourceSequence']
+        if mutation_window_size:
+            start = max(0, mutation_entry.MutationStart - mutation_window_size)
+            stop = min(len(seq), mutation_entry.MutationEnd + mutation_window_size)
+            seq = seq[start:stop]
         identifier = "%s_%s" % (i, mutation_entry['Gene'][:5])
         peptide_entries[identifier] = mutation_entry
+
         input_file.write(">%s\n" % identifier)
         input_file.write(seq)
         # newline unless at end of file
@@ -38,21 +46,46 @@ def create_input_fasta_file(df):
 def bad_binding_score(x):
     return x < 0 or np.isnan(x) or np.isinf(x)
 
-def build_output_rows(epitopes_df, peptide_entries, allele):
+def build_output_rows(lines, peptide_entries, mutation_window_size = None):
+    """
+    First line of XLS file format has HLA alleles
+    and second line has fields like:
+        ['Pos', 'Peptide', 'ID', 
+         '1-log50k', 'nM', 'Rank', 
+         '1-log50k', 'nM', 'Rank', 
+         '1-log50k', 'nM', 'Rank', 
+         ...'Ave', 'NB']
+    """
+    lines = [line.split("\t") for line in lines if len(line) > 0]
+    alleles = [x for x in lines[0] if len(x) > 0]
+    # skip alleles and column headers
+    lines = lines[2:]
     results = []
-    for identifier, group in epitopes_df.groupby("ID"):
+    for line in lines[2:]:
+        pos = int(line[0])
+        epitope = line[1]
+        identifier = line[2]
         assert identifier in peptide_entries, "Bad identifier %s, epitopes = %s" % (identifier, epitopes.head())
         mutation_entry = peptide_entries[identifier]
-        # columns: Pos    Peptide   ID  1-log50k          nM  Rank
-        for epitope_row in group.to_records():
-            pos = epitope_row['Pos']
-            epitope = epitope_row['Peptide']
-            ic50 = epitope_row['nM']
-            rank = epitope_row['Rank']
+
+        if mutation_window_size:
+            # if we clipped parts of the amino acid sequence which don't overlap mutations
+            # then we have to offset epitope positions by however much was removed from the 
+            # beginning of the sequence
+            original_start = max(0, mutation_entry.MutationStart - mutation_window_size)
+            pos += original_start
+
+        for i, allele in enumerate(alleles):
+            
+            # we start at an offset of 3 to skip the allele-invariant pos, epitope, identifier columns
+            # each allele has three columns: log IC50, IC50, rank 
+            log_ic50 = float(line[3+3*i])
+            ic50 = float(line[3+3*i+1])
+            rank = float(line[3+3*i+2])
+            
             # if we have a bad IC50 score we might still get a salvageable 
             # log of the score. Strangely, this is necessary sometimes! 
             if bad_binding_score(ic50):
-                log_ic50 = epitope_row['1-log50k']
                 ic50 = 50000 ** (-log_ic50 + 1)
 
             if bad_binding_score(ic50): 
@@ -75,7 +108,7 @@ def build_output_rows(epitopes_df, peptide_entries, allele):
             new_row['TranscriptId'] = mutation_entry.TranscriptId
 
             # fields specific to this epitope 
-            new_row['Allele'] = allele
+            new_row['Allele'] = normalize_hla_allele_name(allele)
             new_row['EpitopeStart'] = pos 
             new_row['EpitopeEnd'] = pos + len(epitope)
             new_row['Epitope'] = epitope 
@@ -104,9 +137,11 @@ class PanBindingPredictor(object):
         self.alleles = set(self.alleles)
 
 
-    def predict(self, df):
+    def predict(self, df, mutation_window_size = None):
         """
         Given a dataframe of mutated amino acid sequences, run each sequence through NetMHCpan. 
+        If mutation_window_size is not None then only make predictions for that number residues
+        away from mutations. 
 
         Expects the input DataFrame to have the following fields: 
             - SourceSequence
@@ -119,7 +154,8 @@ class PanBindingPredictor(object):
             - TranscriptId
         """
 
-        input_filename, peptide_entries = create_input_fasta_file(df)
+        input_filename, peptide_entries = \
+            create_input_fasta_file(df, mutation_window_size = mutation_window_size)
 
         output_files = {}
         processes = {}
@@ -147,33 +183,28 @@ class PanBindingPredictor(object):
             os.remove(input_filename)
 
 
-        try:
-            # map each allele onto a pair of its output file and process which is running netMHCpan
-            for allele in self.alleles:
-                output_file = tempfile.NamedTemporaryFile("w", prefix="netMHCpan_output", delete=False)
-                command = ["netMHCpan",  "-xls", "-xlsfile", output_file.name, "-l", "9", "-f", input_filename, "-a", allele.replace("*", "")]
-                print "Calling netMHCpan for %s" % allele 
-                print " ".join(command)
-                process_commands[allele] = command
-                with open(os.devnull, 'w') as devull:
-                    processes[allele] = Popen(command, stdout = devull)
-                output_files[allele] = output_file
+        alleles_str = ",".join(allele.replace("*", "") for allele in self.alleles)
+        output_file = tempfile.NamedTemporaryFile("r+", prefix="netMHCpan_output", delete=False)
+        command = ["netMHCpan",  "-xls", "-xlsfile", output_file.name, "-l", "9", "-f", input_filename, "-a", alleles_str]
+        print " ".join(command)
+        try: 
+            start_time = time.time()
+            with open(os.devnull, 'w') as devnull:
+                process = Popen(command, stdout = devnull)
             
-            # wait for each process to be done and collect results into a list of 
-            # records, lateer we'll concatenate them into a single DataFrame
-            results = []
-            for allele, process in processes.iteritems():
-                output_file = output_files[allele]
-                ret_code = process.wait()
-                if ret_code:
-                    logging.info("%s finished with return code %s", allele, ret_code)
-                    raise CalledProcessError(ret_code, process_commands[allele])
-                epitopes_df = pd.read_csv(output_file.name, sep='\t', skiprows = 1)
-                results.extend(build_output_rows(epitopes_df, peptide_entries, allele))
+            ret_code = process.wait()
+            
+            if ret_code:
+                logging.info("netMHCpan finished with return code %s", ret_code)
+                raise CalledProcessError(ret_code, process_commands[allele])
+            else:
+                elapsed_time = time.time() - start_time
+                logging.info("netMHCpan took %0.4f seconds", elapsed_time)
+                lines = output_file.read().split("\n")
+                results = build_output_rows(lines, peptide_entries, mutation_window_size = mutation_window_size)
         except:
             cleanup()
             raise 
-        
         cleanup()
         assert len(results) > 0, "No epitopes from netMHCpan"
         return pd.DataFrame.from_records(results)

@@ -112,7 +112,6 @@ def expand_transcripts(vcf_df, patient_id, min_peptide_length = 9, max_peptide_l
             msg = "SUCCESS: Gene = %s, Mutation = %s" % (row['Gene'], row['PeptideMutationInfo'])
             variant_report[key] = msg
 
-        logging.info("Processing %s, transcript %s", mutation_description, transcript_id)
         
         if chromosome.upper().startswith("M"):
             skip("Mitochondrial DNA is insane, don't even bother")
@@ -123,21 +122,14 @@ def expand_transcripts(vcf_df, patient_id, min_peptide_length = 9, max_peptide_l
 
         padding = max_peptide_length - 1 
         if transcript_id:
-            try:
-                seq, start, stop, annot = \
-                    peptide_from_transcript_variant(
-                        transcript_id, pos, ref, alt,
-                        padding = padding)
-            except KeyboardInterrupt:
-                raise 
-            except:
-                error("Failed to apply mutation")
-                continue 
-            assert isinstance(start, int), (start, type(start))
-            assert isinstance(stop, int), (stop, type(stop))
+            seq, start, stop, annot = \
+                peptide_from_transcript_variant(
+                    transcript_id, pos, ref, alt,
+                    padding = padding)
         else:
             error("Skipping due to invalid transcript ID")
-            continue 
+            continue
+
         if not seq:
             error(annot)
         else:
