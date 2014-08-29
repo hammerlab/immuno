@@ -57,6 +57,7 @@ def build_output_rows(lines, peptide_entries, mutation_window_size = None):
          ...'Ave', 'NB']
     """
     lines = [line.split("\t") for line in lines if len(line) > 0]
+    assert len(lines) > 0, "No output from MHC binding predictor"
     alleles = [x for x in lines[0] if len(x) > 0]
     # skip alleles and column headers
     lines = lines[2:]
@@ -118,18 +119,29 @@ def build_output_rows(lines, peptide_entries, mutation_window_size = None):
     return results 
 
 class PanBindingPredictor(object):
-    def __init__(self, hla_alleles):
-        valid_alleles_str = check_output(["netMHCpan", "-listMHC"])
-        valid_alleles = set([])
-        for line in valid_alleles_str.split("\n"):
-            if not line.startswith("#"):
-                valid_alleles.add(line)
+    def __init__(self, hla_alleles, netmhc_command = None):
+        if netmhc_command is None:
+            netmhc_command = "netMHCpan"
+
+        self.netmhc_command = netmhc_command
+        
+        try:
+            valid_alleles_str = check_output([self.netmhc_command, "-listMHC"], shell=True)
+            assert len(valid_alleles_str) > 0, "%s returned empty allele list" % self.self.netmhc_command
+            valid_alleles = set([])
+            for line in valid_alleles_str.split("\n"):
+                if not line.startswith("#"):
+                    valid_alleles.add(line)
+        except:
+            logging.warning("Failed to run %s -listMHC", self.netmhc_command)
+            valid_alleles = None 
+
         self.alleles = []
         for allele in hla_alleles:
             allele = normalize_hla_allele_name(allele.strip().upper())
             # for some reason netMHCpan drop the "*" in names such as "HLA-A*03:01" becomes "HLA-A03:01"
-            if  allele.replace("*", "") not in valid_alleles:
-                print "Skipping %s (not available in NetMHCpan)" % allele
+            if valid_alleles and (allele.replace("*", "") not in valid_alleles):
+                print "Skipping %s (not available in %s)" % (allele, self.netmhc_command)
             else:
                 self.alleles.append(allele)
         # don't run the MHC predictor twice for homozygous alleles,
@@ -185,7 +197,7 @@ class PanBindingPredictor(object):
 
         alleles_str = ",".join(allele.replace("*", "") for allele in self.alleles)
         output_file = tempfile.NamedTemporaryFile("r+", prefix="netMHCpan_output", delete=False)
-        command = ["netMHCpan",  "-xls", "-xlsfile", output_file.name, "-l", "9", "-f", input_filename, "-a", alleles_str]
+        command = [self.netmhc_command,  "-xls", "-xlsfile", output_file.name, "-l", "9", "-f", input_filename, "-a", alleles_str]
         print " ".join(command)
         try: 
             start_time = time.time()
@@ -195,16 +207,16 @@ class PanBindingPredictor(object):
             ret_code = process.wait()
             
             if ret_code:
-                logging.info("netMHCpan finished with return code %s", ret_code)
+                logging.info("%s finished with return code %s", self.netmhc_command, ret_code)
                 raise CalledProcessError(ret_code, process_commands[allele])
             else:
                 elapsed_time = time.time() - start_time
-                logging.info("netMHCpan took %0.4f seconds", elapsed_time)
+                logging.info("%s took %0.4f seconds", self.netmhc_command, elapsed_time)
                 lines = output_file.read().split("\n")
                 results = build_output_rows(lines, peptide_entries, mutation_window_size = mutation_window_size)
         except:
             cleanup()
             raise 
         cleanup()
-        assert len(results) > 0, "No epitopes from netMHCpan"
+        assert len(results) > 0, "No epitopes from %s" % self.netmhc_command
         return pd.DataFrame.from_records(results)

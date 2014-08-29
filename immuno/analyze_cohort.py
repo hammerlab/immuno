@@ -79,6 +79,12 @@ parser.add_argument("--combined-maf",
 )
 
 
+parser.add_argument("--mhc-command",
+    default = "netMHCpan",
+    help = "Name of external MHC binding predictor (output should be same format as netMHCpan)"
+)
+
+
 MUTATION_FILE_EXTENSIONS = [".maf", ".vcf"]
 
 def find_mutation_files(input_files,  combined_maf = False, max_peptide_length = 31):
@@ -176,7 +182,7 @@ def generate_mutation_counts(mutation_files, hla_types, max_peptide_length = 31,
         if not args.quiet:
             print_mutation_report(patient_id, variant_report, raw_genomic_mutation_df, transcripts_df)
         logging.info("Calling MHC binding predictor for %s (#%d/%d)", patient_id, i+1, n)
-        mhc = PanBindingPredictor(hla_allele_names)
+        mhc = PanBindingPredictor(hla_allele_names, netmhc_command = args.mhc_command)
         scored_epitopes = mhc.predict(transcripts_df, mutation_window_size = 9)
 
         imm = ImmunogenicityPredictor(
