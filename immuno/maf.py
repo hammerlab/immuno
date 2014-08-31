@@ -14,16 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-import gzip, logging, argparse, glob, re, pickle
+import gzip
+import logging
+import argparse
+import glob
+import re
+import pickle
 
 import pandas
 import Bio.SeqIO
 
 import common
 
-
-MAF_COLUMN_NAMES =  [
+MAF_COLUMN_NAMES = [
     'Hugo_Symbol',
     'Entrez_Gene_Id',
     'Center',
@@ -44,7 +47,9 @@ MAF_COLUMN_NAMES =  [
     'Match_Norm_Seq_Allele1',
     'Match_Norm_Seq_Allele2',
 ]
-def load_maf(filename, nrows = None, verbose = True):
+
+
+def load_maf(filename, nrows=None, verbose=True):
     """
     Load the guaranteed columns of a TCGA MAF file into a DataFrame
     """
@@ -57,19 +62,33 @@ def load_maf(filename, nrows = None, verbose = True):
             if line.startswith("#") or line.startswith("Hugo_Symbol"):
                 lines_to_skip += 1
             else:
-                break 
+                break
     df = pandas.read_csv(
-        filename, 
-        skiprows=lines_to_skip, 
-        sep="\t", 
-        usecols = range(len(MAF_COLUMN_NAMES)),
-        low_memory=False, 
+        filename,
+        skiprows=lines_to_skip,
+        sep="\t",
+        usecols=range(len(MAF_COLUMN_NAMES)),
+        low_memory=False,
         names=MAF_COLUMN_NAMES)
     if verbose:
-        print df[['NCBI_Build', 'Variant_Type','Chromosome', 'Start_Position', 'Reference_Allele',
-                  'Tumor_Seq_Allele1', 'Tumor_Seq_Allele2', 'Tumor_Sample_Barcode']]
+        print df[['NCBI_Build', 'Variant_Type', 'Chromosome',
+                  'Start_Position', 'Reference_Allele',
+                  'Tumor_Seq_Allele1', 'Tumor_Seq_Allele2',
+                  'Tumor_Sample_Barcode']]
     build_37 = df['NCBI_Build'] == 37
     build_hg19 = df['NCBI_Build'].astype(str) == 'hg19'
     ok_reference = build_37 | build_hg19
-    assert ok_reference.all(), "Invalid NCBI build '%s' in MAF file %s" % (df[~ok_reference]['NCBI_Build'].ix[0], filename)
-    return df 
+    assert ok_reference.all(), "Invalid NCBI build '%s' in MAF file %s" % (
+        df[~ok_reference]['NCBI_Build'].ix[0], filename)
+    return df
+
+
+def get_patient_id(tcga_barcode):
+    """
+    Accepts a TCGA barcode (full or partial), and returns the
+    portion corresponding to the patient ID.
+    See https://wiki.nci.nih.gov/display/TCGA/TCGA+Barcode
+    """
+    assert tcga_barcode.startswith("TCGA") and len(tcga_barcode) >= 12,\
+        "Invalid TCGA barcode: %s" % tcga_barcode
+    return tcga_barcode[:12]
