@@ -33,11 +33,12 @@ Example usage:
 
 import argparse
 import logging
+import pandas as pd
 from os import listdir
-from os.path import join, split, splitext, abspath
+from os.path import join, split, splitext, abspath, isfile
 from collections import OrderedDict
 
-from common import init_logging
+from common import init_logging, splitext_permissive
 from immunogenicity import ImmunogenicityPredictor
 from load_file import load_file, maf_to_vcf, expand_transcripts,\
     load_variants
@@ -72,18 +73,32 @@ parser.add_argument("--binding-threshold",
 parser.add_argument("--combined-maf",
                     default=False,
                     action="store_true",
-                    help=("Rather than using filenames to identify patients, " 
-                          "a single MAF file can have multiple tumor " 
+                    help=("Rather than using filenames to identify patients, "
+                          "a single MAF file can have multiple tumor "
                           "barcodes."))
+parser.add_argument("--rna-filter-dir",
+                    type=str,
+                    default=None,
+                    help=("Directory containing RNASeq gene expression "
+                          "levels (one file per patient). If provided, we "
+                          "filter mutations with no gene expression."))
 parser.add_argument("--debug-patient-id",
                     type=str,
                     default=None,
-                    help=("If we have a directory or a file containing " 
-                          "multiple patient IDs, limit that collection to " 
+                    help=("If we have a directory or a file containing "
+                          "multiple patient IDs, limit that collection to "
                           "one specific patient ID for debugging."))
+parser.add_argument("--debug-scored-epitopes-csv",
+                    type=str,
+                    default=None,
+                    help=("If we have a CSV file representing scored "
+                          "epitopes, use that instead of running netMHCpan. "
+                          "If not, generate that CSV file."))
 
 MUTATION_FILE_EXTENSIONS = [".maf", ".vcf"]
 
+class FileType:
+    MAF, VCF, HLA, GENE_EXP = range(0, 4)
 
 def find_mutation_files(
         input_files, combined_maf=False, max_peptide_length=31):
@@ -129,50 +144,85 @@ def find_mutation_files(
     return mutation_files
 
 
-def find_hla_files(input_dir_string, permissive_hla_parsing=True):
+def collect_files(input_dir_string, file_type):
     """
-    Collect all .hla files  in the dir(s) given as a comma-separated string,
-    read in all the HLA alleles and normalize them.
-
-    Returns a dictionary mapping base filenames to lists of HLA allele names.
+    Collect all files in the dir(s) given as a comma-separated string,
+    and then perform per-patient ID file_type-specific processing.
     """
-
-    hla_types = {}
+    patient_to_data = {}
     for dirpath in input_dir_string.split(","):
         for filename in listdir(dirpath):
-            base, ext = splitext(filename)
-            patient_id = get_patient_id(base)
-            if ext == '.hla':
-                path = join(dirpath, filename)
-                logging.info("Reading HLA file %s", path)
-                assert patient_id not in hla_types, (
-                    "Duplicate HLA files for %s" % patient_id)
-                alleles = []
-                with open(path, 'r') as f:
-                    contents = f.read()
-                    for line in contents.split("\n"):
-                        for raw_allele in line.split(","):
-                            if permissive_hla_parsing:
-                                # get rid of surrounding whitespace
-                                raw_allele = raw_allele.strip()
-                                # sometimes we get extra columns with scores,
-                                # ignore those
-                                raw_allele = raw_allele.split(" ")[0]
-                                raw_allele = raw_allele.split("\t")[0]
-                                raw_allele = raw_allele.split("'")[0]
-                            if len(raw_allele) > 0:
-                                alleles.append(
-                                    normalize_hla_allele_name(
-                                        raw_allele))
-                hla_types[patient_id] = alleles
+            base, ext = splitext_permissive(filename, [".txt"])
+            if file_type == FileType.HLA:
+                patient_id = get_patient_id(base)
+                if ext == ".hla":
+                    patient_to_data[patient_id] = read_hla_file(
+                            dirpath,
+                            filename,
+                            permissive_hla_parsing = True)
+            elif file_type == FileType.GENE_EXP:
+                patient_id = get_patient_id(base)
+                if ext == ".quantification" and "gene" in base:
+                    patient_to_data[patient_id] = read_gene_exp_file(
+                            dirpath,
+                            filename,
+                            permissive_gene_parsing = True)
     if args.debug_patient_id:
         patient_id = args.debug_patient_id
-        hla_types = {patient_id: hla_types[patient_id]}
-    return hla_types
+        patient_to_data = {patient_id: patient_to_data[patient_id]}
+    return patient_to_data
 
+
+def read_hla_file(dirpath, filename, permissive_hla_parsing):
+    """
+    Read in HLA alleles and normalize them, returning a list of HLA allele
+    names.
+    """
+    path = join(dirpath, filename)
+    logging.info("Reading HLA file %s", path)
+    alleles = []
+    with open(path, 'r') as f:
+        contents = f.read()
+        for line in contents.split("\n"):
+            for raw_allele in line.split(","):
+                if permissive_hla_parsing:
+                    # get rid of surrounding whitespace
+                    raw_allele = raw_allele.strip()
+                    # sometimes we get extra columns with scores,
+                    # ignore those
+                    raw_allele = raw_allele.split(" ")[0]
+                    raw_allele = raw_allele.split("\t")[0]
+                    raw_allele = raw_allele.split("'")[0]
+                if len(raw_allele) > 0:
+                    alleles.append(
+                        normalize_hla_allele_name(
+                            raw_allele))
+    return alleles
+
+
+def read_gene_exp_file(dirpath, filename, permissive_gene_parsing):
+    """
+    Read in gene expression counts, returning a list of expressed genes.
+
+    Expects the first column to be the gene name (or "<gene name>|<id>"),
+    and the second column to be what we're filtering on.
+    """
+    path = join(dirpath, filename)
+    logging.info("Reading gene expression file %s", path)
+    gene_exp_df = pd.read_csv(path, sep='\t')
+    gene_exp_df = gene_exp_df[gene_exp_df.columns[:2]]
+    gene_col = gene_exp_df.columns[0]
+    count_col = gene_exp_df.columns[1]
+    if permissive_gene_parsing:
+        gene_exp_df[gene_col] = gene_exp_df[gene_col].str.split('|').map(
+                lambda x: x[0])
+    gene_exp_df = gene_exp_df[gene_exp_df[count_col] > 0]
+    return set(gene_exp_df[gene_col].tolist())
+        
 
 def generate_mutation_counts(
-        mutation_files, hla_types, max_peptide_length=31, output_file=None):
+        mutation_files, hla_types, genes_expressed, max_peptide_length=31, 
+        output_file=None):
     """
     Returns dictionary that maps each patient ID to a tuple with six fields:
         - total number of mutated epitopes across all transcripts
@@ -211,16 +261,31 @@ def generate_mutation_counts(
                 variant_report,
                 raw_genomic_mutation_df,
                 transcripts_df)
-        logging.info(
-            "Calling MHC binding predictor for %s (#%d/%d)",
-            patient_id, i + 1, n)
-        mhc = PanBindingPredictor(hla_allele_names)
-        scored_epitopes = mhc.predict(transcripts_df, mutation_window_size=9)
-
+            logging.info(
+                "Calling MHC binding predictor for %s (#%d/%d)",
+                patient_id, i + 1, n)
+       
+        # If we want to read scored_epitopes from a CSV file, do that.
+        if args.debug_scored_epitopes_csv:
+            csv_file = args.debug_scored_epitopes_csv
+            if isfile(csv_file):
+                scored_epitopes = pd.read_csv(csv_file)
+            else:
+                mhc = PanBindingPredictor(hla_allele_names)
+                scored_epitopes = mhc.predict(transcripts_df,
+                        mutation_window_size=9)
+                scored_epitopes.to_csv(csv_file)
+        else:
+            mhc = PanBindingPredictor(hla_allele_names)
+            scored_epitopes = mhc.predict(transcripts_df, 
+                    mutation_window_size=9)
+        
         imm = ImmunogenicityPredictor(
             alleles=hla_allele_names,
             binding_threshold=args.binding_threshold)
         scored_epitopes = imm.predict(scored_epitopes)
+        scored_epitopes.to_csv("scored_epitopes.csv")
+        scored_epitopes = pd.read_csv("scored_epitopes.csv")
 
         grouped = scored_epitopes.groupby(["Gene", "GeneMutationInfo"])
         n_coding_mutations = len(grouped)
@@ -229,6 +294,9 @@ def generate_mutation_counts(
         n_ligands = 0
         n_immunogenic_mutations = 0
         n_immunogenic_epitopes = 0
+        n_immunogenic_gene_expressed_epitopes = 0
+        n_gene_exp_mutations = 0
+        n_gene_exp_epitopes = 0
         for (gene, mut), group in grouped:
             start_mask = group.EpitopeStart < group.MutationEnd
             stop_mask = group.EpitopeEnd > group.MutationStart
@@ -244,12 +312,23 @@ def generate_mutation_counts(
             immunogenic_epitopes = ligands[~ligands.ThymicDeletion]
             n_immunogenic_epitopes += len(immunogenic_epitopes)
             n_immunogenic_mutations += len(immunogenic_epitopes) > 0
-            logging.info("%s %s: epitopes %s, ligands %d, imm %d",
+            if genes_expressed:
+                # Only keep epitopes with genes that are expressed
+                gene_exp_mask = immunogenic_epitopes.Gene.isin(
+                        genes_expressed[patient_id])
+                gene_exp_epitopes = immunogenic_epitopes[gene_exp_mask]
+                n_gene_exp_epitopes += len(gene_exp_epitopes)
+                n_gene_exp_mutations += len(gene_exp_epitopes) > 0
+            else:
+                gene_exp_epitopes = []
+            logging.info(("%s %s: epitopes %s, ligands %d, imm %d, "
+                          "gene exp %s"),
                          gene,
                          mut,
                          len(mutated_epitopes),
                          len(ligands),
-                         len(immunogenic_epitopes))
+                         len(immunogenic_epitopes),
+                         len(gene_exp_epitopes))
         result_tuple = (
             n_coding_mutations,
             n_epitopes,
@@ -257,6 +336,8 @@ def generate_mutation_counts(
             n_ligands,
             n_immunogenic_mutations,
             n_immunogenic_epitopes,
+            n_gene_exp_mutations,
+            n_gene_exp_epitopes
         )
         if output_file:
             data_string = ",".join(str(d) for d in result_tuple)
@@ -285,8 +366,14 @@ if __name__ == "__main__":
     # as the .maf/.vcf files
     hla_dir_arg = args.hla_dir if args.hla_dir else args.input_dir
     assert hla_dir_arg, "Specify HLA directory via --hla-dir argument"
-    hla_types = find_hla_files(hla_dir_arg)
+    hla_types = collect_files(hla_dir_arg, FileType.HLA) 
 
+    # If no RNA dir is specified, then assume we are not doing RNA filtering
+    genes_expressed = None
+    if args.rna_filter_dir:
+        genes_expressed = collect_files(args.rna_filter_dir, 
+                FileType.GENE_EXP) 
+    
     missing = set([])
     # make sure we have HLA types for each patient
     for patient_id in mutation_files.iterkeys():
@@ -307,6 +394,7 @@ if __name__ == "__main__":
     mutation_counts = generate_mutation_counts(
         mutation_files,
         hla_types,
+        genes_expressed,
         output_file=output_file)
     output_file.close()
 
@@ -316,16 +404,21 @@ if __name__ == "__main__":
         (
             n_coding_mutations, n_epitopes,
             n_ligand_mutations, n_ligands,
-            n_immunogenic_mutations, n_immunogenic_epitopes
+            n_immunogenic_mutations, n_immunogenic_epitopes,
+            n_gene_exp_mutations, n_gene_exp_epitopes
         ) = fields
         print(
-            ("%s: # mutations %d (%d epitopes), # mutations with ligands " 
-             "%d (%d epitopes), # immunogenic mutations %d (%d epitopes)") % (
+            ("%s: # mutations %d (%d epitopes), # mutations with ligands "
+             "%d (%d epitopes), # immunogenic mutations %d (%d epitopes), "
+             "# immunogenic mutations with gene expression %d (%d "
+             "epitopes)") % (
                 patient_id,
                 n_coding_mutations,
                 n_epitopes,
                 n_ligand_mutations,
                 n_ligands,
                 n_immunogenic_mutations,
-                n_immunogenic_epitopes
+                n_immunogenic_epitopes,
+                n_gene_exp_mutations,
+                n_gene_exp_epitopes
             ))
