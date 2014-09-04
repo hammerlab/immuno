@@ -27,8 +27,8 @@ The output format is a CSV file with the following fields:
     immunogenic
 
 Example usage:
-  python analyze_cohort.py --input-dir ../canseq/ --hla-input-dir
-    ../canseq-hla/ --output results.csv
+  python analyze_cohort.py --input-dir ../canseq/ --hla-input-dir\
+          ../canseq-hla/ --output results.csv
 """
 
 import argparse
