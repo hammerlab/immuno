@@ -42,7 +42,7 @@ from common import init_logging, splitext_permissive
 from immunogenicity import ImmunogenicityPredictor
 from load_file import load_file, maf_to_vcf, expand_transcripts,\
     load_variants
-from maf import load_maf, get_patient_id
+from maf import load_maf, get_patient_id, is_valid_tcga
 from mhc_common import normalize_hla_allele_name
 from mhc_netmhcpan import PanBindingPredictor
 from mutation_report import print_mutation_report
@@ -97,9 +97,6 @@ parser.add_argument("--debug-scored-epitopes-csv",
 
 MUTATION_FILE_EXTENSIONS = [".maf", ".vcf"]
 
-class FileType:
-    MAF, VCF, HLA, GENE_EXP = range(0, 4)
-
 def find_mutation_files(
         input_files, combined_maf=False, max_peptide_length=31):
     """
@@ -144,7 +141,17 @@ def find_mutation_files(
     return mutation_files
 
 
-def collect_files(input_dir_string, file_type):
+def collect_hla_files(input_dir_string):
+    return collect_files(input_dir_string, read_hla_file,
+            permissive_parsing = True)
+
+
+def collect_gene_exp_files(input_dir_string):
+    return collect_files(input_dir_string, read_gene_exp_file,
+            permissive_parsing = True)
+
+
+def collect_files(input_dir_string, read_file_fn, permissive_parsing):
     """
     Collect all files in the dir(s) given as a comma-separated string,
     and then perform per-patient ID file_type-specific processing.
@@ -153,39 +160,37 @@ def collect_files(input_dir_string, file_type):
     for dirpath in input_dir_string.split(","):
         for filename in listdir(dirpath):
             base, ext = splitext_permissive(filename, [".txt"])
-            if file_type == FileType.HLA:
+            if is_valid_tcga(base):
                 patient_id = get_patient_id(base)
-                if ext == ".hla":
-                    patient_to_data[patient_id] = read_hla_file(
-                            dirpath,
-                            filename,
-                            permissive_hla_parsing = True)
-            elif file_type == FileType.GENE_EXP:
-                patient_id = get_patient_id(base)
-                if ext == ".quantification" and "gene" in base:
-                    patient_to_data[patient_id] = read_gene_exp_file(
-                            dirpath,
-                            filename,
-                            permissive_gene_parsing = True)
+                path = join(dirpath, filename)
+                result = read_file_fn(
+                    path,
+                    base,
+                    ext,
+                    permissive_parsing)
+                if result:
+                    patient_to_data[patient_id] = result
     if args.debug_patient_id:
         patient_id = args.debug_patient_id
         patient_to_data = {patient_id: patient_to_data[patient_id]}
     return patient_to_data
 
 
-def read_hla_file(dirpath, filename, permissive_hla_parsing):
+def read_hla_file(path, base, ext, permissive_parsing):
     """
     Read in HLA alleles and normalize them, returning a list of HLA allele
     names.
     """
-    path = join(dirpath, filename)
+    if ext != ".hla":
+        return []
+
     logging.info("Reading HLA file %s", path)
     alleles = []
     with open(path, 'r') as f:
         contents = f.read()
         for line in contents.split("\n"):
             for raw_allele in line.split(","):
-                if permissive_hla_parsing:
+                if permissive_parsing:
                     # get rid of surrounding whitespace
                     raw_allele = raw_allele.strip()
                     # sometimes we get extra columns with scores,
@@ -200,20 +205,22 @@ def read_hla_file(dirpath, filename, permissive_hla_parsing):
     return alleles
 
 
-def read_gene_exp_file(dirpath, filename, permissive_gene_parsing):
+def read_gene_exp_file(path, base, ext, permissive_parsing):
     """
-    Read in gene expression counts, returning a list of expressed genes.
+    Read in gene expression counts, returning a set of expressed genes.
 
     Expects the first column to be the gene name (or "<gene name>|<id>"),
     and the second column to be what we're filtering on.
     """
-    path = join(dirpath, filename)
+    if not (ext == ".quantification" and "gene" in base):
+        return set()
+
     logging.info("Reading gene expression file %s", path)
     gene_exp_df = pd.read_csv(path, sep='\t')
     gene_exp_df = gene_exp_df[gene_exp_df.columns[:2]]
     gene_col = gene_exp_df.columns[0]
     count_col = gene_exp_df.columns[1]
-    if permissive_gene_parsing:
+    if permissive_parsing:
         gene_exp_df[gene_col] = gene_exp_df[gene_col].str.split('|').map(
                 lambda x: x[0])
     gene_exp_df = gene_exp_df[gene_exp_df[count_col] > 0]
@@ -366,13 +373,12 @@ if __name__ == "__main__":
     # as the .maf/.vcf files
     hla_dir_arg = args.hla_dir if args.hla_dir else args.input_dir
     assert hla_dir_arg, "Specify HLA directory via --hla-dir argument"
-    hla_types = collect_files(hla_dir_arg, FileType.HLA) 
+    hla_types = collect_hla_files(hla_dir_arg)
 
     # If no RNA dir is specified, then assume we are not doing RNA filtering
     genes_expressed = None
     if args.rna_filter_dir:
-        genes_expressed = collect_files(args.rna_filter_dir, 
-                FileType.GENE_EXP) 
+        genes_expressed = collect_gene_exp_files(args.rna_filter_dir)
     
     missing = set([])
     # make sure we have HLA types for each patient
