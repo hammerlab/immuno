@@ -26,6 +26,8 @@ import Bio.SeqIO
 
 import common
 
+TCGA_PATIENT_ID_LENGTH = 12
+
 MAF_COLUMN_NAMES = [
     'Hugo_Symbol',
     'Entrez_Gene_Id',
@@ -83,12 +85,17 @@ def load_maf(filename, nrows=None, verbose=True):
     return df
 
 
+def is_valid_tcga(tcga_barcode):
+    return tcga_barcode.startswith("TCGA") and len(tcga_barcode) >= (
+            TCGA_PATIENT_ID_LENGTH)
+
+
 def get_patient_id(tcga_barcode):
     """
     Accepts a TCGA barcode (full or partial), and returns the
     portion corresponding to the patient ID.
     See https://wiki.nci.nih.gov/display/TCGA/TCGA+Barcode
     """
-    assert tcga_barcode.startswith("TCGA") and len(tcga_barcode) >= 12,\
-        "Invalid TCGA barcode: %s" % tcga_barcode
-    return tcga_barcode[:12]
+    assert is_valid_tcga(tcga_barcode), (
+            "Invalid TCGA barcode: %s" % tcga_barcode)
+    return tcga_barcode[:TCGA_PATIENT_ID_LENGTH]

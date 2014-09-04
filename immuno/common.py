@@ -14,7 +14,7 @@
 
 import appdirs
 import logging
-
+from os.path import splitext
 
 def peptide_substrings(full_peptide, window_length):
     n = len(full_peptide)
@@ -50,3 +50,17 @@ def init_logging(quiet = False):
         format="[%(levelname)s %(filename)s:%(lineno)d %(funcName)s] %(message)s",
         level=log_level
     )
+
+def splitext_permissive(path, ignored_exts):
+    """
+    Runs splitext on the path. However, if ext is in ignored_exts, it re-runs
+    splitext on the base: until finding an ext that is not in ignored_exts.
+
+    Note that these exts include the dot: ".txt", ".bam", etc.
+    """
+    if "" in ignored_exts:
+        raise ValueError("ignored_exts cannot contain the empty string")
+    base, ext = splitext(path)
+    if ext in ignored_exts:
+        return splitext_permissive(base, ignored_exts)
+    return (base, ext)
