@@ -1,0 +1,11 @@
+appdirs
+biopython
+Mako
+nose
+numpy
+scipy
+scikit-learn
+pandas
+requests
+git+git://github.com/hammerlab/datacache
+git+git://github.com/hammerlab/epitopes

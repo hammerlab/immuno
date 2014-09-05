@@ -32,7 +32,12 @@ def get_exons_from_transcript(transcript_id):
 
     returns Pandas dataframe containing only those exons
     """
-    assert transcript_id in data.transcript_exons_dict, "Unknown transcript %s" % transcript_id
+    assert transcript_id in data.transcript_exons_dict, (
+            "Unknown transcript %s in a dict of size %s, "
+            "with initial elements %s") % (
+                    transcript_id,
+                    len(data.transcript_exons_dict),
+                    data.transcript_exons_dict.items()[:5])
     exons = data.transcript_exons_dict[transcript_id]
     assert len(exons) > 0, \
         "Couldn't find exons for transcript %s" % transcript_id

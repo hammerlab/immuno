@@ -1,5 +1,7 @@
 ## Immunotherapy Pipeline
 
+### Status
+[![Build Status](https://travis-ci.org/hammerlab/immuno.png)](https://travis-ci.org/hammerlab/immuno)
 
 ### Usage 
 #### From peptide string
@@ -42,4 +44,4 @@ If you don't either an `hla` or `hla-file` then the default "HLA:A*02:01" will b
 * [pandas](http://pandas.pydata.org/)
 * [BioPython](http://biopython.org/wiki/Main_Page)
 
-You must either have [netMHCpan](http://www.cbs.dtu.dk/services/NetMHCpan/) installed locally or pass the `iedb-mhc` flag to use a web-based MHC binding predictor. 
+You must either have [netMHCpan](http://www.cbs.dtu.dk/services/NetMHCpan/) installed locally or pass the `iedb-mhc` flag to use a web-based MHC binding predictor.
