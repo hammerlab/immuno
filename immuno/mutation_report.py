@@ -38,34 +38,37 @@ DEFAULT_ALLELE = 'HLA-A*02:01'
 parser = argparse.ArgumentParser()
 # must supply either an input file or an amino acid string
 input_group = parser.add_argument_group()
-input_group.add_argument("--input-file", action="append", default=[],
-    help="input file name (i.e. FASTA, MAF, VCF)")
+input_group.add_argument("--input-file", 
+    action="append", 
+    default=[],
+    help="input file(s) (must be FASTA, MAF, TAB or VCF format)")
 
-input_group.add_argument("--string", default = None,
-    help="amino acid string")
+input_group.add_argument("--string", 
+    default=None,
+    help="Literal amino acid string of mutated peptide")
 
 parser.add_argument("--quiet",
-    default = False, 
-    action = "store_true",
-    help = "Suppress verbose output"
+    default=False, 
+    action="store_true",
+    help="Suppress verbose output"
 )
 
 parser.add_argument("--peptide-length",
     default=31,
-    type = int,
-    help="length of vaccine peptides (may contain multiple epitopes)")
+    type=int,
+    help="Length of vaccine peptides (may contain multiple epitopes)")
 
 parser.add_argument("--min-peptide-padding", 
-    default = 0, 
-    type = int, 
-    help = "minimum number of wildtype residues before or after a mutation")
+    default=0, 
+    type=int, 
+    help="Minimum number of wildtype residues before or after a mutation")
 
 parser.add_argument("--hla-file",
-    help="file with one HLA allele per line")
+    help="File with one HLA allele per line")
 
 parser.add_argument(
     "--hla",
-    help="comma separated list of allele (default HLA-A*02:01)")
+    help="Comma separated list of allele (default HLA-A*02:01)")
 
 parser.add_argument("--random-mhc",
     default=False,
@@ -78,39 +81,45 @@ parser.add_argument("--iedb-mhc",
     help="Use IEDB's web API for MHC binding")
 
 parser.add_argument("--output-epitopes-file",
-    help="output file for dataframe containing scored epitopes",
+    help="Output CSV file for dataframe containing scored epitopes",
     required=False)
 
 parser.add_argument("--print-epitopes",
-    help="print dataframe with epitope scores",
+    help="Print dataframe with epitope scores",
     default=False,
     action="store_true")
 
 parser.add_argument("--print-peptides",
-    default = False, 
-    help="print dataframe with vaccine peptide scores",
+    default=False, 
+    help="Print dataframe with vaccine peptide scores",
     action="store_true")
 
 parser.add_argument("--output-report-file",
-    default = "report.html",
-    help = "Path to HTML report containing scored vaccine peptides")
+    default="report.html",
+    help="Path to HTML report containing scored vaccine peptides")
 
-def print_mutation_report(input_filename, variant_report, raw_genomic_mutation_df, transcripts_df):
+def print_mutation_report(
+        input_filename,
+        variant_report,
+        raw_genomic_mutation_df,
+        transcripts_df):
     print 
     print "MUTATION REPORT FOR", input_filename 
     print 
     last_mutation = None 
-    for (mutation_description, transcript_id), msg in variant_report.iteritems():
-        if mutation_description != last_mutation:
+    for (mut_description, transcript_id), msg in variant_report.iteritems():
+        if mut_description != last_mutation:
             print mutation_description
-            last_mutation = mutation_description
+            last_mutation = mut_description
         print "--", transcript_id, ":", msg 
 
     logging.info("---")
     logging.info("FILE LOADING SUMMARY FOR %s", input_filename)
     logging.info("---")
     logging.info("# original mutations: %d", len(raw_genomic_mutation_df))
-    logging.info("# mutations with annotations: %d", len(transcripts_df.groupby(['chr', 'pos', 'ref', 'alt'])))
+    logging.info(
+        "# mutations with annotations: %d", 
+        len(transcripts_df.groupby(['chr', 'pos', 'ref', 'alt'])))
     logging.info("# transcripts: %d", len(transcripts_df))
 
 def group_epitopes(scored_epitopes):
@@ -130,8 +139,9 @@ def group_epitopes(scored_epitopes):
       - MHC_IC50
       - MHC_PercentileRank
     
-    Group epitopes under their originating transcript and make nested lists of dictionaries
-    to contain the binding scores for MHC alleles. 
+    Group epitopes under their originating transcript and
+    make nested lists of dictionaries to contain the binding scores
+    for MHC alleles. 
     
     Return a list of dictionaries for each mutated transcript with fields:
       - TranscriptId
@@ -156,7 +166,8 @@ def group_epitopes(scored_epitopes):
       - 'MHC_IC50' 
     """
     peptides = []
-    for (transcript_id, seq), transcript_group in scored_epitopes.groupby(["TranscriptId", "SourceSequence"]):
+    for (transcript_id, seq), transcript_group in \
+            scored_epitopes.groupby(["TranscriptId", "SourceSequence"]):
         peptide_entry = {}
         peptide_entry["Peptide"] = seq
         peptide_entry['TranscriptId'] = transcript_id
@@ -167,10 +178,13 @@ def group_epitopes(scored_epitopes):
         peptide_entry["PeptideMutationInfo"] = head.PeptideMutationInfo
         peptide_entry["GeneInfo"] = head.GeneInfo
         peptide_entry['Gene'] = head.Gene
-        peptide_entry['Description'] = "%s (%s) : %s" % (head.Gene, head.TranscriptId, head.PeptideMutationInfo) 
+        peptide_entry['Description'] = "%s (%s) : %s" % (
+                head.Gene, head.TranscriptId, head.PeptideMutationInfo
+        ) 
         peptide_entry['Epitopes'] = []
         for (epitope, epitope_start, epitope_end), epitope_group in \
-                transcript_group.groupby(['Epitope', 'EpitopeStart', 'EpitopeEnd']):
+                transcript_group.groupby(
+                    ['Epitope', 'EpitopeStart', 'EpitopeEnd']):
             epitope_entry = {
                 'Epitope' : epitope, 
                 'EpitopeStart' : epitope_start, 
@@ -180,12 +194,15 @@ def group_epitopes(scored_epitopes):
             seen_alleles = set([])
             for epitope_allele_row in epitope_group.to_records():
                 allele = epitope_allele_row['Allele']
-                assert allele not in seen_alleles, "Repeated entry %s" % epitope_allele_row
+                assert allele not in seen_alleles, \
+                    "Repeated entry %s" % epitope_allele_row
                 seen_alleles.add(allele)
+                percentile_rank = epitope_allele_row['MHC_PercentileRank']
+                ic50 = epitope_allele_row['MHC_IC50']
                 allele_entry = {
                     'Allele': allele, 
-                    'MHC_PercentileRank' : epitope_allele_row['MHC_PercentileRank'],
-                    'MHC_IC50' : epitope_allele_row['MHC_IC50'],
+                    'MHC_PercentileRank' : percentile_rank,
+                    'MHC_IC50' : ic50,
                 }
                 epitope_entry['MHC_Allele_Scores'].append(allele_entry)
             peptide_entry['Epitopes'].append(epitope_entry)
@@ -193,8 +210,14 @@ def group_epitopes(scored_epitopes):
     return peptides
 
 def render_report(input_names, peptides, alleles):
-    template_lookup = TemplateLookup(directories=['.', 'viz'], default_filters=['literal'])
-    template = Template(filename = 'viz/index.html.template', lookup = template_lookup)
+    template_lookup = TemplateLookup(
+        directories=['.', 'viz'], 
+        default_filters=['literal']
+    )
+    template = Template(
+        filename = 'viz/index.html.template', 
+        lookup = template_lookup
+    )
 
     html = template.render(
         peptides = peptides, 
@@ -248,13 +271,14 @@ if __name__ == '__main__':
         
     if len(mutated_region_dfs) == 0:
         parser.print_help()
-        print "\nERROR: Must supply at least --string or --input"
+        print "\nERROR: Must supply at least --string or --input-file"
         sys.exit()
 
     mutated_regions = pd.concat(mutated_region_dfs)
 
     if args.random_mhc:
-        scored_epitopes = mhc_random.generate_scored_epitopes(mutated_regions, alleles)
+        scored_epitopes = \
+            mhc_random.generate_scored_epitopes(mutated_regions, alleles)
     elif args.iedb_mhc:
         mhc = IEDBMHCBinding(name = 'mhc', alleles=alleles)
         scored_epitopes = mhc.apply(mutated_regions)
