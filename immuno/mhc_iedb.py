@@ -95,7 +95,7 @@ class IEDBMHCBinding(PipelineElement):
     responses = {}
     for i, peptide in enumerate(data.SourceSequence):
         if peptide not in responses:
-            response = self.query_iedb(peptide, data['info'][i])
+            response = self.query_iedb(peptide, data['GeneInfo'][i])
             response.rename(
                 columns={
                     'peptide': 'Epitope',

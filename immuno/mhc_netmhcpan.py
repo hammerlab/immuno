@@ -118,12 +118,21 @@ def build_output_rows(lines, peptide_entries, mutation_window_size = None):
     return results 
 
 class PanBindingPredictor(object):
-    def __init__(self, hla_alleles):
-        valid_alleles_str = check_output(["netMHCpan", "-listMHC"])
-        valid_alleles = set([])
-        for line in valid_alleles_str.split("\n"):
-            if not line.startswith("#"):
-                valid_alleles.add(line)
+
+    def __init__(self, hla_alleles, netmhc_command = "netMHCpan"):
+        self.netmhc_command = netmhc_command
+        
+        try:
+            valid_alleles_str = check_output([self.netmhc_command, "-listMHC"])
+            assert len(valid_alleles_str) > 0, "%s returned empty allele list" % self.self.netmhc_command
+            valid_alleles = set([])
+            for line in valid_alleles_str.split("\n"):
+                if not line.startswith("#"):
+                    valid_alleles.add(line)
+        except:
+            logging.warning("Failed to run %s -listMHC", self.netmhc_command)
+            valid_alleles = None 
+
         self.alleles = []
         for allele in hla_alleles:
             allele = normalize_hla_allele_name(allele.strip().upper())
@@ -184,8 +193,18 @@ class PanBindingPredictor(object):
 
 
         alleles_str = ",".join(allele.replace("*", "") for allele in self.alleles)
-        output_file = tempfile.NamedTemporaryFile("r+", prefix="netMHCpan_output", delete=False)
-        command = ["netMHCpan",  "-xls", "-xlsfile", output_file.name, "-l", "9", "-f", input_filename, "-a", alleles_str]
+        output_file = \
+            tempfile.NamedTemporaryFile(
+                "r+", 
+                prefix="netMHCpan_output", 
+                delete=False)
+        command = [
+            self.netmhc_command,  
+                "-xls", 
+                "-xlsfile", output_file.name,
+                 "-l", "9",
+                  "-f", input_filename, 
+                  "-a", alleles_str]
         print " ".join(command)
         try: 
             start_time = time.time()

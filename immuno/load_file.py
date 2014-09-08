@@ -49,6 +49,34 @@ def maf_to_vcf(maf_df):
     vcf_df['alt'][use_alt2] = alt2[use_alt2]
     return vcf_df
 
+def tab_to_vcf(tab_df):
+    """
+    Convert variant file with the following columns:
+    - variantId
+    - entrezGeneId
+    - hgncSymbol
+    - chrom
+    - pos 
+    - ref 
+    - alt
+    - tier 
+    - otherId
+    - aaChangeShort
+    - aaChangeLong
+    - effect
+    - enst
+    - canonLogic  
+    - dbsnpId
+    """
+    return pd.DataFrame({
+        'pos' : tab_df['pos'],
+        'ref' : tab_df['ref'],
+        'alt' : tab_df['alt'],
+        'chr' : tab_df['chrom'],
+        'info' : tab_df['hgncSymbol'],
+        'id' : tab_df['dbsnpId']
+    })
+
 def expand_transcripts(vcf_df, patient_id, min_peptide_length = 9, max_peptide_length = 31):
     """
     Applies genomic variants to all possible transcripts. 
@@ -99,17 +127,26 @@ def expand_transcripts(vcf_df, patient_id, min_peptide_length = 9, max_peptide_l
 
         def skip(msg, *args):
             msg = msg % args
-            logging.info("Skipping %s on %s: %s" , mutation_description, transcript_id, msg)
+            logging.info(
+                "Skipping %s on %s: %s" , 
+                    mutation_description, 
+                    transcript_id, 
+                    msg)
             variant_report[key] = msg
 
         def error(msg, *args):
             msg = msg % args
-            logging.warning("Error in %s on %s: %s" , mutation_description, transcript_id, msg)
+            logging.warning(
+                "Error in %s on %s: %s" , 
+                    mutation_description, 
+                    transcript_id, 
+                    msg)
             variant_report[key] = msg
 
         def success(row):
             new_rows.append(row)
-            msg = "SUCCESS: Gene = %s, Mutation = %s" % (row['Gene'], row['PeptideMutationInfo'])
+            msg = "SUCCESS: Gene = %s, Mutation = %s" % \
+                (row['Gene'], row['PeptideMutationInfo'])
             variant_report[key] = msg
 
         
@@ -133,7 +170,7 @@ def expand_transcripts(vcf_df, patient_id, min_peptide_length = 9, max_peptide_l
         if not seq:
             error(annot)
         else:
-            if seq in seen_source_sequences:
+            if any(s.startswith(seq) for s in seen_source_sequences):
                 skip("Already seen sequence %s", seq)
                 continue
             else:
@@ -201,6 +238,9 @@ def load_variants(input_filename):
     elif input_filename.endswith(".maf"):
         maf_df = load_maf(input_filename)
         vcf_df = maf_to_vcf(maf_df)
+    elif input_filename.endswith("tab"):
+        tab_df = pd.read_csv(input_filename, sep='\t', header=0)
+        vcf_df = tab_to_vcf(tab_df)
     else:
         assert False, "Unrecognized file type %s" % input_filename
     return vcf_df 

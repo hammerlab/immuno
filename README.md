@@ -11,7 +11,7 @@ python mutation_report.py --string EDLTVKIGDFGLATEKSRWSGSHQFEQLS --hla "HLA-B*35
 
 #### From input file
 ```sh
-python mutation_report.py --input <.maf, .vcf, .fasta> --hla-file <allele-file> 
+python mutation_report.py --input-file <.vcf, .maf, .tab, .fasta> --hla-file <allele-file> 
 
 ```
 
@@ -20,7 +20,7 @@ If  VCF file is input, it will be annotated w/ gene information and Ensembl tran
 If you don't either an `hla` or `hla-file` then the default "HLA:A*02:01" will be used. 
 
 ### Options:
-* `--input`: Input file containing somatic variants (one of MAF, VCF, or SnpEff annotated VCF)
+* `--input-file`: Input file containing somatic variants (one of MAF, VCF, or SnpEff annotated VCF)
 * `--string`: String of amino acids, with optional annotation of a mutated region between underscores (i.e. QYS\_LL\_Q)
 * `--hla`: Comma separated list of HLA alleles. 
 * `--hla-file`: Text file containing one HLA allele per line. 
@@ -28,8 +28,8 @@ If you don't either an `hla` or `hla-file` then the default "HLA:A*02:01" will b
 * `--min-peptide-padding`: Minimum number of wildtype residues before or after a mutation 
 * `--print-epitopes`: Print dataframe with epitope scores
 * `--print-peptides`: Print dataframe with vaccine peptide scores
-* `--epitopes-path`: CSV output file for dataframe containing scored epitopes
-* `--report-path`: Path to HTML report containing scored vaccine peptides and epitopes
+* `--output-epitopes-file`: CSV output file for dataframe containing scored epitopes
+* `--output-report-file`: Path to HTML report containing scored vaccine peptides and epitopes
 * `--random-mhc`: Random values instead for MHC binding prediction
 * `--iedb-mhc`: Use IEDB's web API for MHC binding
 * `--skip-mhc`: Don't predict MHC binding

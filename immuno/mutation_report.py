@@ -38,7 +38,7 @@ DEFAULT_ALLELE = 'HLA-A*02:01'
 parser = argparse.ArgumentParser()
 # must supply either an input file or an amino acid string
 input_group = parser.add_argument_group()
-input_group.add_argument("--input", action="append", default=[],
+input_group.add_argument("--input-file", action="append", default=[],
     help="input file name (i.e. FASTA, MAF, VCF)")
 
 input_group.add_argument("--string", default = None,
@@ -67,17 +67,6 @@ parser.add_argument(
     "--hla",
     help="comma separated list of allele (default HLA-A*02:01)")
 
-parser.add_argument("--print-epitopes",
-    help="print dataframe with epitope scores",
-    default=False,
-    action="store_true")
-
-parser.add_argument("--print-peptides",
-    default = False, 
-    help="print dataframe with vaccine peptide scores",
-    action="store_true")
-
-
 parser.add_argument("--random-mhc",
     default=False,
     action="store_true",
@@ -88,11 +77,21 @@ parser.add_argument("--iedb-mhc",
     action="store_true",
     help="Use IEDB's web API for MHC binding")
 
-parser.add_argument("--epitopes-path",
+parser.add_argument("--output-epitopes-file",
     help="output file for dataframe containing scored epitopes",
     required=False)
 
-parser.add_argument("--report-path",
+parser.add_argument("--print-epitopes",
+    help="print dataframe with epitope scores",
+    default=False,
+    action="store_true")
+
+parser.add_argument("--print-peptides",
+    default = False, 
+    help="print dataframe with vaccine peptide scores",
+    action="store_true")
+
+parser.add_argument("--output-report-file",
     default = "report.html",
     help = "Path to HTML report containing scored vaccine peptides")
 
@@ -233,7 +232,7 @@ if __name__ == '__main__':
     # loop over all the input files and
     # load each one into a dataframe
 
-    for input_filename in args.input:
+    for input_filename in args.input_file:
         transcripts_df, raw_genomic_mutation_df, variant_report = \
             load_file(input_filename, max_peptide_length = peptide_length)
         mutated_region_dfs.append(transcripts_df)
@@ -241,7 +240,11 @@ if __name__ == '__main__':
         # print each genetic mutation applied to each possible transcript
         # and either why it failed or what protein mutation resulted
         if not args.quiet:
-            print_mutation_report(input_filename, variant_report, raw_genomic_mutation_df, transcripts_df)
+            print_mutation_report(
+                input_filename, 
+                variant_report, 
+                raw_genomic_mutation_df, 
+                transcripts_df)
         
     if len(mutated_region_dfs) == 0:
         parser.print_help()
@@ -266,8 +269,8 @@ if __name__ == '__main__':
     if 'MHC_PercentileRank' in scored_epitopes:
         scored_epitopes = scored_epitopes.sort(['MHC_PercentileRank'])
 
-    if args.epitopes_path:
-        scored_epitopes.to_csv(args.epitopes_path, index=False)
+    if args.output_epitopes_file:
+        scored_epitopes.to_csv(args.output_epitopes_file, index=False)
         
     if args.print_epitopes:
         print scored_epitopes.to_string()
@@ -280,10 +283,10 @@ if __name__ == '__main__':
             print pep 
     
     
-    input_names = ";".join(args.input)
+    input_names = ";".join(args.input_file)
     if args.string:
         input_names += ";" + args.string
     
     html = render_report(input_names, peptides, alleles)
-    with open(args.report_path, 'w') as f:
+    with open(args.output_report_file, 'w') as f:
         f.write(html)
