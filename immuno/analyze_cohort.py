@@ -228,7 +228,10 @@ def read_gene_exp_file(path, base, ext, permissive_parsing):
         
 
 def generate_mutation_counts(
-        mutation_files, hla_types, genes_expressed, max_peptide_length=31, 
+        mutation_files, 
+        hla_types,
+        genes_expressed, 
+        max_peptide_length=31, 
         output_file=None):
     """
     Returns dictionary that maps each patient ID to a tuple with six fields:

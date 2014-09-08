@@ -49,7 +49,27 @@ def maf_to_vcf(maf_df):
     vcf_df['alt'][use_alt2] = alt2[use_alt2]
     return vcf_df
 
-def expand_transcripts(vcf_df, patient_id, min_peptide_length = 9, max_peptide_length = 31):
+def tab_to_vcf(tab_df):
+    """
+    Convert variant file with the following columns:
+    - hgncSymbol
+    - chrom
+    - pos 
+    - ref 
+    - alt
+    - dbsnpId
+    """
+    return pd.DataFrame({
+        'pos' : tab_df['pos'],
+        'ref' : tab_df['ref'],
+        'alt' : tab_df['alt'],
+        'chr' : tab_df['chrom'],
+        'info' : tab_df['hgncSymbol'],
+        'id' : tab_df['dbsnpId']
+    })
+
+def expand_transcripts(
+        vcf_df, patient_id, min_peptide_length=9, max_peptide_length=31):
     """
     Applies genomic variants to all possible transcripts. 
 
@@ -71,11 +91,16 @@ def expand_transcripts(vcf_df, patient_id, min_peptide_length = 9, max_peptide_l
     vcf_df['chr'] = vcf_df.chr.map(normalize_chromosome_name)
     
 
-    # annotate genomic mutations into all the possible known transcripts they might be on
+    # annotate genomic mutations into all the possible 
+    # known transcripts they might be on
     transcripts_df = annotation.annotate_vcf_transcripts(vcf_df)
 
-    assert len(transcripts_df) > 0, "No annotated mutation entries for %s" % patient_id
-    logging.info("Annotated input %s has %d possible transcripts", patient_id, len(transcripts_df))
+    assert len(transcripts_df) > 0, \
+        "No annotated mutation entries for %s" % patient_id
+    logging.info(
+        "Annotated input %s has %d possible transcripts",
+         patient_id,
+         len(transcripts_df))
     
     new_rows = []
 
@@ -83,9 +108,9 @@ def expand_transcripts(vcf_df, patient_id, min_peptide_length = 9, max_peptide_l
 
     seen_source_sequences = set([])
 
-    # for each genetic variant in the source file, we're going to print a string
-    # describing either the resulting protein variant or whatever error
-    # prevented us from getting a result 
+    # for each genetic variant in the source file, 
+    # we're going to print a string describing either the resulting 
+    # protein variant or whatever error prevented us from getting a result 
     variant_report = OrderedDict()
 
     for (chromosome, pos, ref, alt, transcript_id), group in \
@@ -99,17 +124,26 @@ def expand_transcripts(vcf_df, patient_id, min_peptide_length = 9, max_peptide_l
 
         def skip(msg, *args):
             msg = msg % args
-            logging.info("Skipping %s on %s: %s" , mutation_description, transcript_id, msg)
+            logging.info(
+                "Skipping %s on %s: %s" , 
+                    mutation_description, 
+                    transcript_id, 
+                    msg)
             variant_report[key] = msg
 
         def error(msg, *args):
             msg = msg % args
-            logging.warning("Error in %s on %s: %s" , mutation_description, transcript_id, msg)
+            logging.warning(
+                "Error in %s on %s: %s" , 
+                    mutation_description, 
+                    transcript_id, 
+                    msg)
             variant_report[key] = msg
 
         def success(row):
             new_rows.append(row)
-            msg = "SUCCESS: Gene = %s, Mutation = %s" % (row['Gene'], row['PeptideMutationInfo'])
+            msg = "SUCCESS: Gene = %s, Mutation = %s" % \
+                (row['Gene'], row['PeptideMutationInfo'])
             variant_report[key] = msg
 
         
@@ -133,8 +167,8 @@ def expand_transcripts(vcf_df, patient_id, min_peptide_length = 9, max_peptide_l
         if not seq:
             error(annot)
         else:
-            if seq in seen_source_sequences:
-                skip("Already seen sequence %s", seq)
+            if any(s.startswith(seq) for s in seen_source_sequences):
+                skip("Already seen sequence starting with %s", seq)
                 continue
             else:
                 seen_source_sequences.add(seq)
@@ -178,10 +212,23 @@ def expand_transcripts(vcf_df, patient_id, min_peptide_length = 9, max_peptide_l
     peptides['TranscriptId'] = peptides['stable_id_transcript'] 
 
     transcripts_df = transcripts_df.merge(peptides)
-    logging.info("Generated %d peptides from %s", len(transcripts_df), patient_id)
+    logging.info(
+        "Generated %d peptides from %s",
+        len(transcripts_df),
+        patient_id
+    )
 
     # drop verbose or uninteresting columns from VCF
-    for dumb_field in ('description_gene', 'filter', 'qual', 'id', 'name', 'info', 'stable_id_transcript'):
+    dumb_fields = (
+        'description_gene', 
+        'filter', 
+        'qual', 
+        'id', 
+        'name', 
+        'info', 
+        'stable_id_transcript'
+    )
+    for dumb_field in dumb_fields:
         if dumb_field in transcripts_df.columns:
             transcripts_df = transcripts_df.drop(dumb_field, axis = 1)
     
@@ -189,7 +236,8 @@ def expand_transcripts(vcf_df, patient_id, min_peptide_length = 9, max_peptide_l
 
 def load_variants(input_filename):
     """
-    Read the input file into a DataFrame containing (at least) the basic columns of a VCF:
+    Read the input file into a DataFrame containing (at least) 
+    the basic columns of a VCF:
         - chr 
         - pos 
         - ref 
@@ -201,14 +249,18 @@ def load_variants(input_filename):
     elif input_filename.endswith(".maf"):
         maf_df = load_maf(input_filename)
         vcf_df = maf_to_vcf(maf_df)
+    elif input_filename.endswith("tab"):
+        tab_df = pd.read_csv(input_filename, sep='\t', header=0)
+        vcf_df = tab_to_vcf(tab_df)
     else:
         assert False, "Unrecognized file type %s" % input_filename
     return vcf_df 
 
-def load_file(input_filename, min_peptide_length = 9, max_peptide_length = 31):
+def load_file(input_filename, min_peptide_length=9, max_peptide_length=31):
     """
-    Load mutatated peptides from FASTA, VCF, or MAF file. For the latter two formats, 
-    expand their variants across all annotated transcripts.  
+    Load mutatated peptides from FASTA, VCF, or MAF file. 
+    For the latter two formats, expand their variants across all 
+    annotated transcripts.  
 
     Parameters
     --------
@@ -238,4 +290,8 @@ def load_file(input_filename, min_peptide_length = 9, max_peptide_length = 31):
         return load_fasta(input_filename, peptide_length = max_peptide_length)
 
     vcf_df = load_variants(input_filename)
-    return expand_transcripts(vcf_df, input_filename, min_peptide_length = min_peptide_length, max_peptide_length = max_peptide_length)
+    return expand_transcripts(
+        vcf_df,
+        input_filename, 
+        min_peptide_length = min_peptide_length,
+        max_peptide_length = max_peptide_length)
