@@ -109,7 +109,7 @@ def print_mutation_report(
     last_mutation = None 
     for (mut_description, transcript_id), msg in variant_report.iteritems():
         if mut_description != last_mutation:
-            print mutation_description
+            print mut_description
             last_mutation = mut_description
         print "--", transcript_id, ":", msg 
 
