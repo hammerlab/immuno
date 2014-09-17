@@ -21,10 +21,9 @@ import re
 import pandas as pd
 
 from mhc_common import normalize_hla_allele_name, seq_to_str, convert_str
-from pipeline import PipelineElement
 
 
-class IEDBMHCBinding(PipelineElement):
+class IEDBMHCBinding(object):
 
   def __init__(
         self, 
@@ -83,7 +82,7 @@ class IEDBMHCBinding(PipelineElement):
         return pd.DataFrame()
 
 
-  def apply(self, data):
+  def predict(self, data):
     """
     Given a dataframe with long amino acid sequences in the
     'SourceSequence' field, return an augmented dataframe
