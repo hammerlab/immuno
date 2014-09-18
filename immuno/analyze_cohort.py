@@ -125,7 +125,7 @@ def find_mutation_files(
     mutation_files = OrderedDict()
 
     for path in input_filenames:
-        dirpath, flename = split(path)
+        _, filename = split(path)
         base, ext = splitext(filename)
         if ext in MUTATION_FILE_EXTENSIONS:
             logging.info("Reading mutation file %s", path)
@@ -144,11 +144,13 @@ def find_mutation_files(
 
             for patient_id, vcf_df in file_patients.iteritems():
                 patient_id = "-".join(patient_id.split("-")[:3])
-                assert patient_id not in mutation_files, (
-                    "Already processed patient %s before file %s" % (
-                        patient_id,
-                        path))
-                mutation_files[patient_id] = vcf_df
+                if patient_id in mutation_files:
+                    logging.warning(
+                        "Already processed patient %s before file %s",
+                            patient_id,
+                            path)
+                else:
+                    mutation_files[patient_id] = vcf_df
     if args.debug_patient_id:
         patient_id = args.debug_patient_id
         mutation_files = {patient_id: mutation_files[patient_id]}
