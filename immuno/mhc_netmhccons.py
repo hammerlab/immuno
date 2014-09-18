@@ -85,7 +85,7 @@ class ConsensusBindingPredictor(object):
                     "-xlsfile", output_file.name,
                     "-length", "9",
                     "-f", input_filename, 
-                    "-a", allele]
+                    "-a", allele.replace("*", "")]
             print " ".join(command)
 
             # Cleanup either when finished or if an exception gets raised by 
