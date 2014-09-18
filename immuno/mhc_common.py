@@ -17,7 +17,8 @@ import re
 def seq_to_str(obj):
     """
     Given a sequence convert it to a comma separated string. 
-    If, however, the argument is a single object, return its string representation.
+    If, however, the argument is a single object, return its string 
+    representation.
     """
     if isinstance(obj, (unicode, str)):
         return obj
@@ -95,17 +96,20 @@ def normalize_hla_allele_name(hla):
 
     # skip initial separator
     sep, hla = _parse_not_numbers(hla)
-    assert sep in ("", ":", "*"), "Malformed separator %s in HLA type %s" % (sep, original)
+    assert sep in ("", ":", "*"), \
+        "Malformed separator %s in HLA type %s" % (sep, original)
 
     family, hla = _parse_numbers(hla, max_len = 2)
 
     sep, hla = _parse_not_numbers(hla)
 
-    assert sep in ("", ":"), "Malformed separator %s in HLA type %s" % (sep, original)
+    assert sep in ("", ":"), \
+        "Malformed separator %s in HLA type %s" % (sep, original)
 
     allele, hla = _parse_numbers(hla)
 
-    assert len(hla) == 0, "Unexpected suffix %s in HLA type %s" % (hla, original)
+    assert len(hla) == 0, \
+        "Unexpected suffix %s in HLA type %s" % (hla, original)
     
 
     if len(family) == 1:

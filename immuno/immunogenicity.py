@@ -17,7 +17,9 @@ from os import environ, listdir
 from os.path import exists, split, join 
 
 from mhc_common import compact_hla_allele_name
-DEFAULT_PEPTIDE_DIR = environ.get("IMMUNO_THYMIC_PEPTIDES", join(split(__file__)[0], "thymic_peptides"))
+DEFAULT_PEPTIDE_DIR = environ.get(
+    "IMMUNO_THYMIC_PEPTIDES", 
+    join(split(__file__)[0], "thymic_peptides"))
 
 def _load_allele_mapping_dict(path):
     """
@@ -37,11 +39,12 @@ def _load_allele_mapping_dict(path):
 class ImmunogenicityPredictor(object):
 
     """
-    Predict whether some T-cell in a person's circulating repertoire could recognize a
-    particular pattern. The subset of the 'self' proteome which binds 
-    to an individual's HLA alleles tells us which T-cells were removed by negative selection. 
-    T-cells inspect peptides more strongly along interior residues (positions 3-8), so we restrict
-    our query only to those positions. 
+    Predict whether some T-cell in a person's circulating repertoire could 
+    recognize a particular pattern. The subset of the 'self' proteome which
+    binds to an individual's HLA alleles tells us which T-cells were removed
+    by negative selection. T-cells inspect peptides more strongly along
+    interior residues (positions 3-8), so we restrict our query only to those
+    positions. 
     """
 
     def __init__(
@@ -60,39 +63,50 @@ class ImmunogenicityPredictor(object):
         data_path : str, optional 
 
         first_position : int, optional 
-            Start position for extracting substring of query peptide (indexed starting from 1)
+            Start position for extracting substring of 
+            query peptide (indexed starting from 1)
 
         last_position : int, optional 
-            Last position for extracting substring of query peptide (indexed starting from 1)
+            Last position for extracting substring of 
+            query peptide (indexed starting from 1)
         """
 
         self.binding_threshold = binding_threshold
         self.first_position = first_position
         self.last_position = last_position
-        self.alleles = set([compact_hla_allele_name(allele) for allele in alleles])
+        self.alleles = {
+            compact_hla_allele_name(allele) for allele in alleles
+        }
         self.data_path = data_path
 
-        assert exists(self.data_path), "Directory with thymic peptides (%s) does not exist" % self.data_path
+        assert exists(self.data_path), \
+            "Directory with thymic peptides (%s) does not exist" % \
+            self.data_path
 
         available_alleles = listdir(self.data_path)
         
         mappings_file_path = join(self.data_path, 'mappings')
         if exists(mappings_file_path):
-            self.allele_mappings = _load_allele_mapping_dict(mappings_file_path)
+            self.allele_mappings = \
+                _load_allele_mapping_dict(mappings_file_path)
         else:
-            self.allele_mappings = dict(zip(available_alleles, available_alleles))
+            self.allele_mappings = \
+                dict(zip(available_alleles, available_alleles))
         
         self.peptide_sets = {}
 
         for allele in self.alleles:
-            logging.info("Loading thymic MHC peptide set for HLA allele %s", allele)
-            assert allele in self.allele_mappings, "No MHC peptide set available for HLA allele %s" % (allele,)
+            logging.info(
+                "Loading thymic MHC peptide set for HLA allele %s", allele)
+            assert allele in self.allele_mappings, \
+                "No MHC peptide set available for HLA allele %s" % (allele,)
 
             filename = self.allele_mappings[allele] 
-            assert filename in available_alleles, "No MHC peptide set available for HLA allele %s (filename = %s)" % (allele,filename)
+            assert filename in available_alleles, \
+                "No MHC peptide set available for HLA allele %s (filename = %s)" % (allele,filename)
             
             with open(join(self.data_path, filename), 'r') as f:
-                peptide_set = set(l for l in f.read().split("\n") if len(l) > 0)
+                peptide_set = {l for l in f.read().split("\n") if len(l) > 0}
             self.peptide_sets[allele] = peptide_set
 
     def predict(self, peptides_df):
@@ -100,12 +114,14 @@ class ImmunogenicityPredictor(object):
         Determine whether 9-mer peptide is immunogenic by checking
 
         1) that the epitope binds strongly to a particular MHC allele
-        2) the "core" of the peptide (positions 3-8) don't overlap with any other 
-           peptides in the "self"/thymic MHC ligand sets of that HLA allele. 
+        2) the "core" of the peptide (positions 3-8) don't overlap with any 
+           other peptides in the self/thymic MHC ligand sets of that HLA allele 
 
         Returns DataFrame with two extra columns:
-            - ThymicDeletion: Was this epitope deleted during thymic selection (and thus can't be recognize by T-cells)?
-            - Immunogenic: Is this epitope a sufficiently strong binder that wasn't deleted during thymic selection? 
+            - ThymicDeletion: Was this epitope deleted during thymic selection 
+              (and thus can't be recognize by T-cells)?
+            - Immunogenic: Is this epitope a sufficiently strong binder that
+              wasn't deleted during thymic selection? 
         """
         
         thymic_peptide_sets = self.peptide_sets.values()
@@ -116,11 +132,14 @@ class ImmunogenicityPredictor(object):
             row = peptides_df.ix[i]
             peptide = row.Epitope 
             allele = compact_hla_allele_name(row.Allele)
-            # positions in the epitope are indexed starting from 1 to match immunology nomenclature
+            # positions in the epitope are indexed starting from 1 to 
+            # match immunology nomenclature
             substring = peptide[self.first_position - 1 : self.last_position]
-            peptides_df['ThymicDeletion'].ix[i] = substring in self.peptide_sets[allele]
+            peptides_df['ThymicDeletion'].ix[i] = \
+                substring in self.peptide_sets[allele]
         
-        peptides_df["Immunogenic"] = ~peptides_df["ThymicDeletion"] &  (peptides_df["MHC_IC50"] <= self.binding_threshold)
+        peptides_df["Immunogenic"] = ~peptides_df["ThymicDeletion"] & \
+             (peptides_df["MHC_IC50"] <= self.binding_threshold)
 
         return peptides_df
     

@@ -13,8 +13,9 @@
 # limitations under the License.
 
 import numpy as np
-
 import tempfile
+
+from mhc_common import normalize_hla_allele_name
 
 def create_input_fasta_file(df, mutation_window_size = None):
     """
