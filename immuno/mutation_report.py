@@ -27,6 +27,7 @@ from mako.lookup import TemplateLookup
 from common import peptide_substrings, init_logging
 from mhc_iedb import IEDBMHCBinding, normalize_hla_allele_name
 from mhc_netmhcpan import PanBindingPredictor
+from mhc_netmhccons import ConsensusBindingPredictor
 import mhc_random 
 from load_file import load_file
 from strings import load_comma_string
@@ -38,6 +39,7 @@ DEFAULT_ALLELE = 'HLA-A*02:01'
 parser = argparse.ArgumentParser()
 # must supply either an input file or an amino acid string
 input_group = parser.add_argument_group()
+
 input_group.add_argument("--input-file", 
     action="append", 
     default=[],
@@ -79,6 +81,11 @@ parser.add_argument("--iedb-mhc",
     default=False,
     action="store_true",
     help="Use IEDB's web API for MHC binding")
+
+parser.add_argument("--netmhc-cons",
+    default=False,
+    action="store_true",
+    help="Use local NetMHCcons binding predictor")
 
 parser.add_argument("--output-epitopes-file",
     help="Output CSV file for dataframe containing scored epitopes",
@@ -281,7 +288,10 @@ if __name__ == '__main__':
             mhc_random.generate_scored_epitopes(mutated_regions, alleles)
     elif args.iedb_mhc:
         mhc = IEDBMHCBinding(name = 'mhc', alleles=alleles)
-        scored_epitopes = mhc.apply(mutated_regions)
+        scored_epitopes = mhc.predict(mutated_regions)
+    elif args.netmhc_cons:
+        predictor = ConsensusBindingPredictor(alleles)
+        scored_epitopes = predictor.predict(mutated_regions)
     else:
         predictor = PanBindingPredictor(alleles)
         scored_epitopes = predictor.predict(mutated_regions)

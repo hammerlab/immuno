@@ -45,55 +45,69 @@ from load_file import load_file, maf_to_vcf, expand_transcripts,\
 from maf import load_maf, get_patient_id, is_valid_tcga
 from mhc_common import normalize_hla_allele_name
 from mhc_netmhcpan import PanBindingPredictor
+from mhc_netmhccons import ConsensusBindingPredictor
 from mutation_report import print_mutation_report
 
 parser = argparse.ArgumentParser()
 group = parser.add_mutually_exclusive_group(required=True)
 group.add_argument("--input-dir",
-                   type=str,
-                   help="Directory containing MAF or VCF input files")
+   type=str,
+   help="Directory containing MAF or VCF input files")
+
 group.add_argument("--input-file",
-                   type=str,
-                   help="Single MAF or VCF input file")
+   type=str,
+   help="Single MAF or VCF input file")
+
 parser.add_argument("--hla-dir",
-                    type=str,
-                    default=None,
-                    help=("Directory containing HLA allele files (with"
-                        "suffix .hla)"))
+    type=str,
+    default=None,
+    help=("Directory containing HLA allele files (with suffix .hla)"))
+
 parser.add_argument("--output",
-                    default="analyze_cohort_results.csv",
-                    help="Path to output file")
+    default="analyze_cohort_results.csv",
+    help="Path to output file")
+
 parser.add_argument("--quiet",
-                    type=str,
-                    help="Suppress INFO log messages")
+    type=str,
+    help="Suppress INFO log messages")
+
 parser.add_argument("--binding-threshold",
-                    type=int,
-                    default=500,
-                    help="Cutoff IC50 score for epitope MHC binding")
+    type=int,
+    default=500,
+    help="Cutoff IC50 score for epitope MHC binding")
+
 parser.add_argument("--combined-maf",
-                    default=False,
-                    action="store_true",
-                    help=("Rather than using filenames to identify patients, "
-                          "a single MAF file can have multiple tumor "
-                          "barcodes."))
+    default=False,
+    action="store_true",
+    help=("Rather than using filenames to identify patients, "
+          "a single MAF file can have multiple tumor barcodes."))
+
 parser.add_argument("--rna-filter-dir",
-                    type=str,
-                    default=None,
-                    help=("Directory containing RNASeq gene expression "
-                          "levels (one file per patient). If provided, we "
-                          "filter mutations with no gene expression."))
+    type=str,
+    default=None,
+    help=("Directory containing RNASeq gene expression "
+          "levels (one file per patient). If provided, we "
+          "filter mutations with no gene expression."))
+
 parser.add_argument("--debug-patient-id",
-                    type=str,
-                    default=None,
-                    help=("If we have a directory or a file containing "
-                          "multiple patient IDs, limit that collection to "
-                          "one specific patient ID for debugging."))
+    type=str,
+    default=None,
+    help=("If we have a directory or a file containing "
+          "multiple patient IDs, limit that collection to "
+          "one specific patient ID for debugging."))
+
 parser.add_argument("--debug-scored-epitopes-csv",
-                    type=str,
-                    default=None,
-                    help=("If we have a CSV file representing scored "
-                          "epitopes, use that instead of running netMHCpan. "
-                          "If not, generate that CSV file."))
+    type=str,
+    default=None,
+    help=("If we have a CSV file representing scored "
+          "epitopes, use that instead of running netMHCpan. "
+          "If not, generate that CSV file."))
+
+parser.add_argument("--netmhc-cons",
+    default=False,
+    action="store_true",
+    help="Use local NetMHCcons binding predictor (otherwise use NetMHCpan)")
+
 
 MUTATION_FILE_EXTENSIONS = [".maf", ".vcf"]
 
@@ -274,19 +288,25 @@ def generate_mutation_counts(
             logging.info(
                 "Calling MHC binding predictor for %s (#%d/%d)",
                 patient_id, i + 1, n)
-       
+        
+        def make_mhc_predictor():
+            if args.netmhc_cons:
+                return ConsensusBindingPredictor(hla_allele_names)
+            else:
+                return PanBindingPredictor(hla_allele_names)
+            
         # If we want to read scored_epitopes from a CSV file, do that.
         if args.debug_scored_epitopes_csv:
             csv_file = args.debug_scored_epitopes_csv
             if isfile(csv_file):
                 scored_epitopes = pd.read_csv(csv_file)
             else:
-                mhc = PanBindingPredictor(hla_allele_names)
+                mhc = make_mhc_predictor()
                 scored_epitopes = mhc.predict(transcripts_df,
                         mutation_window_size=9)
                 scored_epitopes.to_csv(csv_file)
         else:
-            mhc = PanBindingPredictor(hla_allele_names)
+            mhc = make_mhc_predictor()
             scored_epitopes = mhc.predict(transcripts_df, 
                     mutation_window_size=9)
         
