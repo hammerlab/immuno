@@ -118,16 +118,16 @@ class CleanupFiles(object):
             try:
                 f.close()
             except:
-                pass 
+                logging.warning("Failed to close %s", f) 
 
             try:
                 os.remove(f.name)
             except:
-                pass 
+                logging.warning("Failed to remove file %s", f) 
 
         for name in self.filenames:
             logging.info("Cleaning up %s", name)
             try:
                 os.remove(name)
             except:
-                pass 
+                logging.warning("Failed to remove filename %s", name) 
