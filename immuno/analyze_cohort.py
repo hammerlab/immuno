@@ -337,11 +337,14 @@ def generate_mutation_counts(
             # drop them
             mutated_epitopes = mutated_epitopes.groupby(['Epitope']).first()
             n_epitopes += len(mutated_epitopes)
-            ligands = mutated_epitopes[
-                mutated_epitopes.MHC_IC50 <= args.binding_threshold]
+            below_threshold_mask = \
+                mutated_epitopes.MHC_IC50 <= args.binding_threshold
+            ligands = mutated_epitopes[below_threshold_mask]
             n_ligands += len(ligands)
             n_ligand_mutations += len(ligands) > 0
-            immunogenic_epitopes = ligands[~ligands.ThymicDeletion]
+            thymic_deletion_mask = \
+                np.array(ligands.ThymicDeletion).astype(bool)
+            immunogenic_epitopes = ligands[~thymic_deletion_mask]
             n_immunogenic_epitopes += len(immunogenic_epitopes)
             n_immunogenic_mutations += len(immunogenic_epitopes) > 0
             if genes_expressed:
