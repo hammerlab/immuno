@@ -33,15 +33,18 @@ Example usage:
 
 import argparse
 import logging
-import pandas as pd
 from os import listdir
 from os.path import join, split, splitext, abspath, isfile
 from collections import OrderedDict
 
+import pandas as pd
+import numpy as np
+
 from common import init_logging, splitext_permissive
 from immunogenicity import ImmunogenicityPredictor
-from load_file import load_file, maf_to_vcf, expand_transcripts,\
-    load_variants
+from load_file import (
+    load_file, maf_to_vcf, expand_transcripts, load_variants
+)
 from maf import load_maf, get_patient_id, is_valid_tcga
 from mhc_common import normalize_hla_allele_name
 from mhc_netmhcpan import PanBindingPredictor
