@@ -1,5 +1,6 @@
-from immuno.common import splitext_permissive
+from os.path import split 
 from nose.tools import eq_, raises
+from immuno.common import splitext_permissive, find_paths
 
 def test_splitext_permissive():
     base, ext = splitext_permissive("", [".txt", ".gz"])
@@ -34,3 +35,15 @@ def test_splitext_permissive_error1():
 @raises(ValueError)
 def test_splitext_permissive_error2():
     base, ext = splitext_permissive("test", [".tar", ""])
+
+def test_find_paths():
+    curr_dir = split(__file__)[0]
+    test_files = find_paths(directory_string = curr_dir, extensions = [".py"])
+    assert len(test_files) > 0
+
+@raises(OSError)
+def test_find_paths_wrong_dir():
+    curr_dir = split(__file__)[0]
+    wrong_dir = curr_dir + "_NONSENSE_!!!!!"
+    test_files = find_paths(directory_string = wrong_dir)
+    

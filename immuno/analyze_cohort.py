@@ -34,13 +34,13 @@ Example usage:
 import argparse
 import logging
 from os import listdir
-from os.path import join, split, splitext, abspath, isfile
+from os.path import join, split, splitext, isfile, abspath
 from collections import OrderedDict
 
 import pandas as pd
 import numpy as np
 
-from common import init_logging, splitext_permissive
+from common import (init_logging, splitext_permissive, find_paths)
 from immunogenicity import ImmunogenicityPredictor
 from load_file import (
     load_file, maf_to_vcf, expand_transcripts, load_variants
@@ -245,12 +245,11 @@ def read_gene_exp_file(path, base, ext, permissive_parsing):
     gene_exp_df = gene_exp_df[gene_exp_df[count_col] > 0]
     return set(gene_exp_df[gene_col].tolist())
         
-
 def generate_mutation_counts(
-        mutation_files, 
+        mutation_files,
         hla_types,
-        genes_expressed, 
-        max_peptide_length=31, 
+        genes_expressed,
+        max_peptide_length=31,
         output_file=None):
     """
     Returns dictionary that maps each patient ID to a tuple with six fields:
@@ -293,13 +292,13 @@ def generate_mutation_counts(
             logging.info(
                 "Calling MHC binding predictor for %s (#%d/%d)",
                 patient_id, i + 1, n)
-        
+
         def make_mhc_predictor():
             if args.netmhc_cons:
                 return ConsensusBindingPredictor(hla_allele_names)
             else:
                 return PanBindingPredictor(hla_allele_names)
-            
+
         # If we want to read scored_epitopes from a CSV file, do that.
         if args.debug_scored_epitopes_csv:
             csv_file = args.debug_scored_epitopes_csv
@@ -312,9 +311,9 @@ def generate_mutation_counts(
                 scored_epitopes.to_csv(csv_file)
         else:
             mhc = make_mhc_predictor()
-            scored_epitopes = mhc.predict(transcripts_df, 
+            scored_epitopes = mhc.predict(transcripts_df,
                     mutation_window_size=9)
-        
+
         imm = ImmunogenicityPredictor(
             alleles=hla_allele_names,
             binding_threshold=args.binding_threshold)
@@ -329,44 +328,33 @@ def generate_mutation_counts(
         n_ligands = 0
         n_immunogenic_mutations = 0
         n_immunogenic_epitopes = 0
-        n_immunogenic_gene_expressed_epitopes = 0
-        n_gene_exp_mutations = 0
-        n_gene_exp_epitopes = 0
         for (gene, mut), group in grouped:
             start_mask = group.EpitopeStart < group.MutationEnd
             stop_mask = group.EpitopeEnd > group.MutationStart
-            mutated_epitopes = group[start_mask & stop_mask]
+            mutated_subset = group[start_mask & stop_mask]
             # we might have duplicate epitopes from multiple transcripts, so
             # drop them
-            mutated_epitopes = mutated_epitopes.groupby(['Epitope']).first()
-            n_epitopes += len(mutated_epitopes)
+            n_curr_epitopes = len(mutated_subset.groupby(['Epitope']))
+            n_epitopes += n_curr_epitopes
             below_threshold_mask = \
-                mutated_epitopes.MHC_IC50 <= args.binding_threshold
-            ligands = mutated_epitopes[below_threshold_mask]
-            n_ligands += len(ligands)
-            n_ligand_mutations += len(ligands) > 0
+                mutated_subset.MHC_IC50 <= args.binding_threshold
+            ligands = mutated_subset[below_threshold_mask]
+            n_curr_ligands = len(ligands.groupby(['Epitope']))
+            n_ligands += n_curr_ligands
+            n_ligand_mutations += (n_curr_ligands) > 0
             thymic_deletion_mask = \
                 np.array(ligands.ThymicDeletion).astype(bool)
             immunogenic_epitopes = ligands[~thymic_deletion_mask]
-            n_immunogenic_epitopes += len(immunogenic_epitopes)
-            n_immunogenic_mutations += len(immunogenic_epitopes) > 0
-            if genes_expressed:
-                # Only keep epitopes with genes that are expressed
-                gene_exp_mask = immunogenic_epitopes.Gene.isin(
-                        genes_expressed[patient_id])
-                gene_exp_epitopes = immunogenic_epitopes[gene_exp_mask]
-                n_gene_exp_epitopes += len(gene_exp_epitopes)
-                n_gene_exp_mutations += len(gene_exp_epitopes) > 0
-            else:
-                gene_exp_epitopes = []
-            logging.info(("%s %s: epitopes %s, ligands %d, imm %d, "
-                          "gene exp %s"),
+            curr_immunogenic_epitopes = immunogenic_epitopes.groupby(['Epitope']).first()
+            n_immunogenic_epitopes += len(curr_immunogenic_epitopes)
+            n_immunogenic_mutations += len(curr_immunogenic_epitopes) > 0
+            logging.info(("%s %s: epitopes %s, ligands %d, imm %d"),
                          gene,
                          mut,
-                         len(mutated_epitopes),
-                         len(ligands),
-                         len(immunogenic_epitopes),
-                         len(gene_exp_epitopes))
+                         n_curr_epitopes,
+                         n_curr_ligands,
+                         len(curr_immunogenic_epitopes),
+                        )
         result_tuple = (
             n_coding_mutations,
             n_epitopes,
@@ -374,8 +362,6 @@ def generate_mutation_counts(
             n_ligands,
             n_immunogenic_mutations,
             n_immunogenic_epitopes,
-            n_gene_exp_mutations,
-            n_gene_exp_epitopes
         )
         if output_file:
             data_string = ",".join(str(d) for d in result_tuple)
@@ -410,7 +396,7 @@ if __name__ == "__main__":
     genes_expressed = None
     if args.rna_filter_dir:
         genes_expressed = collect_gene_exp_files(args.rna_filter_dir)
-    
+
     missing = set([])
     # make sure we have HLA types for each patient
     for patient_id in mutation_files.iterkeys():
@@ -442,13 +428,11 @@ if __name__ == "__main__":
             n_coding_mutations, n_epitopes,
             n_ligand_mutations, n_ligands,
             n_immunogenic_mutations, n_immunogenic_epitopes,
-            n_gene_exp_mutations, n_gene_exp_epitopes
         ) = fields
         print(
             ("%s: # mutations %d (%d epitopes), # mutations with ligands "
-             "%d (%d epitopes), # immunogenic mutations %d (%d epitopes), "
-             "# immunogenic mutations with gene expression %d (%d "
-             "epitopes)") % (
+             "%d (%d epitopes), # immunogenic mutations %d (%d epitopes) "
+            ) % (
                 patient_id,
                 n_coding_mutations,
                 n_epitopes,
@@ -456,6 +440,4 @@ if __name__ == "__main__":
                 n_ligands,
                 n_immunogenic_mutations,
                 n_immunogenic_epitopes,
-                n_gene_exp_mutations,
-                n_gene_exp_epitopes
             ))

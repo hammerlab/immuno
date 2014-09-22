@@ -14,7 +14,7 @@
 
 import logging
 import os
-from os.path import splitext
+from os.path import splitext, abspath, join
 from subprocess import Popen, CalledProcessError
 import time 
 
@@ -92,6 +92,27 @@ def run_command(args):
         elapsed_time = time.time() - start_time
         logging.info("%s took %0.4f seconds", cmd, elapsed_time)
 
+def find_paths(filename_string = "", directory_string = "", extensions = None):
+    """
+    Parse input comma separated list of files and comma separated list
+    of directories, collecting all of their full file paths. 
+    """
+    paths = []
+    if filename_string:
+        for filename in filename_string.split(","):
+            paths.append(abspath(filename.strip()))
+    if directory_string:
+        for dirpath in directory_string.split(","):
+            for filename in os.listdir(dirpath):
+                path = join(dirpath, filename)
+                paths.append(path)
+    if extensions is not None:
+        paths = [
+            p for p in paths 
+            if any(p.endswith(ext) for ext in extensions)
+        ]
+    return paths
+    
 
 class CleanupFiles(object):
     """
