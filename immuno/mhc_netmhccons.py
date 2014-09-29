@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import tempfile
-import os
 import logging
+import os
+import subprocess
+import tempfile
 import time 
 
 import numpy as np
@@ -40,11 +41,23 @@ class ConsensusBindingPredictor(object):
             assert False, "Failed to run %s" % self.netmhc_command
 
         # normalize alleles and keep only unique names
-        self.alleles = {
+        normalized_alleles = {
             normalize_hla_allele_name(allele.strip().upper())
             for allele in hla_alleles
         }
-        
+
+        self.alleles = []
+
+        for allele in normalized_alleles:
+            try:
+                subprocess.check_output(
+                    ['netMHCcons', '-a', 'HLA-A23:31'],
+                    stderr=subprocess.STDOUT)
+                self.alleles.append(allele)
+            except subprocess.CalledProcessError, e:
+                if "allele" in e.outout and "wrong format" in e.output:
+                    logging.warning(
+                        "Allele %s not recognized by NetMHCcons", allele)
 
     def predict(self, df, mutation_window_size = None):
         """
@@ -76,15 +89,15 @@ class ConsensusBindingPredictor(object):
 
             output_file = tempfile.NamedTemporaryFile(
                     "r+", 
-                    prefix="netMHCcons_output_%d" % i, 
+                    prefix="netMHCcons_output_%d" % i,
                     delete=False)
             output_files[allele] = output_file
             command = [
                 self.netmhc_command,  
-                    "-xls", 
+                    "-xls",
                     "-xlsfile", output_file.name,
                     "-length", "9",
-                    "-f", input_filename, 
+                    "-f", input_filename,
                     "-a", allele.replace("*", "")]
             print " ".join(command)
 
