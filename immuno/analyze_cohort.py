@@ -111,6 +111,12 @@ parser.add_argument("--netmhc-cons",
     action="store_true",
     help="Use local NetMHCcons binding predictor (otherwise use NetMHCpan)")
 
+parser.add_argument("--resume",
+    default=False, 
+    action="store_true",
+    help="Append to an existing output file"
+)
+
 
 MUTATION_FILE_EXTENSIONS = [".maf", ".vcf"]
 
@@ -250,6 +256,7 @@ def generate_mutation_counts(
         hla_types,
         genes_expressed,
         max_peptide_length=31,
+        skip_identifiers = {},
         output_file=None):
     """
     Returns dictionary that maps each patient ID to a tuple with six fields:
@@ -266,6 +273,9 @@ def generate_mutation_counts(
     mutation_counts = OrderedDict()
     n = len(mutation_files)
     for i, (patient_id, vcf_df) in enumerate(mutation_files.iteritems()):
+        if patient_id in skip_identifiers:
+            logging.info("Skipping patient ID %s", patient_id)
+            continue
         hla_allele_names = hla_types[patient_id]
         logging.info(
             "Processing %s (#%d/%d) with HLA alleles %s",
@@ -413,12 +423,31 @@ if __name__ == "__main__":
     for patient_id in missing:
         del mutation_files[patient_id]
 
-    output_file = open(args.output, 'w')
+    if args.resume:
+        with open(args.output, 'r') as f:
+            lines = [l for l in f.read().split("\n") if len(l) > 0]
+            fields = [l.split(",") for l in lines]
+            # expect ID and 6 data fields
+            # warning: the number of fields is tightly 
+            # coupled with the code that actually writes the CSV files
+            complete_fields = [l for l in fields if len(l) == 7]
+        output_file = open(args.output, 'w')
+        finished_identifiers = []
+        for l in complete_fields:
+            identifier = l[0]
+            finished_identifiers.append(identifier)
+            output_file.write("%s\n" % ",".join(l))
+    else:
+        finished_identifiers = []
+        output_file = open(args.output, 'w')
+
     mutation_counts = generate_mutation_counts(
         mutation_files,
         hla_types,
         genes_expressed,
+        skip_identifiers = finished_identifiers,
         output_file=output_file)
+
     output_file.close()
 
     print
