@@ -42,22 +42,29 @@ class ConsensusBindingPredictor(object):
 
         # normalize alleles and keep only unique names
         normalized_alleles = {
-            normalize_hla_allele_name(allele.strip().upper())
+            normalize_hla_allele_name(allele.strip().upper()).replace("*", "")
             for allele in hla_alleles
         }
 
         self.alleles = []
 
+        # try running "netMHCcons -a" with each allele name
+        # and check if it gives you back a "wrong format" error 
         for allele in normalized_alleles:
             try:
                 subprocess.check_output(
-                    ['netMHCcons', '-a', 'HLA-A23:31'],
+                    ['netMHCcons', '-a', allele],
                     stderr=subprocess.STDOUT)
-                self.alleles.append(allele)
             except subprocess.CalledProcessError, e:
-                if "allele" in e.outout and "wrong format" in e.output:
+                if "allele" in e.output and "wrong format" in e.output:
                     logging.warning(
                         "Allele %s not recognized by NetMHCcons", allele)
+                    continue
+            except:
+                pass 
+            logging.info("Normalize HLA allele %s", allele)
+            self.alleles.append(allele)
+
 
     def predict(self, df, mutation_window_size = None):
         """
@@ -98,7 +105,7 @@ class ConsensusBindingPredictor(object):
                     "-xlsfile", output_file.name,
                     "-length", "9",
                     "-f", input_filename,
-                    "-a", allele.replace("*", "")]
+                    "-a", allele]
             print " ".join(command)
 
             # Cleanup either when finished or if an exception gets raised by 
