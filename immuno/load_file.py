@@ -23,7 +23,6 @@ from common import normalize_chromosome_name, is_valid_peptide
 from ensembl import annotation, gene_names
 from ensembl.transcript_variant import peptide_from_transcript_variant
 from vcf import load_vcf
-from snpeff import load_snpeff
 from maf import load_maf
 from fasta import load_fasta
 
