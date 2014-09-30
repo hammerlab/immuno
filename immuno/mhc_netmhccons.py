@@ -22,7 +22,7 @@ import numpy as np
 import pandas as pd 
 from epitopes.mutate import gene_mutation_description
 
-from common import run_command, CleanupFiles
+from common import run_multiple_commands, CleanupFiles
 from mhc_common import normalize_hla_allele_name
 from mhc_formats import create_input_fasta_file, parse_xls_file
 
@@ -36,7 +36,8 @@ class ConsensusBindingPredictor(object):
         self.netmhc_command = netmhc_command
         
         try:
-            run_command([self.netmhc_command])
+            subprocess.check_output([self.netmhc_command],
+                stderr=subprocess.STDOUT)
         except:
             assert False, "Failed to run %s" % self.netmhc_command
 
@@ -53,7 +54,7 @@ class ConsensusBindingPredictor(object):
         for allele in normalized_alleles:
             try:
                 subprocess.check_output(
-                    ['netMHCcons', '-a', allele],
+                    [self.netmhc_command, '-a', allele],
                     stderr=subprocess.STDOUT)
             except subprocess.CalledProcessError, e:
                 if "allele" in e.output and "wrong format" in e.output:
@@ -91,7 +92,7 @@ class ConsensusBindingPredictor(object):
 
         output_files = {}
            
-        results = []
+        commands_list = []
         for i, allele in enumerate(self.alleles):
 
             output_file = tempfile.NamedTemporaryFile(
@@ -106,18 +107,19 @@ class ConsensusBindingPredictor(object):
                     "-length", "9",
                     "-f", input_filename,
                     "-a", allele]
-            print " ".join(command)
-
-            # Cleanup either when finished or if an exception gets raised by 
-            # deleting the input and output files
-            with CleanupFiles(
-                    filenames = [input_filename], 
-                    dictionaries = [output_files]):
-                run_command(command)
-                results.extend(
-                        parse_xls_file(
-                            output_file.read(),
-                            peptide_entries, 
-                            mutation_window_size=mutation_window_size))
+            commands_list.append(command)
+            
+        results = []
+        # Cleanup either when finished or if an exception gets raised by 
+        # deleting the input and output files
+        with CleanupFiles(
+                filenames = [input_filename], 
+                dictionaries = [output_files]):
+            run_multiple_commands(commands_list, print_commands = True)
+            results.extend(
+                    parse_xls_file(
+                        output_file.read(),
+                        peptide_entries, 
+                        mutation_window_size=mutation_window_size))
         assert len(results) > 0, "No epitopes from netMHCcons"
         return pd.DataFrame.from_records(results)

@@ -1,6 +1,11 @@
 from os.path import split 
+from subprocess import CalledProcessError
 from nose.tools import eq_, raises
-from immuno.common import splitext_permissive, find_paths
+
+from immuno.common import (
+    splitext_permissive, find_paths,
+    AsyncProcess, run_command, run_multiple_commands
+)
 
 def test_splitext_permissive():
     base, ext = splitext_permissive("", [".txt", ".gz"])
@@ -46,4 +51,21 @@ def test_find_paths_wrong_dir():
     curr_dir = split(__file__)[0]
     wrong_dir = curr_dir + "_NONSENSE_!!!!!"
     test_files = find_paths(directory_string = wrong_dir)
-    
+
+def test_async_ls():
+    process = AsyncProcess(["ls"])
+    process.wait()
+
+def test_run_ls():
+    run_command(["ls", "-als"])
+
+@raises(OSError)
+def test_run_bad_command():    
+    run_command(["__DSH#*#*&SHJ"])
+
+@raises(CalledProcessError)
+def test_run_invalid_args():    
+    run_command(["ls", "-Z_z"], suppress_stderr = True)
+
+def test_run_mulitple_ls():
+    run_multiple_commands([["ls"], ["ls"]])
