@@ -96,14 +96,18 @@ class ImmunogenicityPredictor(object):
         self.peptide_sets = {}
 
         for allele in self.alleles:
-            logging.info(
-                "Loading thymic MHC peptide set for HLA allele %s", allele)
-            assert allele in self.allele_mappings, \
-                "No MHC peptide set available for HLA allele %s" % (allele,)
+            if allele not in self.allele_mappings:
+                logging.warn(
+                    "No MHC peptide set available for HLA allele %s", allele)
+                continue
+            else:
+                logging.info(
+                    "Loading thymic MHC peptide set for HLA allele %s", allele)
 
             filename = self.allele_mappings[allele] 
             assert filename in available_alleles, \
-                "No MHC peptide set available for HLA allele %s (filename = %s)" % (allele,filename)
+                "No MHC peptide set available for HLA allele %s (file = %s)" % \
+                    (allele,filename)
             
             with open(join(self.data_path, filename), 'r') as f:
                 peptide_set = {l for l in f.read().split("\n") if len(l) > 0}
@@ -118,28 +122,33 @@ class ImmunogenicityPredictor(object):
            other peptides in the self/thymic MHC ligand sets of that HLA allele 
 
         Returns DataFrame with two extra columns:
-            - ThymicDeletion: Was this epitope deleted during thymic selection 
+            - ThymicDeletion: Was this epitope deleted during thymic selection
               (and thus can't be recognize by T-cells)?
             - Immunogenic: Is this epitope a sufficiently strong binder that
-              wasn't deleted during thymic selection? 
+              wasn't deleted during thymic selection?
         """
         
         thymic_peptide_sets = self.peptide_sets.values()
         
-        peptides_df["ThymicDeletion"] = False
-        
+        # assume a peptide is non-immunogenic unless not in thymic sets
+        # We do this in case some alleles are missing, resulting in all
+        # their associated ligands being considered non-immunogenic
+        peptides_df["ThymicDeletion"] = True
         for i in xrange(len(peptides_df)):
             row = peptides_df.ix[i]
             peptide = row.Epitope 
             allele = compact_hla_allele_name(row.Allele)
-            # positions in the epitope are indexed starting from 1 to 
-            # match immunology nomenclature
-            substring = peptide[self.first_position - 1 : self.last_position]
-            peptides_df['ThymicDeletion'].ix[i] = \
-                substring in self.peptide_sets[allele]
+            if allele in self.peptide_sets:
+                # positions in the epitope are indexed starting from 1 to
+                # match immunology nomenclature
+                substring = \
+                    peptide[self.first_position - 1 : self.last_position]
+                peptides_df['ThymicDeletion'].ix[i] = \
+                    substring in self.peptide_sets[allele]
         
-        peptides_df["Immunogenic"] = ~peptides_df["ThymicDeletion"] & \
-             (peptides_df["MHC_IC50"] <= self.binding_threshold)
+        peptides_df["Immunogenic"] = \
+            ~peptides_df["ThymicDeletion"] & \
+            (peptides_df["MHC_IC50"] <= self.binding_threshold)
 
         return peptides_df
     

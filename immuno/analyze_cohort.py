@@ -437,6 +437,7 @@ if __name__ == "__main__":
             identifier = l[0]
             finished_identifiers.append(identifier)
             output_file.write("%s\n" % ",".join(l))
+        output_file.flush()
     else:
         finished_identifiers = []
         output_file = open(args.output, 'w')
