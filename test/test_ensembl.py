@@ -13,8 +13,8 @@
 # limitations under the License.
 
 import pandas as pd
-from epitopes.mutate import mutate_protein_from_transcript
 
+from immuno.mutate import mutate_protein_from_transcript
 import immuno.ensembl.annotation as ensembl
 from immuno.ensembl.transcript_data import EnsemblReferenceData
 

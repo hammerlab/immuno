@@ -17,7 +17,7 @@ from Bio import SeqIO
 
 from strings import parse_string
 
-def load_fasta(fasta_filename, peptide_length):
+def load_fasta(fasta_filename):
     seqs = []
     ids = []
     names = []
@@ -30,7 +30,6 @@ def load_fasta(fasta_filename, peptide_length):
         ids.append(record.id)
         names.append(record.name)
         descriptions.append(record.description)
-
     assert len(ids) == len(seqs) == len(names) == len(descriptions) ==\
         len(starts) == len(stops)
     return pd.DataFrame({

@@ -51,7 +51,7 @@ MAF_COLUMN_NAMES = [
 ]
 
 
-def load_maf(filename, nrows=None, verbose=True):
+def load_maf(filename, nrows=None, verbose=False):
     """
     Load the guaranteed columns of a TCGA MAF file into a DataFrame
     """

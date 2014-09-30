@@ -16,12 +16,12 @@ import logging
 from copy import deepcopy
 from collections import OrderedDict 
 
-from epitopes.mutate import gene_mutation_description
 import pandas as pd
 
 from common import normalize_chromosome_name, is_valid_peptide
 from ensembl import annotation, gene_names
 from ensembl.transcript_variant import peptide_from_transcript_variant
+from mutate import gene_mutation_description
 from vcf import load_vcf
 from maf import load_maf
 from fasta import load_fasta
@@ -86,7 +86,7 @@ def expand_transcripts(
     """
 
     assert len(vcf_df)  > 0, "No mutation entries for %s" % patient_id 
-    
+    logging.info("Expanding transcripts from %d variants for %s", len(vcf_df), patient_id)    
     vcf_df['chr'] = vcf_df.chr.map(normalize_chromosome_name)
     
 
@@ -286,9 +286,11 @@ def load_file(input_filename, min_peptide_length=9, max_peptide_length=31):
 
     if input_filename.endswith(".fasta") \
             or input_filename.endswith(".fa"):
-        return load_fasta(input_filename, peptide_length = max_peptide_length)
+        return load_fasta(input_filename)
 
     vcf_df = load_variants(input_filename)
+    vcf_df = vcf_df.drop_duplicates()
+
     return expand_transcripts(
         vcf_df,
         input_filename, 

@@ -16,25 +16,25 @@ import logging
 import os
 import subprocess
 import tempfile
-import time 
+import time
 
 import numpy as np
-import pandas as pd 
-from epitopes.mutate import gene_mutation_description
+import pandas as pd
 
-from common import run_multiple_commands, CleanupFiles
+from process_helpers import run_multiple_commands_redirect_stdout
+from cleanup_context import CleanupFiles
 from mhc_common import normalize_hla_allele_name
-from mhc_formats import create_input_fasta_file, parse_xls_file
+from mhc_formats import create_input_fasta_file, parse_netmhc_stdout
 
 
 class ConsensusBindingPredictor(object):
 
     def __init__(
-            self, 
-            hla_alleles, 
+            self,
+            hla_alleles,
             netmhc_command = "netMHCcons"):
         self.netmhc_command = netmhc_command
-        
+
         try:
             subprocess.check_output([self.netmhc_command],
                 stderr=subprocess.STDOUT)
@@ -50,7 +50,7 @@ class ConsensusBindingPredictor(object):
         self.alleles = []
 
         # try running "netMHCcons -a" with each allele name
-        # and check if it gives you back a "wrong format" error 
+        # and check if it gives you back a "wrong format" error
         for allele in normalized_alleles:
             try:
                 subprocess.check_output(
@@ -62,19 +62,19 @@ class ConsensusBindingPredictor(object):
                         "Allele %s not recognized by NetMHCcons", allele)
                     continue
             except:
-                pass 
+                pass
             logging.info("Normalize HLA allele %s", allele)
             self.alleles.append(allele)
 
 
     def predict(self, df, mutation_window_size = None):
         """
-        Given a dataframe of mutated amino acid sequences, run each sequence 
-        through NetMHCcons. 
+        Given a dataframe of mutated amino acid sequences, run each sequence
+        through NetMHCcons.
         If mutation_window_size is not None then only make predictions for that
-        number residues away from mutations. 
+        number residues away from mutations.
 
-        Expects the input DataFrame to have the following fields: 
+        Expects the input DataFrame to have the following fields:
             - SourceSequence
             - MutationStart
             - MutationEnd
@@ -91,35 +91,56 @@ class ConsensusBindingPredictor(object):
         )
 
         output_files = {}
-           
-        commands_list = []
+        commands = {}
+        dirs = []
         for i, allele in enumerate(self.alleles):
-
+            temp_dirname = tempfile.mkdtemp(prefix="tmp_netmhccons_")
+            logging.info("Created temporary directory %s for allele %s",
+                allele,
+                temp_dirname
+            )
+            dirs.append(temp_dirname)
             output_file = tempfile.NamedTemporaryFile(
-                    "r+", 
+                    "w",
                     prefix="netMHCcons_output_%d" % i,
                     delete=False)
-            output_files[allele] = output_file
             command = [
-                self.netmhc_command,  
-                    "-xls",
-                    "-xlsfile", output_file.name,
+                self.netmhc_command,
                     "-length", "9",
                     "-f", input_filename,
-                    "-a", allele]
-            commands_list.append(command)
-            
+                    "-a", allele,
+                    '-tdir', temp_dirname]
+            commands[output_file] = command
+
         results = []
-        # Cleanup either when finished or if an exception gets raised by 
+
+        # Cleanup either when finished or if an exception gets raised by
         # deleting the input and output files
+        filenames_to_delete = [input_filename]
+        for f in output_files.keys():
+            filenames_to_delete.append(f.name)
+
         with CleanupFiles(
-                filenames = [input_filename], 
-                dictionaries = [output_files]):
-            run_multiple_commands(commands_list, print_commands = True)
-            results.extend(
-                    parse_xls_file(
-                        output_file.read(),
-                        peptide_entries, 
-                        mutation_window_size=mutation_window_size))
+                filenames = filenames_to_delete,
+                directories = dirs):
+            run_multiple_commands_redirect_stdout(
+                commands, print_commands = True)
+            for output_file, command in commands.iteritems():
+                # closing/opening looks insane
+                # but I was getting empty files otherwise
+                output_file.close()
+                with  open(output_file.name, 'r') as f:
+                    rows = parse_netmhc_stdout(
+                        f.read(),
+                        peptide_entries,
+                        mutation_window_size=mutation_window_size)
+                results.extend(rows)
         assert len(results) > 0, "No epitopes from netMHCcons"
-        return pd.DataFrame.from_records(results)
+        df = pd.DataFrame.from_records(results)
+        unique_alleles = set(df.Allele)
+        assert len(unique_alleles) == len(self.alleles), \
+            "Expected %d alleles (%s) but got %d (%s)" % (
+                len(self.alleles), self.alleles, 
+                len(unique_alleles), unique_alleles
+            )
+        return df

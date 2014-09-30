@@ -2,13 +2,13 @@
 import tempfile
 import os
 import logging
-import time 
+import time
 
 import numpy as np
-import pandas as pd 
-from epitopes.mutate import gene_mutation_description
+import pandas as pd
 
-from common import run_command, CleanupFiles
+from cleanup_context import CleanupFiles
+from process_helpers import run_command
 from mhc_common import normalize_hla_allele_name
 from mhc_formats import create_input_fasta_file, parse_xls_file
 
@@ -16,11 +16,11 @@ from mhc_formats import create_input_fasta_file, parse_xls_file
 class PanBindingPredictor(object):
 
     def __init__(
-            self, 
-            hla_alleles, 
+            self,
+            hla_alleles,
             netmhc_command = "netMHCpan"):
         self.netmhc_command = netmhc_command
-        
+
         try:
             run_command([self.netmhc_command])
         except:
