@@ -69,28 +69,65 @@ def splitext_permissive(path, ignored_exts):
         return splitext_permissive(base, ignored_exts)
     return (base, ext)
 
+class AsyncProcess(object):
+    """
+    A thin wrapper around Popen which starts a process asynchronously,
+    suppresses stdout printing, and raises an exception if the return code 
+    of wait() isn't 0
+    """
 
-def run_command(args):
+    def __init__(self, args, suppress_stdout = True, suppress_stderr = False):
+        assert len(args) > 0
+        self.cmd = args[0]
+        with open(os.devnull, 'w') as devnull:
+            stderr = devnull if suppress_stderr else None
+            stdout = devnull if suppress_stdout else None
+            self.process = Popen(args, stdout = stdout, stderr = stderr)
+
+    def wait(self):
+        ret_code = self.process.wait()
+        logging.info(
+            "%s finished with return code %s", 
+            self.cmd,
+            ret_code)
+        if ret_code:
+            raise CalledProcessError(ret_code, self.cmd)
+        return ret_code
+
+def run_command(args, **kwargs):
     """
     Given a list whose first element is a command name, followed by arguments, 
     execute it and show timing info. 
     """
+    assert len(args) > 0
     cmd = args[0]
     start_time = time.time()
-    with open(os.devnull, 'w') as devnull:
-        process = Popen(args, stdout = devnull)
+    process = AsyncProcess(args, **kwargs)
+    process.wait()
+    elapsed_time = time.time() - start_time
+    logging.info("%s took %0.4f seconds", cmd, elapsed_time)
 
-    ret_code = process.wait()
+def run_multiple_commands(multiple_args_lists, print_commands=True, **kwargs):
+    assert len(multiple_args_lists) > 0
+    assert all(len(args) > 0 for args in multiple_args_lists)
+    start_time = time.time()
+    command_names = [args[0] for args in multiple_args_lists]
+    processes = []
+    for args in multiple_args_lists:
+        if print_commands:
+            print " ".join(args)
+        p = AsyncProcess(args, **kwargs)
+        processes.append(p)
 
-    if ret_code:
-        logging.info(
-            "%s finished with return code %s", 
-            cmd,
-            ret_code)
-        raise CalledProcessError(ret_code, cmd)
-    else:
-        elapsed_time = time.time() - start_time
-        logging.info("%s took %0.4f seconds", cmd, elapsed_time)
+    for p in processes:
+        p.wait()
+
+    elapsed_time = time.time() - start_time
+    logging.info("Ran %d commands (%s) in %0.4f seconds",
+        len(multiple_args_lists),
+        ",".join(command_names),
+        elapsed_time
+    )
 
 def find_paths(filename_string = "", directory_string = "", extensions = None):
     """
