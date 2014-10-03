@@ -19,8 +19,9 @@ the mutated residue.
 
 import logging
 
-from epitopes.mutate import mutate_protein_from_transcript, mutate, gene_mutation_description
-
+from immuno.mutate import (
+    mutate_protein_from_transcript, mutate, gene_mutation_description
+)
 from transcript_data import EnsemblReferenceData
 import annotation
 
@@ -51,11 +52,16 @@ def peptide_from_transcript_variant(
         max_length = None):
      
     
+    # sometimes empty strings get represented with a '.'
+    if ref == ".":
+        ref = ""
+    if alt == ".":
+        alt = ""
+
     forward = annotation.is_forward_strand(transcript_id)
     ref = ref if forward else annotation.reverse_complement(ref)
     alt = alt if forward else annotation.reverse_complement(alt)
     transcript = _ensembl.get_cds(transcript_id)
-    
     def error_result(msg, *args):
         logging.warning(msg, *args)
         return None, -1, -1, msg % args 
@@ -74,13 +80,25 @@ def peptide_from_transcript_variant(
             transcript_id)
     elif idx >= len(transcript):
         return error_result(
-            "Can't get position %d in coding sequence of length %d for transcript %s (%s)",
+            "Index %d longer than sequence (len %d) for transcript %s (%s)",
             idx, 
             len(transcript),
             transcript_id,
             gene_mutation_description(pos, ref, alt))
+
+    idx = idx if forward else idx - len(ref) + 1
+
+    # 'ref' represents what the VCF file thought were the reference bases
+    # at this position, now we actually check to make sure the transcript
+    # agrees
+    transcript_ref = str(transcript[idx:idx+len(ref)])
+    if transcript_ref != ref:
+        mutation_description = gene_mutation_description(pos, ref, alt)
+        return error_result(
+            "VCF/MAF expected %s at idx %d of transcript %s, found %s (%s)" % \
+                (ref, idx, transcript_id, transcript_ref, mutation_description)
+        )
     try:      
-        idx = idx if forward else idx - len(ref) + 1  
         region = mutate_protein_from_transcript(
             transcript,
             idx,

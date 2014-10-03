@@ -35,6 +35,7 @@ import argparse
 import logging
 from os import listdir
 from os.path import join, split, splitext, isfile, abspath
+import traceback
 from collections import OrderedDict
 
 import pandas as pd
@@ -137,7 +138,6 @@ def find_mutation_files(
         _, filename = split(path)
         base, ext = splitext(filename)
         if ext in MUTATION_FILE_EXTENSIONS:
-            logging.info("Reading mutation file %s", path)
             if ext.endswith('maf') and combined_maf:
                 maf_df = load_maf(path)
                 file_patients = {}
@@ -277,9 +277,14 @@ def generate_mutation_counts(
             logging.info("Skipping patient ID %s", patient_id)
             continue
         hla_allele_names = hla_types[patient_id]
+        
         logging.info(
             "Processing %s (#%d/%d) with HLA alleles %s",
             patient_id, i + 1, n, hla_allele_names)
+        
+        if not args.quiet:
+            print vcf_df 
+
         try:
             transcripts_df, raw_genomic_mutation_df, variant_report = (
                 expand_transcripts(
@@ -290,7 +295,8 @@ def generate_mutation_counts(
             raise
         except:
             logging.warning("Failed to apply mutations for %s", patient_id)
-            continue
+            raise
+
         # print each genetic mutation applied to each possible transcript
         # and either why it failed or what protein mutation resulted
         if not args.quiet:
@@ -323,6 +329,9 @@ def generate_mutation_counts(
             mhc = make_mhc_predictor()
             scored_epitopes = mhc.predict(transcripts_df,
                     mutation_window_size=9)
+        
+        if not args.quiet:
+            print scored_epitopes
 
         imm = ImmunogenicityPredictor(
             alleles=hla_allele_names,
@@ -385,6 +394,8 @@ if __name__ == "__main__":
 
     init_logging(args.quiet)
 
+    # collect input files from commandline arguments specifying either
+    # filenames or directories
     input_filenames = []
     if args.input_file:
         for filename in args.input_file.split(","):
