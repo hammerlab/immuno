@@ -140,7 +140,7 @@ class ConsensusBindingPredictor(object):
         unique_alleles = set(df.Allele)
         assert len(unique_alleles) == len(self.alleles), \
             "Expected %d alleles (%s) but got %d (%s)" % (
-                len(self.alleles), self.alleles, 
+                len(self.alleles), self.alleles,
                 len(unique_alleles), unique_alleles
             )
         return df

@@ -36,7 +36,7 @@ class PanBindingPredictor(object):
                     valid_alleles.add(line)
         except:
             logging.warning("Failed to run %s -listMHC", self.netmhc_command)
-            valid_alleles = None 
+            valid_alleles = None
 
         self.alleles = []
         for allele in hla_alleles:
@@ -54,12 +54,12 @@ class PanBindingPredictor(object):
 
     def predict(self, df, mutation_window_size = None):
         """
-        Given a dataframe of mutated amino acid sequences, run each sequence 
-        through NetMHCpan. 
+        Given a dataframe of mutated amino acid sequences, run each sequence
+        through NetMHCpan.
         If mutation_window_size is not None then only make predictions for that
-        number residues away from mutations. 
+        number residues away from mutations.
 
-        Expects the input DataFrame to have the following fields: 
+        Expects the input DataFrame to have the following fields:
             - SourceSequence
             - MutationStart
             - MutationEnd
@@ -74,30 +74,30 @@ class PanBindingPredictor(object):
             df,
             mutation_window_size=mutation_window_size
         )
-        
+
         alleles_str = \
             ",".join(allele.replace("*", "") for allele in self.alleles)
         output_file =  tempfile.NamedTemporaryFile(
-                "r+", 
-                prefix="netMHCpan_output", 
+                "r+",
+                prefix="netMHCpan_output",
                 delete=False)
         command = [
-            self.netmhc_command,  
-                "-xls", 
+            self.netmhc_command,
+                "-xls",
                 "-xlsfile", output_file.name,
                  "-l", "9",
-                  "-f", input_filename, 
+                  "-f", input_filename,
                   "-a", alleles_str]
         print " ".join(command)
 
         with CleanupFiles(
-                filenames = [input_filename], 
+                filenames = [input_filename],
                 files = [output_file]):
             run_command(command)
             results = parse_xls_file(
-                output_file.read(), peptide_entries, 
+                output_file.read(), peptide_entries,
                 mutation_window_size=mutation_window_size
             )
-        
+
         assert len(results) > 0, "No epitopes from netMHCpan"
         return pd.DataFrame.from_records(results)

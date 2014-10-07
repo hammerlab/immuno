@@ -28,7 +28,7 @@ from common import peptide_substrings, init_logging
 from mhc_iedb import IEDBMHCBinding, normalize_hla_allele_name
 from mhc_netmhcpan import PanBindingPredictor
 from mhc_netmhccons import ConsensusBindingPredictor
-import mhc_random 
+import mhc_random
 from load_file import load_file
 from strings import load_comma_string
 from immunogenicity import ImmunogenicityPredictor
@@ -40,17 +40,17 @@ parser = argparse.ArgumentParser()
 # must supply either an input file or an amino acid string
 input_group = parser.add_argument_group()
 
-input_group.add_argument("--input-file", 
-    action="append", 
+input_group.add_argument("--input-file",
+    action="append",
     default=[],
     help="input file(s) (must be FASTA, MAF, TAB or VCF format)")
 
-input_group.add_argument("--string", 
+input_group.add_argument("--string",
     default=None,
     help="Literal amino acid string of mutated peptide")
 
 parser.add_argument("--quiet",
-    default=False, 
+    default=False,
     action="store_true",
     help="Suppress verbose output"
 )
@@ -60,9 +60,9 @@ parser.add_argument("--peptide-length",
     type=int,
     help="Length of vaccine peptides (may contain multiple epitopes)")
 
-parser.add_argument("--min-peptide-padding", 
-    default=0, 
-    type=int, 
+parser.add_argument("--min-peptide-padding",
+    default=0,
+    type=int,
     help="Minimum number of wildtype residues before or after a mutation")
 
 parser.add_argument("--hla-file",
@@ -97,7 +97,7 @@ parser.add_argument("--print-epitopes",
     action="store_true")
 
 parser.add_argument("--print-peptides",
-    default=False, 
+    default=False,
     help="Print dataframe with vaccine peptide scores",
     action="store_true")
 
@@ -110,22 +110,22 @@ def print_mutation_report(
         variant_report,
         raw_genomic_mutation_df,
         transcripts_df):
-    print 
-    print "MUTATION REPORT FOR", input_filename 
-    print 
-    last_mutation = None 
+    print
+    print "MUTATION REPORT FOR", input_filename
+    print
+    last_mutation = None
     for (mut_description, transcript_id), msg in variant_report.iteritems():
         if mut_description != last_mutation:
             print mut_description
             last_mutation = mut_description
-        print "--", transcript_id, ":", msg 
+        print "--", transcript_id, ":", msg
 
     logging.info("---")
     logging.info("FILE LOADING SUMMARY FOR %s", input_filename)
     logging.info("---")
     logging.info("# original mutations: %d", len(raw_genomic_mutation_df))
     logging.info(
-        "# mutations with annotations: %d", 
+        "# mutations with annotations: %d",
         len(transcripts_df.groupby(['chr', 'pos', 'ref', 'alt'])))
     logging.info("# transcripts: %d", len(transcripts_df))
 
@@ -137,7 +137,7 @@ def group_epitopes(scored_epitopes):
       - MutationStart
       - MutationEnd
       - GeneMutationInfo
-      - PeptideMutationInfo 
+      - PeptideMutationInfo
       - Gene
       - GeneInfo
       - Epitope
@@ -145,32 +145,32 @@ def group_epitopes(scored_epitopes):
       - EpitopeEnd
       - MHC_IC50
       - MHC_PercentileRank
-    
+
     Group epitopes under their originating transcript and
     make nested lists of dictionaries to contain the binding scores
-    for MHC alleles. 
-    
+    for MHC alleles.
+
     Return a list of dictionaries for each mutated transcript with fields:
       - TranscriptId
       - SourceSequence
       - MutationStart
       - MutationEnd
       - GeneMutationInfo
-      - PeptideMutationInfo 
+      - PeptideMutationInfo
       - Gene
       - GeneInfo
       - Epitopes : list of dictionaries
-      
+
     Each entry of the 'Epitopes' list contains the following fields:
       - 'Epitope'
       - 'EpitopeStart'
       - 'EpitopeEnd'
-      - 'MHC_AlleleScores' : list of allele-specific entries 
-    
+      - 'MHC_AlleleScores' : list of allele-specific entries
+
     Each entry of 'MHC_AlleleScores' the following fields:
-      - 'Allele' 
+      - 'Allele'
       - 'MHC_PercentileRank'
-      - 'MHC_IC50' 
+      - 'MHC_IC50'
     """
     peptides = []
     for (transcript_id, seq), transcript_group in \
@@ -187,15 +187,15 @@ def group_epitopes(scored_epitopes):
         peptide_entry['Gene'] = head.Gene
         peptide_entry['Description'] = "%s (%s) : %s" % (
                 head.Gene, head.TranscriptId, head.PeptideMutationInfo
-        ) 
+        )
         peptide_entry['Epitopes'] = []
         for (epitope, epitope_start, epitope_end), epitope_group in \
                 transcript_group.groupby(
                     ['Epitope', 'EpitopeStart', 'EpitopeEnd']):
             epitope_entry = {
-                'Epitope' : epitope, 
-                'EpitopeStart' : epitope_start, 
-                'EpitopeEnd' : epitope_end, 
+                'Epitope' : epitope,
+                'EpitopeStart' : epitope_start,
+                'EpitopeEnd' : epitope_end,
                 'MHC_Allele_Scores' : []
             }
             seen_alleles = set([])
@@ -207,7 +207,7 @@ def group_epitopes(scored_epitopes):
                 percentile_rank = epitope_allele_row['MHC_PercentileRank']
                 ic50 = epitope_allele_row['MHC_IC50']
                 allele_entry = {
-                    'Allele': allele, 
+                    'Allele': allele,
                     'MHC_PercentileRank' : percentile_rank,
                     'MHC_IC50' : ic50,
                 }
@@ -218,21 +218,21 @@ def group_epitopes(scored_epitopes):
 
 def render_report(input_names, peptides, alleles):
     template_lookup = TemplateLookup(
-        directories=['.', 'viz'], 
+        directories=['.', 'viz'],
         default_filters=['literal']
     )
     template = Template(
-        filename = 'viz/index.html.template', 
+        filename = 'viz/index.html.template',
         lookup = template_lookup
     )
 
     html = template.render(
-        peptides = peptides, 
-        vcf_filename = input_names, 
+        peptides = peptides,
+        vcf_filename = input_names,
         hla_alleles = alleles,
     )
-    return html 
-    
+    return html
+
 
 
 if __name__ == '__main__':
@@ -271,11 +271,11 @@ if __name__ == '__main__':
         # and either why it failed or what protein mutation resulted
         if not args.quiet:
             print_mutation_report(
-                input_filename, 
-                variant_report, 
-                raw_genomic_mutation_df, 
+                input_filename,
+                variant_report,
+                raw_genomic_mutation_df,
                 transcripts_df)
-        
+
     if len(mutated_region_dfs) == 0:
         parser.print_help()
         print "\nERROR: Must supply at least --string or --input-file"
@@ -305,22 +305,22 @@ if __name__ == '__main__':
 
     if args.output_epitopes_file:
         scored_epitopes.to_csv(args.output_epitopes_file, index=False)
-        
+
     if args.print_epitopes:
         print scored_epitopes.to_string()
 
     peptides = group_epitopes(scored_epitopes)
-   
+
 
     if args.print_peptides:
         for pep in peptides:
-            print pep 
-    
-    
+            print pep
+
+
     input_names = ";".join(args.input_file)
     if args.string:
         input_names += ";" + args.string
-    
+
     html = render_report(input_names, peptides, alleles)
     with open(args.output_report_file, 'w') as f:
         f.write(html)

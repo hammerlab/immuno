@@ -150,7 +150,7 @@ def test_get_3prime_utr_length_RET():
 
     transcript_id = "ENST00000355710"
     exons = ensembl.get_exons_from_transcript(transcript_id)
- 
+
     utr_length = ensembl.get_three_prime_utr_length(exons)
     print utr_length
     assert(utr_length == 2082)
@@ -159,7 +159,7 @@ def test_get_5prime_utr_length_CTNNB1():
 
     transcript_id = "ENST00000405570"
     exons = ensembl.get_exons_from_transcript(transcript_id)
- 
+
     utr_length = ensembl.get_five_prime_utr_length(exons)
     print utr_length
     assert(utr_length == 156)
@@ -177,7 +177,7 @@ def test_get_5prime_utr_length_reverse_strand_CASP9():
 
     transcript_id = "ENST00000333868"
     exons = ensembl.get_exons_from_transcript(transcript_id)
- 
+
     utr_length = ensembl.get_five_prime_utr_length(exons, forward = False)
     print utr_length
     assert(utr_length == 95)
