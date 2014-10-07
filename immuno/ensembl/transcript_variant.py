@@ -38,7 +38,7 @@ def peptide_from_protein_transcript_variant(transcript_id, pos, ref, alt):
             return str(mutate(transcript, pos, ref, alt))
         except:
             logging.warning(
-                "Failed to mutate transcript %s (%s)", 
+                "Failed to mutate transcript %s (%s)",
                 transcript_id,
                 gene_mutation_description(pos, ref, alt)
             )

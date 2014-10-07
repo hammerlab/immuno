@@ -127,7 +127,7 @@ def get_cds_start_phase(transcript_id):
         return None
 
 def get_transcript_index_from_pos(
-        pos, 
+        pos,
         transcript_id,
         skip_untranslated_region= True):
     """
@@ -150,13 +150,13 @@ def get_transcript_index_from_pos(
     """
     exons = get_exons_from_transcript(transcript_id)
     exons = exons.sort(columns=['seq_region_start_exon', 'seq_region_end_exon'])
-    exons['exon_length'] = exons['seq_region_end_exon'] - exons['seq_region_start_exon'] + 1
+    exons['exon_length'] = \
+        exons['seq_region_end_exon'] - exons['seq_region_start_exon'] + 1
     starts = exons['seq_region_start_exon']
     stops = exons['seq_region_end_exon']
     intervals = zip(starts, stops)
 
     transcript_length = exons['exon_length'].sum()
-    # logging.info("Full transcript length for %s = %d", transcript_id, transcript_length)
     transcript_idx = get_idx_from_interval(pos, intervals)
 
     if transcript_idx is None:
@@ -165,14 +165,14 @@ def get_transcript_index_from_pos(
     else:
         # Reverse array index if on reverse strand
         forward = is_forward_strand(transcript_id)
-        transcript_idx = transcript_idx if forward else transcript_length - transcript_idx - 1
-        # logging.info("Transcript strand forward? %s = %d", transcript_id, forward)
+        transcript_idx = transcript_idx if forward else \
+            transcript_length - transcript_idx - 1
         if skip_untranslated_region:
             # Adjust for translations (CDS) start region
             prefix_utr_length = get_five_prime_utr_length(exons, forward)
-            # logging.info("UTR length for %s = %d", transcript_id, prefix_utr_length)
             if transcript_idx < prefix_utr_length:
-                logging.warn("UTR mutation at cDNA position %d, transcript %s does not apply", 
+                logging.warn(
+                    "UTR mutation at cDNA position %d, transcript %s",
                     transcript_idx, transcript_id)
                 return None
             else:
@@ -193,64 +193,74 @@ def get_transcript_index_from_pos(
 
 def get_five_prime_utr_length(exons_df, forward = True):
     """
-    Gets the length of the 5' UTR from a set of sorted exons from a specifc transcript
+    Gets the length of the 5' UTR from a set of sorted exons
+    from a specifc transcript
 
     Parameters
     ----------
-    exons : Pandas dataframe with 'exon_id', 'seq_region_end_exon', 'seq_region_start_exon'
-            Also, 'start_exon_id' marks the exon that starts translation and 'seq_start'
-            is the offset into the first translated exon
+    exons : Pandas dataframe with 'exon_id', 'seq_region_end_exon',
+            'seq_region_start_exon'
+            Also, 'start_exon_id' marks the exon that starts translation and
+            'seq_start' is the offset into the first translated exon
 
     forward : bool, default = True, is forward strand or not
 
     Return utr_length : int
     """
-    exons_df = exons_df.sort(columns=['seq_region_start_exon', 'seq_region_end_exon'], ascending=[forward, forward])
+    exons_df = exons_df.sort(
+        columns=['seq_region_start_exon', 'seq_region_end_exon'],
+        ascending=[forward, forward])
     utr_length = 0
     for idx, row in exons_df.iterrows():
         if row['exon_id'] == row['start_exon_id']:
             utr_length += row['seq_start'] - 1
-            return utr_length         
+            return utr_length
         else:
-            utr_length += row['seq_region_end_exon'] - row['seq_region_start_exon'] + 1
+            utr_length += \
+                row['seq_region_end_exon'] - row['seq_region_start_exon'] + 1
     return None
 
 def get_three_prime_utr_length(exons_df, forward = True):
     """
-    Gets the length of the 3' UTR from a set of sorted exons from a specifc transcript
+    Gets the length of the 3' UTR from a set of sorted exons from
+    a specifc transcript
 
     Parameters
     ----------
-    exons : Pandas dataframe with 'exon_id', 'seq_region_end_exon', 'seq_region_start_exon'
-            Also, 'end_exon_id' marks the exon that starts translation and 'seq_end'
-            is the offset into the last translated exon
+    exons : Pandas dataframe with columns:
+              'exon_id', 'seq_region_end_exon', 'seq_region_start_exon'
+            Also, 'end_exon_id' marks the exon that starts translation and
+            'seq_end' is the offset into the last translated exon
 
     forward : bool, default = True, is forward strand or not
 
     Return utr_length : int
     """
     reverse = not forward
-    exons_df = exons_df.sort(columns=['seq_region_start_exon', 'seq_region_end_exon'], ascending=[reverse, reverse])
+    exons_df = exons_df.sort(
+        columns=['seq_region_start_exon', 'seq_region_end_exon'],
+        ascending=[reverse, reverse])
     utr_length = 0
     for idx, row in exons_df.iterrows():
-        exon_length = row['seq_region_end_exon'] - row['seq_region_start_exon'] + 1
+        exon_length = \
+            row['seq_region_end_exon'] - row['seq_region_start_exon'] + 1
         if row['exon_id'] == row['end_exon_id']:
             utr_length += exon_length - row['seq_end']
-            return utr_length           
+            return utr_length
         else:
             utr_length += exon_length
     return None
 
 def annotate_vcf_transcripts(vcf_df):
     """
-    Expand each variant in a DataFrame into multiple entries for all transcript_ids 
-    that could contain the mutated position 
+    Expand each variant in a DataFrame into multiple entries for
+    all transcript_ids that could contain the mutated position
     Parameters
     ----------
     vcf_df : Pandas DataFrame with chr, pos, ref, alt columns
 
     Return DataFrame with extra columns:
-        - 'name' 
+        - 'name'
         - 'stable_id_gene'
         - 'description_gene'
         - 'seq_region_start_gene'
@@ -262,13 +272,14 @@ def annotate_vcf_transcripts(vcf_df):
 
     genome_annotation_data_df = data.transcripts_dataframe
 
-     # combine each variant entry from `vcf_df` with all possible gene annotations
-    # on the same chromosome from `genome_annotation_data_df`
+    # combine each variant entry from `vcf_df` with all possible gene
+    # annotations  on the same chromosome from `genome_annotation_data_df`
     all_possible_transcripts = vcf_df.merge(
         genome_annotation_data_df, left_on='chr', right_on='name', how='left')
     variant_position = all_possible_transcripts['pos']
     transcript_start = all_possible_transcripts['seq_region_start_transcript']
     transcript_stop = all_possible_transcripts['seq_region_end_transcript']
-    mask = (variant_position > transcript_start) & (variant_position < transcript_stop)
+    mask = (variant_position > transcript_start) & \
+        (variant_position < transcript_stop)
     annotated = all_possible_transcripts[mask]
     return annotated.drop_duplicates()

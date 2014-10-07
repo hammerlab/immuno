@@ -133,13 +133,13 @@ class IEDBMHCBinding(object):
     responses['MHC_IC50'] = responses['ann_ic50']
 
     # instead of just building up a new dataframe I'm expliciting
-    # dropping fields here to document what other information is available   
+    # dropping fields here to document what other information is available
     drop_fields = (
-        'seq_num', 
-        'method', 
-        'ann_ic50', 
-        'ann_rank', 
-        'consensus_percentile_rank', 
+        'seq_num',
+        'method',
+        'ann_ic50',
+        'ann_rank',
+        'consensus_percentile_rank',
         'smm_ic50',
         'smm_rank',
         'comblib_sidney2008_score',
@@ -150,10 +150,10 @@ class IEDBMHCBinding(object):
             responses = responses.drop(field, axis = 1)
 
     result = data.merge(responses, on='SourceSequence')
-   
+
     # some of the MHC scores come back as all NaN so drop them
     result = result.dropna(axis=1, how='all')
-    
+
     return result
 
 class IEDBMHC1Binding(IEDBMHCBinding):

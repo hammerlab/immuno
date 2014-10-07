@@ -28,12 +28,12 @@ def validate_transcript_mutation(row):
     print row
     peptide, start, stop, annot = \
     transcript_variant.peptide_from_transcript_variant(
-        transcript_id, 
-        row['position'], 
-        ref=row['ref'], 
-        alt=row['alt'], 
-        padding = None, 
-        max_length = None)    
+        transcript_id,
+        row['position'],
+        ref=row['ref'],
+        alt=row['alt'],
+        padding = None,
+        max_length = None)
     assert peptide is not None
     aa_index = row['aapos'] - 1
     assert peptide[row['aapos'] - 1] == row['aaalt'], \
