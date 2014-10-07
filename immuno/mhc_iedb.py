@@ -26,7 +26,7 @@ from mhc_common import normalize_hla_allele_name, seq_to_str, convert_str
 class IEDBMHCBinding(object):
 
   def __init__(
-        self, 
+        self,
         alleles=[],
         name="IEDB-MHC-Binding",
         method=['consensus'],
@@ -39,7 +39,6 @@ class IEDBMHCBinding(object):
     self._alleles = alleles
 
   def _get_iedb_request_params(self, sequence):
-    
     params = {
         "method" : seq_to_str(self._method),
         "length" : seq_to_str(self._lengths),
@@ -55,7 +54,7 @@ class IEDBMHCBinding(object):
     try:
         data = urllib.urlencode(request_values)
         req = urllib2.Request(self._url, data)
-        response = urllib2.urlopen(req).read() 
+        response = urllib2.urlopen(req).read()
         lines = response.split("\n")
 
         # manually parsing since pandas is insane
@@ -101,31 +100,30 @@ class IEDBMHCBinding(object):
                     'length' : 'EpitopeLength',
                     'start' : 'EpitopeStart',
                     'end' : 'EpitopeEnd',
-                    'allele' : 'Allele', 
+                    'allele' : 'Allele',
                 },
                 inplace=True)
             response['EpitopeStart'] -= 1
             response['EpitopeEnd'] -= 1
-            responses[peptide] = response 
+            responses[peptide] = response
         else:
             logging.info(
                 "Skipping binding for peptide %s, already queried",
                 peptide)
 
-   
     # concatenating the responses makes a MultiIndex with two columns
     # - SourceSequence
     # - index of epitope from that sequence's IEDB call
-    # 
-    # ...when we reset the index, we turn these into two columns 
+    #
+    # ...when we reset the index, we turn these into two columns
     # named 'level_0', and 'level_1'. We want to rename the former
-    # and delete the latter. 
+    # and delete the latter.
     responses = pd.concat(responses).reset_index()
     responses['SourceSequence'] = responses['level_0']
     del responses['level_0']
     del responses['level_1']
-    
-    # IEDB has inclusive end positions, change to exclusive 
+
+    # IEDB has inclusive end positions, change to exclusive
     responses['EpitopeEnd'] += 1
 
     assert 'ann_rank' in responses, responses.head()
@@ -133,7 +131,7 @@ class IEDBMHCBinding(object):
 
     assert 'ann_ic50' in responses, responses.head()
     responses['MHC_IC50'] = responses['ann_ic50']
-     
+
     # instead of just building up a new dataframe I'm expliciting
     # dropping fields here to document what other information is available   
     drop_fields = (

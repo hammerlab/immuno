@@ -11,13 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import logging
 import re
 
 def seq_to_str(obj):
     """
-    Given a sequence convert it to a comma separated string. 
-    If, however, the argument is a single object, return its string 
+    Given a sequence convert it to a comma separated string.
+    If, however, the argument is a single object, return its string
     representation.
     """
     if isinstance(obj, (unicode, str)):
@@ -31,8 +31,8 @@ def convert_str(obj):
     """
     Given a string, convert it to an int or float if possible.
     """
-    if obj is None: 
-        return obj 
+    if obj is None:
+        return obj
     try:
         try:
             return int(obj)
@@ -53,7 +53,7 @@ def _parse_substring(hla, pred, max_len = None):
         max_len = min(max_len, len(hla))
     while pos < max_len and pred(hla[pos]):
         result += hla[pos]
-        pos +=1 
+        pos +=1
     return result, hla[pos:]
 
 def _parse_letters(hla, max_len = None):
@@ -73,7 +73,7 @@ def normalize_hla_allele_name(hla):
         - HLA-A02:03
         - HLA-A:02:03
         - HLA-A2
-        - A2 
+        - A2
         - A*03:02
         - A02:02
         - A:02:03
@@ -84,13 +84,12 @@ def normalize_hla_allele_name(hla):
     hla = hla.strip()
     if hla.startswith("HLA-"):
         hla = hla[4:]
-    
-    # gene name is sequence of letters at start of HLA string 
+
+    # gene name is sequence of letters at start of HLA string
     gene, hla = _parse_letters(hla)
-    
 
     assert len(gene) > 0, "No HLA gene name given in %s" % original
-    assert len(hla) > 0, "Malformed HLA type %s" % original 
+    assert len(hla) > 0, "Malformed HLA type %s" % original
 
     gene = gene.upper()
 
@@ -110,14 +109,13 @@ def normalize_hla_allele_name(hla):
 
     assert len(hla) == 0, \
         "Unexpected suffix %s in HLA type %s" % (hla, original)
-    
 
     if len(family) == 1:
-        family = "0" + family 
+        family = "0" + family
     if len(allele) == 0:
         allele = "01"
     elif len(allele) == 1:
-        allele = "0" + allele 
+        allele = "0" + allele
     return "HLA-%s*%s:%s" % (gene, family, allele )
 
 def compact_hla_allele_name(hla):
