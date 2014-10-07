@@ -2,6 +2,7 @@ import argparse
 from os.path import exists, join, isdir
 from vcf import load_vcf
 from flask import Flask
+from flask import render_template
 
 parser = argparse.ArgumentParser(
     description="Web UI for inspecting cancer neoantigens")
@@ -20,40 +21,24 @@ app = Flask(__name__)
 
 @app.route('/')
 def index():
-    return 'Immuno UI'
+    return render_template("home.html")
 
-@app.route('/patients')
+@app.route("/patients")
 def patients():
-    return 'Patients'
+    return render_template("patients.html", message = "test message")
 
 @app.route("/patient/<patient_filename>")
 def patient(patient_filename):
-
     variant_path = join(args.variant_path, patient_filename)
     if not exists(variant_path):
         return "File not found: %s" % variant_path
     if not variant_path.endswith(".vcf"):
         return "Not a VCF file: %s" % variant_path
     vcf_df = load_vcf(variant_path)
-    return """
-    <html>
-    <head><title>Patient ID: %s</title></head>
-    <body>
-    <div>
-    Variant filename: %s
-    </div>
-    <h2>
-    Variants
-    </h2>
-    %s
-    </body>
-    </html>
-    """ % (
-        variant_path,
-        variant_path,
-        vcf_df.to_html()
-    )
-
+    return render_template("patient.html",
+        patient_id = variant_path,
+        variant_filename = variant_path,
+        df_html = vcf_df.to_html())
 
 if __name__ == '__main__':
     args = parser.parse_args()
