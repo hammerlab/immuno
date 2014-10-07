@@ -15,7 +15,7 @@
 from immuno import vcf
 
 def test_vcf_to_dataframe():
-    vcf_file = 'example.vcf'
+    vcf_file = 'data/example.vcf'
     df = vcf.load_vcf(vcf_file)
     assert df is not None
     assert(len(df) == 3)

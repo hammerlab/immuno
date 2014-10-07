@@ -48,6 +48,7 @@ from load_file import (
 )
 from maf import load_maf, get_patient_id, is_valid_tcga
 from mhc_common import normalize_hla_allele_name
+from hla_file import read_hla_file
 from mhc_netmhcpan import PanBindingPredictor
 from mhc_netmhccons import ConsensusBindingPredictor
 from mutation_report import print_mutation_report
@@ -113,7 +114,7 @@ parser.add_argument("--netmhc-cons",
     help="Use local NetMHCcons binding predictor (otherwise use NetMHCpan)")
 
 parser.add_argument("--resume",
-    default=False, 
+    default=False,
     action="store_true",
     help="Append to an existing output file"
 )
@@ -168,12 +169,12 @@ def find_mutation_files(
 
 def collect_hla_files(input_dir_string):
     return collect_files(input_dir_string, read_hla_file,
-            permissive_parsing = True)
+        permissive_parsing = True)
 
 
 def collect_gene_exp_files(input_dir_string):
     return collect_files(input_dir_string, read_gene_exp_file,
-            permissive_parsing = True)
+        permissive_parsing = True)
 
 
 def collect_files(input_dir_string, read_file_fn, permissive_parsing):
@@ -188,11 +189,7 @@ def collect_files(input_dir_string, read_file_fn, permissive_parsing):
             if is_valid_tcga(base):
                 patient_id = get_patient_id(base)
                 path = join(dirpath, filename)
-                result = read_file_fn(
-                    path,
-                    base,
-                    ext,
-                    permissive_parsing)
+                result = read_file_fn(path, permissive_parsing)
                 if result:
                     patient_to_data[patient_id] = result
     if args.debug_patient_id:
@@ -201,45 +198,13 @@ def collect_files(input_dir_string, read_file_fn, permissive_parsing):
     return patient_to_data
 
 
-def read_hla_file(path, base, ext, permissive_parsing):
-    """
-    Read in HLA alleles and normalize them, returning a list of HLA allele
-    names.
-    """
-    if ext != ".hla":
-        return []
-
-    logging.info("Reading HLA file %s", path)
-    alleles = []
-    with open(path, 'r') as f:
-        contents = f.read()
-        for line in contents.split("\n"):
-            for raw_allele in line.split(","):
-                if permissive_parsing:
-                    # get rid of surrounding whitespace
-                    raw_allele = raw_allele.strip()
-                    # sometimes we get extra columns with scores,
-                    # ignore those
-                    raw_allele = raw_allele.split(" ")[0]
-                    raw_allele = raw_allele.split("\t")[0]
-                    raw_allele = raw_allele.split("'")[0]
-                if len(raw_allele) > 0:
-                    alleles.append(
-                        normalize_hla_allele_name(
-                            raw_allele))
-    return alleles
-
-
-def read_gene_exp_file(path, base, ext, permissive_parsing):
+def read_gene_exp_file(path, permissive_parsing):
     """
     Read in gene expression counts, returning a set of expressed genes.
 
     Expects the first column to be the gene name (or "<gene name>|<id>"),
     and the second column to be what we're filtering on.
     """
-    if not (ext == ".quantification" and "gene" in base):
-        return set()
-
     logging.info("Reading gene expression file %s", path)
     gene_exp_df = pd.read_csv(path, sep='\t')
     gene_exp_df = gene_exp_df[gene_exp_df.columns[:2]]
@@ -250,7 +215,7 @@ def read_gene_exp_file(path, base, ext, permissive_parsing):
                 lambda x: x[0])
     gene_exp_df = gene_exp_df[gene_exp_df[count_col] > 0]
     return set(gene_exp_df[gene_col].tolist())
-        
+
 def generate_mutation_counts(
         mutation_files,
         hla_types,
@@ -277,13 +242,12 @@ def generate_mutation_counts(
             logging.info("Skipping patient ID %s", patient_id)
             continue
         hla_allele_names = hla_types[patient_id]
-        
         logging.info(
             "Processing %s (#%d/%d) with HLA alleles %s",
             patient_id, i + 1, n, hla_allele_names)
-        
+
         if not args.quiet:
-            print vcf_df 
+            print vcf_df
 
         try:
             transcripts_df, raw_genomic_mutation_df, variant_report = (
@@ -329,7 +293,7 @@ def generate_mutation_counts(
             mhc = make_mhc_predictor()
             scored_epitopes = mhc.predict(transcripts_df,
                     mutation_window_size=9)
-        
+
         if not args.quiet:
             print scored_epitopes
 
@@ -439,7 +403,7 @@ if __name__ == "__main__":
             lines = [l for l in f.read().split("\n") if len(l) > 0]
             fields = [l.split(",") for l in lines]
             # expect ID and 6 data fields
-            # warning: the number of fields is tightly 
+            # warning: the number of fields is tightly
             # coupled with the code that actually writes the CSV files
             complete_fields = [l for l in fields if len(l) == 7]
         output_file = open(args.output, 'w')

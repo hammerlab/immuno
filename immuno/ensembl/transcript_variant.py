@@ -26,7 +26,6 @@ from transcript_data import EnsemblReferenceData
 import annotation
 
 _ensembl = EnsemblReferenceData()
-   
 
 def peptide_from_protein_transcript_variant(transcript_id, pos, ref, alt):
     """
@@ -50,8 +49,7 @@ def peptide_from_transcript_variant(
         transcript_id, pos, ref, alt,
         padding = None,
         max_length = None):
-     
-    
+
     # sometimes empty strings get represented with a '.'
     if ref == ".":
         ref = ""
@@ -64,13 +62,13 @@ def peptide_from_transcript_variant(
     transcript = _ensembl.get_cds(transcript_id)
     def error_result(msg, *args):
         logging.warning(msg, *args)
-        return None, -1, -1, msg % args 
+        return None, -1, -1, msg % args
 
     if not transcript:
         return error_result("Couldn't find transcript for ID %s", transcript_id)
 
     idx = annotation.get_transcript_index_from_pos(
-        pos, 
+        pos,
         transcript_id,
         skip_untranslated_region = True)
     if idx is None:
@@ -81,7 +79,7 @@ def peptide_from_transcript_variant(
     elif idx >= len(transcript):
         return error_result(
             "Index %d longer than sequence (len %d) for transcript %s (%s)",
-            idx, 
+            idx,
             len(transcript),
             transcript_id,
             gene_mutation_description(pos, ref, alt))
@@ -98,21 +96,17 @@ def peptide_from_transcript_variant(
             "VCF/MAF expected %s at idx %d of transcript %s, found %s (%s)" % \
                 (ref, idx, transcript_id, transcript_ref, mutation_description)
         )
-    try:      
-        region = mutate_protein_from_transcript(
-            transcript,
-            idx,
-            ref,
-            alt,
-            padding = padding)
-        start = region.mutation_start
-        stop = start + region.n_inserted
-        if max_length and len(region.seq) > max_length:
-            seq = region.seq[:max_length]
-            stop = min(stop, max_length)
-        else:
-            seq = region.seq
-        return seq, start, stop, region.annot
-    except:
-        raise
-   
+    region = mutate_protein_from_transcript(
+        transcript,
+        idx,
+        ref,
+        alt,
+        padding = padding)
+    start = region.mutation_start
+    stop = start + region.n_inserted
+    if max_length and len(region.seq) > max_length:
+        seq = region.seq[:max_length]
+        stop = min(stop, max_length)
+    else:
+        seq = region.seq
+    return seq, start, stop, region.annot

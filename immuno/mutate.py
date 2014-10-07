@@ -91,9 +91,13 @@ def protein_mutation_description(
         early_stop):
 
     ref_start = aa_position
+
+    assert len(original_protein) > ref_start, \
+        "Protein sequence too short (%d residues) for index %d" % \
+        (len(original_protein), ref_start)
+
     ref_stop = max(aa_position + n_deleted, 1)
     aa_ref = original_protein[ref_start : ref_stop]
-
     mut_start = aa_position
     mut_stop = max(aa_position + n_inserted, 1)
     aa_mut = mutated_protein[mut_start : mut_stop]
@@ -155,6 +159,7 @@ def mutate_protein_from_transcript(
         Number of wildtype amino acids to keep left and right of the
         mutation. Default is to return whole mutated string.
     """
+
     # turn any character sequence into a BioPython sequence
     transcript_seq = Seq(str(transcript_seq))
 
@@ -171,6 +176,19 @@ def mutate_protein_from_transcript(
     mutated_dna = mutate(transcript_seq, position, dna_ref, dna_alt)
     mutated_protein = mutated_dna.translate()
     n_mutated_protein = len(mutated_protein)
+
+    if str(original_protein) == str(mutated_protein):
+        # if protein product is unmodified then
+        # this is a silent mutation
+        return Mutation(
+            seq = "",
+            start = 0,
+            stop = 0,
+            mutation_start = 0,
+            n_removed = 0,
+            n_inserted = 0,
+            annot = "SILENT"
+        )
 
     aa_position = int(position / 3)  # genomic position to codon position
 
