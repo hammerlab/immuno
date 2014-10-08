@@ -1,5 +1,8 @@
 appdirs
 biopython
+Flask
+Flask-SQLAlchemy
+Flask-User
 Mako
 nose
 numpy

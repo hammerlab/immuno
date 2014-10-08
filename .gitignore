@@ -46,3 +46,6 @@ nosetests.xml
 
 # machine learning models might be too big
 *.pickle
+
+# sqlite DBs
+*.sqlite
