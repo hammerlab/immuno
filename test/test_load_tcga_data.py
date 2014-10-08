@@ -17,3 +17,7 @@ def test_load_tcga_skcm():
     transcripts_df, vcf_df, variant_report = load_file(maf_filename)
     assert len(vcf_df) > 0
     assert len(transcripts_df) > 0
+
+if __name__ == '__main__':
+  from dsltools import testing_helpers
+  testing_helpers.run_local_tests()

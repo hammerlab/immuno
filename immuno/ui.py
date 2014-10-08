@@ -26,10 +26,11 @@ def patient(patient_filename):
     if not variant_file_path.endswith(".vcf"):
         return "Not a VCF file: %s" % variant_file_path
     vcf_df = load_vcf(variant_file_path)
+    vcf_rows = [row for _, row in vcf_df.iterrows()]
     return render_template("patient.html",
         patient_id = variant_file_path,
         variant_filename = variant_file_path,
-        df_html = vcf_df.to_html())
+        vcf = vcf_rows)
 
 if __name__ == '__main__':
     app.debug = True

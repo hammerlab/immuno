@@ -102,8 +102,6 @@ def is_incomplete_cds(transcript_id):
     else:
         return False
 
-
-
 def get_start_exon(transcript_id):
     start_exons = data.start_exons_dataframe
     mask = start_exons['stable_id_transcript'] == transcript_id

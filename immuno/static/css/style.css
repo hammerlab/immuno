@@ -1,10 +1,44 @@
 body {
-    padding: 11px;
-    font-family: "brandon-grotesque", verdana, helvetica, sans-serif;
+  padding: 11px;
+  font-family: "brandon-grotesque", verdana, helvetica, sans-serif;
 }
+
 pre {
-    font-family: "inconsolata", monospace;
+  font-family: "inconsolata", monospace;
 }
-table td {
-    font-family: helvetica, arial, sans-serif;
+
+/* stolen gratuitously from
+   http://demosthenes.info/blog/559/CSS-Design-Patterns-For-HTML5-Tables
+*/
+table {
+  border: 1px solid #777;
+  border-collapse: collapse;
+  font-family: Futura, Arial, sans-serif;
+}
+
+caption {
+  font-size: larger; margin: 1em auto;
+}
+
+th, td {
+  padding: .65em;
+}
+
+th, thead {
+  background: #000;
+  border: 1px solid #000;
+  color: #fff;
+}
+
+tr:nth-child(odd) {
+  background: #ccc;
+}
+
+tr:hover {
+  background: #aaa;
+}
+
+td {
+  border-right: 1px solid #777;
+  text-align: center;
 }
