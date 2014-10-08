@@ -28,7 +28,7 @@ def patient(patient_filename):
 
 if __name__ == '__main__':
     app.debug = True
-    app.config.from_object('config')
+    app.config.from_object("config")
     assert isdir(app.config["VARIANT_PATH"]), (
         "Variant path %s must be a directory" % app.config["VARIANT_PATH"])
     assert isdir(app.config["HLA_PATH"]), (
