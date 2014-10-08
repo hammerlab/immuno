@@ -1,21 +1,7 @@
-import argparse
-from os.path import exists, join, isdir
 from vcf import load_vcf
 from flask import Flask
 from flask import render_template
-
-parser = argparse.ArgumentParser(
-    description="Web UI for inspecting cancer neoantigens")
-
-parser.add_argument(
-    "--variant-path",
-    default = ".",
-    help="Path to directory with VCF/MAF files with patient mutations")
-
-parser.add_argument(
-    "--hla-path",
-    default = ".",
-    help="Path directory with files containing patient HLA types")
+from os.path import exists, join, isdir
 
 app = Flask(__name__)
 
@@ -29,22 +15,22 @@ def patients():
 
 @app.route("/patient/<patient_filename>")
 def patient(patient_filename):
-    variant_path = join(args.variant_path, patient_filename)
-    if not exists(variant_path):
-        return "File not found: %s" % variant_path
-    if not variant_path.endswith(".vcf"):
-        return "Not a VCF file: %s" % variant_path
-    vcf_df = load_vcf(variant_path)
+    variant_file_path = join(app.config["VARIANT_PATH"], patient_filename)
+    if not exists(variant_file_path):
+        return "File not found: %s" % variant_file_path
+    if not variant_file_path.endswith(".vcf"):
+        return "Not a VCF file: %s" % variant_file_path
+    vcf_df = load_vcf(variant_file_path)
     return render_template("patient.html",
-        patient_id = variant_path,
-        variant_filename = variant_path,
+        patient_id = variant_file_path,
+        variant_filename = variant_file_path,
         df_html = vcf_df.to_html())
 
 if __name__ == '__main__':
-    args = parser.parse_args()
-    assert isdir(args.variant_path), \
-        "Variant path %s must be a directory" % args.variant_path
-    assert isdir(args.hla_path), \
-        "HLA path %s must be a directory" % args.hla_path
     app.debug = True
+    app.config.from_object('config')
+    assert isdir(app.config["VARIANT_PATH"]), (
+        "Variant path %s must be a directory" % app.config["VARIANT_PATH"])
+    assert isdir(app.config["HLA_PATH"]), (
+        "HLA path %s must be a directory" % app.config["HLA_PATH"])
     app.run()
