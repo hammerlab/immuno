@@ -23,12 +23,12 @@ def cached_property(fn):
     save the result.
     """
     field_name = '_cached_%s' % fn.__name__
-    @property
     def _cached_property(self):
         if not hasattr(self, field_name):
             setattr(self, field_name, fn(self))
         return getattr(self, field_name)
-    return _cached_property
+    _cached_property.__name__ = fn.__name__
+    return property(_cached_property)
 
 
 class EnsemblAnnotationData(object):
