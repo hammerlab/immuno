@@ -1,9 +1,14 @@
 from vcf import load_vcf
 from flask import Flask
 from flask import render_template
+import os
 from os.path import exists, join, isdir
 
 app = Flask(__name__)
+
+# Default to the current working directory if these variables are not set
+VARIANT_PATH = os.environ.get("VARIANT_PATH", os.getcwd())
+HLA_PATH = os.environ.get("HLA_PATH", os.getcwd())
 
 @app.route('/')
 def index():
@@ -15,7 +20,7 @@ def patients():
 
 @app.route("/patient/<patient_filename>")
 def patient(patient_filename):
-    variant_file_path = join(app.config["VARIANT_PATH"], patient_filename)
+    variant_file_path = join(VARIANT_PATH, patient_filename)
     if not exists(variant_file_path):
         return "File not found: %s" % variant_file_path
     if not variant_file_path.endswith(".vcf"):
@@ -28,9 +33,8 @@ def patient(patient_filename):
 
 if __name__ == '__main__':
     app.debug = True
-    app.config.from_object("config")
-    assert isdir(app.config["VARIANT_PATH"]), (
-        "Variant path %s must be a directory" % app.config["VARIANT_PATH"])
-    assert isdir(app.config["HLA_PATH"]), (
-        "HLA path %s must be a directory" % app.config["HLA_PATH"])
+    assert isdir(VARIANT_PATH), \
+        "Variant path %s must be a directory" % VARIANT_PATH
+    assert isdir(HLA_PATH), \
+        "HLA path %s must be a directory" % HLA_PATH
     app.run()
