@@ -23,6 +23,7 @@ class ConfigClass(object):
     SQLALCHEMY_DATABASE_URI = environ.get('IMMUNO_DB')
 
     # Flask-User config
+    USER_PRODUCT_NAME = 'immuno'
     USER_ENABLE_EMAIL = True
     USER_ENABLE_CHANGE_PASSWORD = True
     USER_ENABLE_CHANGE_USERNAME = False
