@@ -2,8 +2,6 @@
 export IMMUNO_DEBUG=True
 export IMMUNO_PORT=5000
 export IMMUNO_USE_RELOADER=False
-export IMMUNO_VARIANT_PATH=
-export IMMUNO_HLA_PATH=
 
 # Flask environment variables
 export IMMUNO_DB=sqlite:///immuno_ui.sqlite

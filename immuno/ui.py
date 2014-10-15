@@ -18,8 +18,6 @@ class ConfigClass(object):
     DEBUG = str2bool(environ.get('IMMUNO_DEBUG', 'False'))
     PORT = int(environ.get('IMMUNO_PORT', 5000))
     USE_RELOADER = str2bool(environ.get('IMMUNO_USE_RELOADER', False))
-    VARIANT_PATH = environ.get('IMMUNO_VARIANT_PATH', getcwd())
-    HLA_PATH = environ.get('IMMUNO_HLA_PATH', getcwd())
     UPLOAD_FOLDER = join(getcwd(), 'uploads')
 
     # Flask config
@@ -69,6 +67,16 @@ class User(db.Model, UserMixin):
     confirmed_at = db.Column(db.DateTime())
     reset_password_token = db.Column(db.String(100), nullable=False, default='')
 
+# TODO: distinguish between file types
+class File(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False, default=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+
+    def __init__(self, name, user_id):
+        self.name = name
+        self.user_id = user_id
+
 db_adapter = SQLAlchemyAdapter(db, User)
 user_manager = UserManager(db_adapter, app)
 
@@ -87,16 +95,16 @@ def profile():
 @app.route('/patient/<patient_filename>')
 @login_required
 def patient(patient_filename):
-    variant_file_path = join(app.config['VARIANT_PATH'], patient_filename)
-    if not exists(variant_file_path):
-        return 'File not found: %s' % variant_file_path
-    if not variant_file_path.endswith('.vcf'):
-        return 'Not a VCF file: %s' % variant_file_path
-    vcf_df = load_vcf(variant_file_path)
+    file_names = File.query.with_entities(File.name).filter_by(
+        user_id=current_user.id).all()
+    # TODO: Loop through all files
+    filename = file_names[0][0]
+    print join(app.config['UPLOAD_FOLDER'], filename)
+    vcf_df = load_vcf(join(app.config['UPLOAD_FOLDER'], filename))
     vcf_rows = [row for _, row in vcf_df.iterrows()]
     return render_template('patient.html',
-        patient_id = variant_file_path,
-        variant_filename = variant_file_path,
+        patient_id = filename,
+        variant_filename = filename,
         vcf = vcf_rows)
 
 def allowed_file(filename):
@@ -112,6 +120,9 @@ def upload_file():
             if file and allowed_file(file.filename):
                 filename = secure_filename(file.filename)
                 file.save(join(app.config['UPLOAD_FOLDER'], filename))
+                file = File(filename, current_user.id)
+                db.session.add(file)
+                db.session.commit()
                 filenames.append(filename)
         return render_template('uploaded.html', filenames=filenames)
     return render_template('upload.html')
