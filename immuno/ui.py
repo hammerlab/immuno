@@ -1,28 +1,43 @@
+from common import str2bool
 from vcf import load_vcf
+
 from flask import Flask
-from flask import render_template
+from flask import redirect, render_template, url_for
 from flask.ext.sqlalchemy import SQLAlchemy
 from flask.ext.user import (current_user, login_required, UserManager,
     UserMixin, SQLAlchemyAdapter)
-import os
-from os.path import exists, join, isdir
+from flask_mail import Mail, Message
+from os import environ, getcwd
+from os.path import exists, join
 
 class ConfigClass(object):
     # Custom config
-    VARIANT_PATH = os.environ.get('IMMUNO_VARIANT_PATH', os.getcwd())
-    HLA_PATH = os.environ.get('IMMUNO_HLA_PATH', os.getcwd())
+    DEBUG = str2bool(environ.get('IMMUNO_DEBUG', 'False'))
+    PORT = int(environ.get('IMMUNO_PORT', 5000))
+    USE_RELOADER = str2bool(environ.get('IMMUNO_USE_RELOADER', False))
+    VARIANT_PATH = environ.get('IMMUNO_VARIANT_PATH', getcwd())
+    HLA_PATH = environ.get('IMMUNO_HLA_PATH', getcwd())
 
     # Flask config
-    USE_RELOADER = os.environ.get('USE_RELOADER', False).lower() == 'false'
-    PORT = int(os.environ.get('PORT', 5000))
-    SECRET_KEY = os.environ.get('IMMUNO_SECRET_KEY')
-    SQLALCHEMY_DATABASE_URI = os.environ.get('IMMUNO_DB')
+    SECRET_KEY = environ.get('IMMUNO_SECRET_KEY')
+    SQLALCHEMY_DATABASE_URI = environ.get('IMMUNO_DB')
 
     # Flask-User config
-    USER_ENABLE_EMAIL = False
+    USER_ENABLE_EMAIL = True
+
+    # Flask-Mail config
+    MAIL_SERVER = environ.get('IMMUNO_MAIL_SERVER')
+    MAIL_PORT = int(environ.get('IMMUNO_MAIL_PORT', 5000))
+    MAIL_USE_SSL = str2bool(environ.get('IMMUNO_MAIL_USE_SSL', 'False'))
+    MAIL_USE_TLS = str2bool(environ.get('IMMUNO_MAIL_USE_TLS', 'False'))
+    MAIL_USERNAME = environ.get('IMMUNO_MAIL_USERNAME')
+    MAIL_PASSWORD = environ.get('IMMUNO_MAIL_PASSWORD')
+    MAIL_DEFAULT_SENDER = environ.get('IMMUNO_MAIL_DEFAULT_SENDER')
 
 app = Flask(__name__)
 app.config.from_object(__name__ + '.ConfigClass')
+mail = Mail()
+mail.init_app(app)
 db = SQLAlchemy(app)
 
 class User(db.Model, UserMixin):
@@ -30,20 +45,28 @@ class User(db.Model, UserMixin):
     active = db.Column(db.Boolean(), nullable=False, default=False)
     username = db.Column(db.String(50), nullable=False, unique=True)
     password = db.Column(db.String(255), nullable=False, default='')
+    email = db.Column(db.String(255), nullable=False, unique=True)
+    confirmed_at = db.Column(db.DateTime())
+    reset_password_token = db.Column(db.String(100), nullable=False, default='')
 
 db_adapter = SQLAlchemyAdapter(db, User)
 user_manager = UserManager(db_adapter, app)
 
 @app.route('/')
 def patients():
-    if not current_user.is_authenticated():
-        return render_template('home.html')
-    return render_template('patients.html', message='test message')
+    if current_user.is_authenticated():
+        return redirect(url_for('profile'))
+    else:
+        return redirect(url_for('user.login'))
+
+@app.route('/profile')
+@login_required
+def profile():
+    return render_template('profile.html')
 
 @app.route('/patient/<patient_filename>')
+@login_required
 def patient(patient_filename):
-    if not current_user.is_authenticated():
-        return render_template('home.html')
     variant_file_path = join(app.config['VARIANT_PATH'], patient_filename)
     if not exists(variant_file_path):
         return 'File not found: %s' % variant_file_path
@@ -55,11 +78,3 @@ def patient(patient_filename):
         patient_id = variant_file_path,
         variant_filename = variant_file_path,
         vcf = vcf_rows)
-
-if __name__ == '__main__':
-    app.debug = True
-    assert isdir(app.config['VARIANT_PATH']), \
-        'Variant path %s must be a directory' % app.config['VARIANT_PATH']
-    assert isdir(app.config['HLA_PATH']), \
-        'HLA path %s must be a directory' % app.config['HLA_PATH']
-    app.run()

@@ -3,6 +3,7 @@ biopython
 Flask
 Flask-SQLAlchemy
 Flask-User
+Flask-Mail
 Mako
 nose
 numpy

@@ -79,7 +79,6 @@ def splitext_permissive(path, ignored_exts):
         return splitext_permissive(base, ignored_exts)
     return (base, ext)
 
-
 def find_paths(filename_string = "", directory_string = "", extensions = None):
     """
     Parse input comma separated list of files and comma separated list
@@ -101,3 +100,5 @@ def find_paths(filename_string = "", directory_string = "", extensions = None):
         ]
     return paths
 
+def str2bool(value):
+    return value.lower() in ('yes', 'true', 't', '1')
