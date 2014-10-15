@@ -106,11 +106,14 @@ def allowed_file(filename):
 @login_required
 def upload_file():
     if request.method == 'POST':
-        file = request.files['file']
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            file.save(join(app.config['UPLOAD_FOLDER'], filename))
-            return redirect(url_for('uploaded_file', filename=filename))
+        filenames = []
+        files = request.files.getlist("file")
+        for file in files:
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                file.save(join(app.config['UPLOAD_FOLDER'], filename))
+                filenames.append(filename)
+        return render_template('uploaded.html', filenames=filenames)
     return render_template('upload.html')
 
 @app.route('/uploads/<filename>')
