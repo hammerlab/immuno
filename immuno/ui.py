@@ -11,9 +11,13 @@ class ConfigClass(object):
     # Custom config
     VARIANT_PATH = os.environ.get('IMMUNO_VARIANT_PATH', os.getcwd())
     HLA_PATH = os.environ.get('IMMUNO_HLA_PATH', os.getcwd())
+
     # Flask config
+    USE_RELOADER = os.environ.get('USE_RELOADER', False).lower() == 'false'
+    PORT = int(os.environ.get('PORT', 5000))
     SECRET_KEY = os.environ.get('IMMUNO_SECRET_KEY')
     SQLALCHEMY_DATABASE_URI = os.environ.get('IMMUNO_DB')
+
     # Flask-User config
     USER_ENABLE_EMAIL = False
 
