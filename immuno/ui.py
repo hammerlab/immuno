@@ -24,6 +24,22 @@ class ConfigClass(object):
 
     # Flask-User config
     USER_ENABLE_EMAIL = True
+    USER_ENABLE_CHANGE_PASSWORD = True
+    USER_ENABLE_CHANGE_USERNAME = False
+    USER_ENABLE_CONFIRM_EMAIL = True
+    USER_ENABLE_FORGOT_PASSWORD = True
+    USER_ENABLE_MULTIPLE_EMAILS = False
+    USER_ENABLE_REGISTRATION = True
+    USER_ENABLE_RETYPE_PASSWORD = True
+    USER_ENABLE_USERNAME = False
+    USER_CONFIRM_EMAIL_EXPIRATION = 2*24*3600
+    USER_PASSWORD_HASH = 'bcrypt'
+    USER_PASSWORD_HASH_MODE = 'passlib'
+    USER_REQUIRE_INVITATION = False
+    USER_RESET_PASSWORD_EXPIRATION = 2*24*3600
+    USER_SEND_PASSWORD_CHANGED_EMAIL = True
+    USER_SEND_REGISTERED_EMAIL = True
+    USER_SEND_USERNAME_CHANGED_EMAIL = False
 
     # Flask-Mail config
     MAIL_SERVER = environ.get('IMMUNO_MAIL_SERVER')
@@ -43,7 +59,6 @@ db = SQLAlchemy(app)
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     active = db.Column(db.Boolean(), nullable=False, default=False)
-    username = db.Column(db.String(50), nullable=False, unique=True)
     password = db.Column(db.String(255), nullable=False, default='')
     email = db.Column(db.String(255), nullable=False, unique=True)
     confirmed_at = db.Column(db.DateTime())
