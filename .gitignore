@@ -49,3 +49,6 @@ nosetests.xml
 
 # sqlite DBs
 *.sqlite
+
+# environment variables
+env.sh

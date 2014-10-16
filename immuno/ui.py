@@ -1,61 +1,133 @@
+from common import str2bool
 from vcf import load_vcf
+
 from flask import Flask
-from flask import render_template
+from flask import redirect, request, render_template, url_for, send_from_directory
 from flask.ext.sqlalchemy import SQLAlchemy
 from flask.ext.user import (current_user, login_required, UserManager,
     UserMixin, SQLAlchemyAdapter)
-import os
-from os.path import exists, join, isdir
+from flask_mail import Mail, Message
+from werkzeug import secure_filename
+from os import environ, getcwd
+from os.path import exists, join
+
+ALLOWED_EXTENSIONS = set(['vcf', 'hla'])
 
 class ConfigClass(object):
     # Custom config
-    VARIANT_PATH = os.environ.get('IMMUNO_VARIANT_PATH', os.getcwd())
-    HLA_PATH = os.environ.get('IMMUNO_HLA_PATH', os.getcwd())
+    DEBUG = str2bool(environ.get('IMMUNO_DEBUG', 'False'))
+    PORT = int(environ.get('IMMUNO_PORT', 5000))
+    USE_RELOADER = str2bool(environ.get('IMMUNO_USE_RELOADER', False))
+    UPLOAD_FOLDER = join(getcwd(), 'uploads')
+
     # Flask config
-    SECRET_KEY = os.environ.get('IMMUNO_SECRET_KEY')
-    SQLALCHEMY_DATABASE_URI = os.environ.get('IMMUNO_DB')
+    SECRET_KEY = environ.get('IMMUNO_SECRET_KEY')
+    SQLALCHEMY_DATABASE_URI = environ.get('IMMUNO_DB')
+
     # Flask-User config
-    USER_ENABLE_EMAIL = False
+    USER_PRODUCT_NAME = 'immuno'
+    USER_ENABLE_EMAIL = True
+    USER_ENABLE_CHANGE_PASSWORD = True
+    USER_ENABLE_CHANGE_USERNAME = False
+    USER_ENABLE_CONFIRM_EMAIL = True
+    USER_ENABLE_FORGOT_PASSWORD = True
+    USER_ENABLE_MULTIPLE_EMAILS = False
+    USER_ENABLE_REGISTRATION = True
+    USER_ENABLE_RETYPE_PASSWORD = True
+    USER_ENABLE_USERNAME = False
+    USER_CONFIRM_EMAIL_EXPIRATION = 2 * 24 * 3600
+    USER_PASSWORD_HASH = 'bcrypt'
+    USER_PASSWORD_HASH_MODE = 'passlib'
+    USER_REQUIRE_INVITATION = False
+    USER_RESET_PASSWORD_EXPIRATION = 2 * 24 * 3600
+    USER_SEND_PASSWORD_CHANGED_EMAIL = True
+    USER_SEND_REGISTERED_EMAIL = True
+    USER_SEND_USERNAME_CHANGED_EMAIL = False
+
+    # Flask-Mail config
+    MAIL_SERVER = environ.get('IMMUNO_MAIL_SERVER')
+    MAIL_PORT = int(environ.get('IMMUNO_MAIL_PORT', 5000))
+    MAIL_USE_SSL = str2bool(environ.get('IMMUNO_MAIL_USE_SSL', 'False'))
+    MAIL_USE_TLS = str2bool(environ.get('IMMUNO_MAIL_USE_TLS', 'False'))
+    MAIL_USERNAME = environ.get('IMMUNO_MAIL_USERNAME')
+    MAIL_PASSWORD = environ.get('IMMUNO_MAIL_PASSWORD')
+    MAIL_DEFAULT_SENDER = environ.get('IMMUNO_MAIL_DEFAULT_SENDER')
 
 app = Flask(__name__)
 app.config.from_object(__name__ + '.ConfigClass')
+mail = Mail()
+mail.init_app(app)
 db = SQLAlchemy(app)
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     active = db.Column(db.Boolean(), nullable=False, default=False)
-    username = db.Column(db.String(50), nullable=False, unique=True)
     password = db.Column(db.String(255), nullable=False, default='')
+    email = db.Column(db.String(255), nullable=False, unique=True)
+    confirmed_at = db.Column(db.DateTime())
+    reset_password_token = db.Column(db.String(100), nullable=False, default='')
+
+# TODO: distinguish between file types
+class File(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False, default=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+
+    def __init__(self, name, user_id):
+        self.name = name
+        self.user_id = user_id
 
 db_adapter = SQLAlchemyAdapter(db, User)
 user_manager = UserManager(db_adapter, app)
 
 @app.route('/')
 def patients():
-    if not current_user.is_authenticated():
-        return render_template('home.html')
-    return render_template('patients.html', message='test message')
+    if current_user.is_authenticated():
+        return redirect(url_for('profile'))
+    else:
+        return redirect(url_for('user.login'))
+
+@app.route('/profile')
+@login_required
+def profile():
+    return render_template('profile.html')
 
 @app.route('/patient/<patient_filename>')
+@login_required
 def patient(patient_filename):
-    if not current_user.is_authenticated():
-        return render_template('home.html')
-    variant_file_path = join(app.config['VARIANT_PATH'], patient_filename)
-    if not exists(variant_file_path):
-        return 'File not found: %s' % variant_file_path
-    if not variant_file_path.endswith('.vcf'):
-        return 'Not a VCF file: %s' % variant_file_path
-    vcf_df = load_vcf(variant_file_path)
+    file_names = File.query.with_entities(File.name).filter_by(
+        user_id=current_user.id).all()
+    # TODO: Loop through all files
+    filename = file_names[0][0]
+    print join(app.config['UPLOAD_FOLDER'], filename)
+    vcf_df = load_vcf(join(app.config['UPLOAD_FOLDER'], filename))
     vcf_rows = [row for _, row in vcf_df.iterrows()]
     return render_template('patient.html',
-        patient_id = variant_file_path,
-        variant_filename = variant_file_path,
+        patient_id = filename,
+        variant_filename = filename,
         vcf = vcf_rows)
 
-if __name__ == '__main__':
-    app.debug = True
-    assert isdir(app.config['VARIANT_PATH']), \
-        'Variant path %s must be a directory' % app.config['VARIANT_PATH']
-    assert isdir(app.config['HLA_PATH']), \
-        'HLA path %s must be a directory' % app.config['HLA_PATH']
-    app.run()
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
+
+@app.route('/upload', methods=['GET', 'POST'])
+@login_required
+def upload_file():
+    if request.method == 'POST':
+        filenames = []
+        files = request.files.getlist("file")
+        for file in files:
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                file.save(join(app.config['UPLOAD_FOLDER'], filename))
+                file = File(filename, current_user.id)
+                db.session.add(file)
+                db.session.commit()
+                filenames.append(filename)
+        return render_template('uploaded.html', filenames=filenames)
+    return render_template('upload.html')
+
+@app.route('/uploads/<filename>')
+@login_required
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
