@@ -2,7 +2,8 @@ from common import str2bool
 from vcf import load_vcf
 
 from flask import Flask
-from flask import redirect, request, render_template, url_for, send_from_directory
+from flask import redirect, request, render_template, url_for,
+    send_from_directory
 from flask.ext.sqlalchemy import SQLAlchemy
 from flask.ext.user import (current_user, login_required, UserManager,
     UserMixin, SQLAlchemyAdapter)
@@ -10,6 +11,7 @@ from flask_mail import Mail, Message
 from werkzeug import secure_filename
 from os import environ, getcwd
 from os.path import exists, join
+from vcf import load_vcf
 
 ALLOWED_EXTENSIONS = set(['vcf', 'hla'])
 
@@ -67,15 +69,32 @@ class User(db.Model, UserMixin):
     confirmed_at = db.Column(db.DateTime())
     reset_password_token = db.Column(db.String(100), nullable=False, default='')
 
-# TODO: distinguish between file types
-class File(db.Model):
+class Patient(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(255), nullable=False, default=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    name = db.Column(db.String(255), nullable=False, unique=True)
+    notes = db.Column(db.Text, nullable=True)
 
-    def __init__(self, name, user_id):
-        self.name = name
-        self.user_id = user_id
+class Variant(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'))
+    chr = db.Column(db.String(10), nullable=False)
+    pos = db.Column(db.Integer, nullable=False)
+    ref = db.Column(db.String(1000), nullable=True)
+    alt = db.Column(db.String(1000), nullable=False)
+
+    def __init__(self, patient_id, chr, pos, ref, alt):
+        self.patient_id = patient_id
+        self.chr = chr
+        self.pos = pos
+        self.ref = ref
+        self.alt = alt
+
+class HLAType(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'))
+    allele = db.Column(db.String(15), nullable=False)
+    mhc_class = db.Column(db.String(1), nullable=False)
 
 db_adapter = SQLAlchemyAdapter(db, User)
 user_manager = UserManager(db_adapter, app)
@@ -113,19 +132,36 @@ def allowed_file(filename):
 @app.route('/upload', methods=['GET', 'POST'])
 @login_required
 def upload_file():
+    """TODO: Implement streaming, or at least delete the file when done."""
     if request.method == 'POST':
         filenames = []
-        files = request.files.getlist("file")
+        files = request.files.getlist('file')
         for file in files:
             if file and allowed_file(file.filename):
                 filename = secure_filename(file.filename)
-                file.save(join(app.config['UPLOAD_FOLDER'], filename))
-                file = File(filename, current_user.id)
-                db.session.add(file)
+                print filename
+                filepath = join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(filepath)
+                variants = create_variants(filepath)
+                db.session.add_all(variants)
                 db.session.commit()
                 filenames.append(filename)
         return render_template('uploaded.html', filenames=filenames)
     return render_template('upload.html')
+
+def create_variants(filepath):
+    vcf_df = load_vcf(filepath)
+    variants = []
+    for index, row in vcf_df.iterrows():
+        patient_id = "testpatient"
+        chr = row['chr']
+        pos = row['pos']
+        ref = row['ref']
+        alt = row['alt']
+        variant = Variant(patient_id=patient_id, chr=chr, pos=pos,
+            ref=ref, alt=alt)
+        variants.append(variant)
+    return variants
 
 @app.route('/uploads/<filename>')
 @login_required
