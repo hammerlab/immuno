@@ -2,6 +2,14 @@
 
 {% block body %}
 
-Hello, {{ current_user.email }}.
+{{ current_user.email }}
+
+<h1>Patients</h1>
+
+{% for patient in patients %}
+<p>
+<a href="{{ url_for('patient', patient_name=patient.name) }}">{{ patient.name }}</a>
+</p>
+{% endfor %}
 
 {% endblock %}

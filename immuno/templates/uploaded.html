@@ -4,7 +4,7 @@
 
 {% for filename in filenames %}
 <p>
-<a href="{{ url_for('uploaded_file', filename = filename) }}">{{ filename }}</a>
+<a href="{{ url_for('uploaded_file', filename=filename) }}">{{ filename }}</a>
 </p>
 {% endfor %}
 

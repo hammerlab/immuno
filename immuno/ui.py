@@ -2,18 +2,20 @@ from common import str2bool
 from vcf import load_vcf
 
 from flask import Flask
-from flask import redirect, request, render_template, url_for,
-    send_from_directory
+from flask import (redirect, request, render_template, url_for,
+    send_from_directory)
 from flask.ext.sqlalchemy import SQLAlchemy
 from flask.ext.user import (current_user, login_required, UserManager,
     UserMixin, SQLAlchemyAdapter)
 from flask_mail import Mail, Message
+from flask.ext.wtf import Form
+from flask.ext.wtf.file import FileField, FileRequired, FileAllowed
 from werkzeug import secure_filename
 from os import environ, getcwd
 from os.path import exists, join
 from vcf import load_vcf
-
-ALLOWED_EXTENSIONS = set(['vcf', 'hla'])
+from hla_file import read_hla_file
+from wtforms import SubmitField, TextField, TextAreaField, validators
 
 class ConfigClass(object):
     # Custom config
@@ -94,7 +96,12 @@ class HLAType(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'))
     allele = db.Column(db.String(15), nullable=False)
-    mhc_class = db.Column(db.String(1), nullable=False)
+    mhc_class = db.Column(db.SmallInteger, nullable=False)
+
+    def __init__(self, patient_id, allele, mhc_class):
+        self.patient_id = patient_id
+        self.allele = allele
+        self.mhc_class = mhc_class
 
 db_adapter = SQLAlchemyAdapter(db, User)
 user_manager = UserManager(db_adapter, app)
@@ -109,51 +116,72 @@ def patients():
 @app.route('/profile')
 @login_required
 def profile():
-    return render_template('profile.html')
-
-@app.route('/patient/<patient_filename>')
-@login_required
-def patient(patient_filename):
-    file_names = File.query.with_entities(File.name).filter_by(
+    patients = Patient.query.with_entities(Patient.name).filter_by(
         user_id=current_user.id).all()
-    # TODO: Loop through all files
-    filename = file_names[0][0]
-    print join(app.config['UPLOAD_FOLDER'], filename)
-    vcf_df = load_vcf(join(app.config['UPLOAD_FOLDER'], filename))
-    vcf_rows = [row for _, row in vcf_df.iterrows()]
-    return render_template('patient.html',
-        patient_id = filename,
-        variant_filename = filename,
-        vcf = vcf_rows)
+    return render_template('profile.html', patients=patients)
 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
-
-@app.route('/upload', methods=['GET', 'POST'])
+@app.route('/patient/<name>')
 @login_required
-def upload_file():
-    """TODO: Implement streaming, or at least delete the file when done."""
-    if request.method == 'POST':
-        filenames = []
-        files = request.files.getlist('file')
-        for file in files:
-            if file and allowed_file(file.filename):
-                filename = secure_filename(file.filename)
-                print filename
-                filepath = join(app.config['UPLOAD_FOLDER'], filename)
-                file.save(filepath)
-                variants = create_variants(filepath)
-                db.session.add_all(variants)
-                db.session.commit()
-                filenames.append(filename)
-        return render_template('uploaded.html', filenames=filenames)
-    return render_template('upload.html')
+def patient(name):
+    id, name, notes = Patient.query.with_entities(Patient.id, Patient.name,
+        Patient.notes).filter_by(name=name).one()
+    variants = Variant.query.with_entities(Variant.chr, Variant.pos,
+        Variant.ref, Variant.alt).filter_by(patient_id=id).all()
+    hla_types = HLAType.query.with_entities(HLAType.allele,
+        HLAType.mhc_class).filter_by(patient_id=id).all()
+    return render_template('patient.html',
+        name=name,
+        notes=notes,
+        variants=variants,
+        hla_types=hla_types)
 
-def create_variants(filepath):
+class NewPatientForm(Form):
+    name = TextField('Patient Name',
+        validators=[validators.required(), validators.length(max=10)])
+    notes = TextAreaField('Patient Notes',
+        validators=[validators.optional(), validators.length(max=200)])
+    vcf_file = FileField('VCF File',
+        validators=[FileRequired(), FileAllowed(['vcf'], 'VCF Only')])
+    hla_file = FileField('HLA File',
+        validators=[FileRequired(), FileAllowed(['hla'], 'HLA Only')])
+    submit = SubmitField("Send")
+
+@app.route('/patient/new', methods=['GET', 'POST'])
+@login_required
+def patient_new():
+    """TODO: Implement streaming, or at least delete the file when done."""
+    form = NewPatientForm(csrf_enabled=False)
+    if form.validate_on_submit():
+        patient = create_patient(request=request, user_id=current_user.id)
+        db.session.add(patient)
+        db.session.commit()
+
+        variants = create_variants(file=request.files['vcf_file'],
+            patient_id=patient.id)
+        db.session.add_all(variants)
+        db.session.commit()
+
+        hla_types = create_hla_types(file=request.files['hla_file'],
+            patient_id=patient.id)
+        db.session.add_all(hla_types)
+        db.session.commit()
+
+        return redirect(url_for('patient', name=patient.name))
+    return render_template('upload.html', form=form)
+
+def create_patient(request, user_id):
+    name = request.form['name']
+    notes = request.form['notes']
+    patient = Patient(user_id=user_id, name=name, notes=notes)
+    return patient
+
+def create_variants(file, patient_id):
+    filename = secure_filename(file.filename)
+    filepath = join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(filepath)
     vcf_df = load_vcf(filepath)
     variants = []
     for index, row in vcf_df.iterrows():
-        patient_id = "testpatient"
         chr = row['chr']
         pos = row['pos']
         ref = row['ref']
@@ -162,6 +190,17 @@ def create_variants(filepath):
             ref=ref, alt=alt)
         variants.append(variant)
     return variants
+
+def create_hla_types(file, patient_id):
+    filename = secure_filename(file.filename)
+    filepath = join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(filepath)
+    alleles = read_hla_file(filepath)
+    hla_types = []
+    for allele in alleles:
+        hla_type = HLAType(patient_id=patient_id, allele=allele, mhc_class=1)
+        hla_types.append(hla_type)
+    return hla_types
 
 @app.route('/uploads/<filename>')
 @login_required
