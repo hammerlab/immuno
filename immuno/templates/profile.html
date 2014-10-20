@@ -8,7 +8,7 @@
 
 {% for patient in patients %}
 <p>
-<a href="{{ url_for('patient', patient_name=patient.name) }}">{{ patient.name }}</a>
+<a href="{{ url_for('patient', name=patient.name) }}">{{ patient.name }}</a>
 </p>
 {% endfor %}
 
