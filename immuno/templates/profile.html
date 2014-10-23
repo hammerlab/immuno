@@ -4,6 +4,10 @@
 
 {{ current_user.email }}
 
+<p>
+<a href="{{ url_for('new_patient') }}">Add Patient</a>
+</p>
+
 <h1>Patients</h1>
 
 {% for patient in patients %}
