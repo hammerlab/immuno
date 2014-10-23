@@ -2,8 +2,9 @@
 
 {% block body %}
 
+<p>
 {{ current_user.email }}
-
+</p>
 <div>
 <a href="{{ url_for('new_patient') }}">Add Patient</a>
 </div>
