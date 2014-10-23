@@ -21,8 +21,6 @@ import sys
 import pandas as pd
 from Bio import SeqIO
 import numpy as np
-from mako.template import Template
-from mako.lookup import TemplateLookup
 
 from common import peptide_substrings, init_logging
 from mhc_iedb import IEDBMHCBinding, normalize_hla_allele_name
@@ -216,25 +214,6 @@ def group_epitopes(scored_epitopes):
         peptides.append(peptide_entry)
     return peptides
 
-def render_report(input_names, peptides, alleles):
-    template_lookup = TemplateLookup(
-        directories=['.', 'viz'],
-        default_filters=['literal']
-    )
-    template = Template(
-        filename = 'viz/index.html.template',
-        lookup = template_lookup
-    )
-
-    html = template.render(
-        peptides = peptides,
-        vcf_filename = input_names,
-        hla_alleles = alleles,
-    )
-    return html
-
-
-
 if __name__ == '__main__':
     args = parser.parse_args()
 
@@ -299,7 +278,6 @@ if __name__ == '__main__':
     imm = ImmunogenicityPredictor(alleles = alleles)
     scored_epitopes = imm.predict(scored_epitopes)
 
-
     if 'MHC_PercentileRank' in scored_epitopes:
         scored_epitopes = scored_epitopes.sort(['MHC_PercentileRank'])
 
@@ -311,16 +289,6 @@ if __name__ == '__main__':
 
     peptides = group_epitopes(scored_epitopes)
 
-
     if args.print_peptides:
         for pep in peptides:
             print pep
-
-
-    input_names = ";".join(args.input_file)
-    if args.string:
-        input_names += ";" + args.string
-
-    html = render_report(input_names, peptides, alleles)
-    with open(args.output_report_file, 'w') as f:
-        f.write(html)
