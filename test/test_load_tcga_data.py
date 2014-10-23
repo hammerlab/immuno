@@ -19,5 +19,5 @@ def test_load_tcga_skcm():
     assert len(transcripts_df) > 0
 
 if __name__ == '__main__':
-  from dsltools import testing_helpers
-  testing_helpers.run_local_tests()
+    from dsltools import testing_helpers
+    testing_helpers.run_local_tests()

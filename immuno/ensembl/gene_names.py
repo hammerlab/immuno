@@ -54,7 +54,7 @@ _BIOMART_QUERY = \
 </Query>
 """.replace("\n", "")
 _BIOMART_URL = \
-	"http://www.biomart.org/biomart/martservice/result?query=%s" % \
+	"http://feb2014.archive.ensembl.org/biomart/martservice/result?query=%s" % \
 	_BIOMART_QUERY
 
 def transcript_id_to_gene_id(transcript_id, _table_cache = [None]):
