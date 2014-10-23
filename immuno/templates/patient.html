@@ -4,46 +4,99 @@
 Patient: {{ name }}
 {% endblock %}
 
+{% block head %}
+<link rel="stylesheet" href="/static/css/peptides.css">
+{% endblock %}
+
 {% block body %}
-
 <h1>Patient {{ name }}</h1>
-
 <h2>Notes:</h2>
-
 <p>
 {{ notes }}
 </p>
 
 <h2>HLA Types</h2>
 <table>
-    <tr>
-        <th>Allele</th>
-        <th>MHC Class</th>
-    </tr>
-    {% for hla_type in hla_types %}
-    <tr>
-        <td>{{ hla_type.allele }}</td>
-        <td>{{ hla_type.mhc_class }}</td>
-    </tr>
-    {% endfor %}
+  <tr>
+    <th>Allele</th>
+      <th>MHC Class</th>
+  </tr>
+  {% for hla_type in hla_types %}
+  <tr>
+    <td>{{ hla_type.allele }}</td>
+    <td>{{ hla_type.mhc_class }}</td>
+  </tr>
+  {% endfor %}
 </table>
 
 <h2>Variants</h2>
 <table>
-    <tr>
-        <th>chr</th>
-        <th>pos</th>
-        <th>ref</th>
-        <th>alt</th>
-    </tr>
-    {% for variant in variants %}
-    <tr>
-        <td>{{ variant.chr }}</td>
-        <td>{{ variant.pos }}</td>
-        <td>{{ variant.ref }}</td>
-        <td>{{ variant.alt }}</td>
-    </tr>
-    {% endfor %}
+  <tr>
+    <th>chr</th>
+    <th>pos</th>
+    <th>ref</th>
+    <th>alt</th>
+  </tr>
+  {% for variant in variants %}
+  <tr>
+    <td>{{ variant.chr }}</td>
+    <td>{{ variant.pos }}</td>
+    <td>{{ variant.ref }}</td>
+    <td>{{ variant.alt }}</td>
+  </tr>
+  {% endfor %}
 </table>
 
+<div id="peptides-list">
+  Binding threshold:
+  <input type="range" id="slider" value="500" min="1" max="2500">
+  &nbsp;&nbsp;
+  <span id="slider-type"></span>
+  <span id="tval">500</span><span id="suffix">nM</span>&nbsp;
+  <select name="sort-value">
+      <option selected value="ic50">IC50</option>
+      <option value="percentile">Percentile</option>
+  </select>
+  <span id="close-inspector" title="Close inspector.">&times;</span>
+  <div id="peptides"></div>
+</div>
+
+<script src="/static/js/d3.min.js"></script>
+<script src="/static/js/underscore-min.js"></script>
+<script src="/static/js/data.js"></script>
+<script src="/static/js/peptides.js"></script>
+<script>
+vaccine_peptide_array = [
+  {% for peptide in peptides %}
+    {
+      sequence: "{{ peptide['Peptide'] }}",
+      length : "{{ peptide['Peptide']|length }}",
+      mutation : "{{ peptide['PeptideMutationInfo'] }}",
+      gene : "{{ peptide['Gene'] }}",
+      transcriptId : "{{ peptide['TranscriptId'] }}",
+      description : "{{ peptide['Description'] }}",
+      mutStart: {{ peptide['MutationStart'] }},
+      mutEnd : {{ peptide['MutationEnd'] }},
+      epitopes: [
+        {% for epitope in peptide['Epitopes'] %}
+          {
+            start: {{ epitope['EpitopeStart'] }},
+            length: {{ epitope['EpitopeEnd'] - epitope['EpitopeStart'] }},
+            scores: {
+              {% for score in epitope['MHC_Allele_Scores'] %}
+                "{{ score['Allele'] }}" : {
+                   percentile : {{ score['MHC_PercentileRank'] }},
+                   bindingScore : {{ score['MHC_IC50'] }}
+                },
+              {% endfor %}
+            },
+            sequence: "{{ epitope['Epitope'] }}",
+          },
+        {% endfor %}
+      ],
+    },
+  {% endfor %}
+];
+peptides.run(vaccine_peptide_array);
+</script>
 {% endblock %}
