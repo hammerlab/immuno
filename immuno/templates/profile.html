@@ -13,7 +13,7 @@
 
 {% for patient in patients %}
 <div>
-<a href="{{ url_for('patient', name=patient.name) }}">{{ patient.name }}</a>
+<a href="{{ url_for('patient', name=patient.display_id) }}">{{ patient.display_id }}</a>
 </div>
 {% endfor %}
 
