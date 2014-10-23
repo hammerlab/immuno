@@ -1,9 +1,11 @@
 from common import str2bool
-from vcf import load_vcf
-from mutation_report import normalize_hla_allele_name, group_epitopes
-from load_file import expand_transcripts
+from hla_file import read_hla_file
 from immunogenicity import ImmunogenicityPredictor
+from mhc_common import normalize_hla_allele_name, mhc_class_from_normalized
 import mhc_random
+from mutation_report import group_epitopes
+from load_file import expand_transcripts
+from vcf import load_vcf
 
 from flask import Flask
 from flask import (redirect, request, render_template, url_for,
@@ -14,14 +16,13 @@ from flask.ext.user import (current_user, login_required, UserManager,
 from flask_mail import Mail, Message
 from flask.ext.wtf import Form
 from flask.ext.wtf.file import FileField, FileRequired, FileAllowed
-from werkzeug import secure_filename
+from jinja2 import ChoiceLoader, FileSystemLoader
 from os import environ, getcwd
 from os.path import exists, join
-from vcf import load_vcf
-from hla_file import read_hla_file
-from wtforms import SubmitField, TextField, TextAreaField, validators
-from jinja2 import ChoiceLoader, FileSystemLoader
 from pandas import DataFrame, Series, concat
+from vcf import load_vcf
+from werkzeug import secure_filename
+from wtforms import SubmitField, TextField, TextAreaField, validators
 
 class ConfigClass(object):
     # Custom config
@@ -235,7 +236,10 @@ def create_hla_types(file, patient_id):
     alleles = read_hla_file(filepath)
     hla_types = []
     for allele in alleles:
-        hla_type = HLAType(patient_id=patient_id, allele=allele, mhc_class=1)
+        allele_normalized = normalize_hla_allele_name(allele)
+        mhc_class = mhc_class_from_normalized(allele_normalized)
+        hla_type = HLAType(patient_id=patient_id, allele=allele_normalized,
+            mhc_class=mhc_class)
         hla_types.append(hla_type)
     return hla_types
 

@@ -14,6 +14,9 @@
 import logging
 import re
 
+MHC_1_GENE_SET = set(["A", "B", "C", "E", "F", "G", "K", "L"])
+MHC_2_GENE_SET = set(["DM", "DO", "DP", "DQ", "DR"])
+
 def seq_to_str(obj):
     """
     Given a sequence convert it to a comma separated string.
@@ -64,7 +67,6 @@ def _parse_numbers(hla, max_len = None):
 
 def _parse_not_numbers(hla, max_len = None):
     return _parse_substring(hla, lambda c: not c.isdigit(), max_len = max_len)
-
 
 def normalize_hla_allele_name(hla):
     """
@@ -122,3 +124,26 @@ def compact_hla_allele_name(hla):
     long_name = normalize_hla_allele_name(hla)
     # turn HLA-A*02:01 into A0201
     return long_name[4:].replace("*", "").replace(":", "")
+
+def mhc_class_from_normalized(normalized_hla):
+    """
+    Given a normalized HLA allele name, returns 1 or 2 (corresponding to the
+    MHC class).
+
+    Returns 1 for: HLA-A, HLA-B, HLA-C, HLA-E, HLA-F, HLA-G, HLA-K, HLA-L
+    Returns 2 for: HLA-DM, HLA-DO, HLA-DP, HLA-DQ, HLA-DR
+    """
+    assert normalized_hla.startswith("HLA-") and all(
+        delim in normalized_hla for delim in set(["*", ":", "-"])), \
+        "Expected normalized HLA allele name, but received %s" % normalized_hla
+
+    gene_end_pos = normalized_hla.index("*")
+    gene = normalized_hla[4:gene_end_pos]
+
+    if gene in MHC_1_GENE_SET:
+        return 1
+    elif gene in MHC_2_GENE_SET:
+        return 2
+    raise ValueError(
+        "HLA gene %s is not a part of the MHC 1 or MHC 2 gene sets." % gene)
+    return 1
