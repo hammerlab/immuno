@@ -1,5 +1,9 @@
 from common import str2bool
 from vcf import load_vcf
+from mutation_report import normalize_hla_allele_name, group_epitopes
+from load_file import expand_transcripts
+from immunogenicity import ImmunogenicityPredictor
+import mhc_random
 
 from flask import Flask
 from flask import (redirect, request, render_template, url_for,
@@ -16,6 +20,8 @@ from os.path import exists, join
 from vcf import load_vcf
 from hla_file import read_hla_file
 from wtforms import SubmitField, TextField, TextAreaField, validators
+from jinja2 import ChoiceLoader, FileSystemLoader
+from pandas import DataFrame, Series, concat
 
 class ConfigClass(object):
     # Custom config
@@ -120,20 +126,52 @@ def profile():
         user_id=current_user.id).all()
     return render_template('profile.html', patients=patients)
 
+def get_vcf_df(patient_id):
+    variants = Variant.query.with_entities(Variant.chr, Variant.pos,
+        Variant.ref, Variant.alt).filter_by(patient_id=patient_id).all()
+    vcf_df = DataFrame(variants, columns=['chr', 'pos', 'ref', 'alt'])
+
+    # TODO: I added this because downstream functions expect 'info', but this
+    # is silly and hacky.
+    vcf_df['info'] = Series([None] * len(vcf_df))
+    return vcf_df
+
 @app.route('/patient/<name>')
 @login_required
 def patient(name):
+    """This is version of the patient page that literally runs the mutation report
+    pipeline synchronously. This is not good.
+    """
     id, name, notes = Patient.query.with_entities(Patient.id, Patient.name,
         Patient.notes).filter_by(name=name).one()
     variants = Variant.query.with_entities(Variant.chr, Variant.pos,
         Variant.ref, Variant.alt).filter_by(patient_id=id).all()
     hla_types = HLAType.query.with_entities(HLAType.allele,
         HLAType.mhc_class).filter_by(patient_id=id).all()
+
+    peptide_length = 9
+    alleles = [normalize_hla_allele_name(
+        allele) for allele, mhc_class in hla_types]
+
+    vcf_df = get_vcf_df(id)
+    transcripts_df, vcf_df, variant_report = expand_transcripts(
+        vcf_df,
+        id,
+        min_peptide_length = peptide_length,
+        max_peptide_length = peptide_length)
+
+    # TODO: Don't use MHC random
+    scored_epitopes = mhc_random.generate_scored_epitopes(transcripts_df, alleles)
+    imm = ImmunogenicityPredictor(alleles = alleles)
+    scored_epitopes = imm.predict(scored_epitopes)
+    peptides = group_epitopes(scored_epitopes)
+
     return render_template('patient.html',
         name=name,
         notes=notes,
         variants=variants,
-        hla_types=hla_types)
+        hla_types=hla_types,
+        peptides=peptides)
 
 class NewPatientForm(Form):
     name = TextField('Patient Name',
@@ -148,7 +186,7 @@ class NewPatientForm(Form):
 
 @app.route('/patient/new', methods=['GET', 'POST'])
 @login_required
-def patient_new():
+def new_patient():
     """TODO: Implement streaming, or at least delete the file when done."""
     form = NewPatientForm(csrf_enabled=False)
     if form.validate_on_submit():
@@ -165,7 +203,6 @@ def patient_new():
             patient_id=patient.id)
         db.session.add_all(hla_types)
         db.session.commit()
-
         return redirect(url_for('patient', name=patient.name))
     return render_template('upload.html', form=form)
 
