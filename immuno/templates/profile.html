@@ -4,16 +4,16 @@
 
 {{ current_user.email }}
 
-<p>
+<div>
 <a href="{{ url_for('new_patient') }}">Add Patient</a>
-</p>
+</div>
 
 <h1>Patients</h1>
 
 {% for patient in patients %}
-<p>
+<div>
 <a href="{{ url_for('patient', name=patient.name) }}">{{ patient.name }}</a>
-</p>
+</div>
 {% endfor %}
 
 {% endblock %}
