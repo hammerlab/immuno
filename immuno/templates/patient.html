@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 
 {% block title %}
-Patient: {{ name }}
+Patient: {{ display_id }}
 {% endblock %}
 
 {% block head %}
@@ -9,11 +9,7 @@ Patient: {{ name }}
 {% endblock %}
 
 {% block body %}
-<h1>Patient {{ name }}</h1>
-<h2>Notes:</h2>
-<p>
-{{ notes }}
-</p>
+<h1>Patient {{ display_id }}</h1>
 
 <h2>HLA Types</h2>
 <table>

@@ -81,13 +81,12 @@ class User(db.Model, UserMixin):
 class Patient(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    name = db.Column(db.String(255), nullable=False, unique=True)
-    notes = db.Column(db.Text, nullable=True)
+    display_id = db.Column(db.String(1000), nullable=False, unique=True)
 
 class Variant(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'))
-    chr = db.Column(db.String(10), nullable=False)
+    chr = db.Column(db.String(255), nullable=False)
     pos = db.Column(db.Integer, nullable=False)
     ref = db.Column(db.String(1000), nullable=True)
     alt = db.Column(db.String(1000), nullable=False)
@@ -123,7 +122,7 @@ def patients():
 @app.route('/profile')
 @login_required
 def profile():
-    patients = Patient.query.with_entities(Patient.name).filter_by(
+    patients = Patient.query.with_entities(Patient.display_id).filter_by(
         user_id=current_user.id).all()
     return render_template('profile.html', patients=patients)
 
@@ -137,14 +136,14 @@ def get_vcf_df(patient_id):
     vcf_df['info'] = Series([None] * len(vcf_df))
     return vcf_df
 
-@app.route('/patient/<name>')
+@app.route('/patient/<display_id>')
 @login_required
-def patient(name):
+def patient(display_id):
     """This is version of the patient page that literally runs the mutation report
     pipeline synchronously. This is not good.
     """
-    id, name, notes = Patient.query.with_entities(Patient.id, Patient.name,
-        Patient.notes).filter_by(name=name).one()
+    id, display_id = Patient.query.with_entities(Patient.id,
+        Patient.display_id).filter_by(display_id=display_id).one()
     variants = Variant.query.with_entities(Variant.chr, Variant.pos,
         Variant.ref, Variant.alt).filter_by(patient_id=id).all()
     hla_types = HLAType.query.with_entities(HLAType.allele,
@@ -168,17 +167,14 @@ def patient(name):
     peptides = group_epitopes(scored_epitopes)
 
     return render_template('patient.html',
-        name=name,
-        notes=notes,
+        display_id=display_id,
         variants=variants,
         hla_types=hla_types,
         peptides=peptides)
 
 class NewPatientForm(Form):
-    name = TextField('Patient Name',
-        validators=[validators.required(), validators.length(max=10)])
-    notes = TextAreaField('Patient Notes',
-        validators=[validators.optional(), validators.length(max=200)])
+    display_id = TextField('Patient ID',
+        validators=[validators.required(), validators.length(max=1000)])
     vcf_file = FileField('VCF File',
         validators=[FileRequired(), FileAllowed(['vcf'], 'VCF Only')])
     hla_file = FileField('HLA File',
@@ -204,13 +200,12 @@ def new_patient():
             patient_id=patient.id)
         db.session.add_all(hla_types)
         db.session.commit()
-        return redirect(url_for('patient', name=patient.name))
+        return redirect(url_for('patient', display_id=patient.display_id))
     return render_template('upload.html', form=form)
 
 def create_patient(request, user_id):
-    name = request.form['name']
-    notes = request.form['notes']
-    patient = Patient(user_id=user_id, name=name, notes=notes)
+    display_id = request.form['display_id']
+    patient = Patient(user_id=user_id, display_id=display_id)
     return patient
 
 def create_variants(file, patient_id):
