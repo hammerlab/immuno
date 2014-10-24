@@ -1,7 +1,7 @@
 from common import str2bool
 from hla_file import read_hla_file
 from immunogenicity import ImmunogenicityPredictor
-from mhc_common import normalize_hla_allele_name, mhc_class_from_normalized
+from mhc_common import normalize_hla_allele_name, mhc_class_from_normalized_allele_name
 import mhc_random
 from mutation_report import group_epitopes
 from load_file import expand_transcripts
@@ -237,7 +237,7 @@ def create_hla_types(file, patient_id):
     hla_types = []
     for allele in alleles:
         allele_normalized = normalize_hla_allele_name(allele)
-        mhc_class = mhc_class_from_normalized(allele_normalized)
+        mhc_class = mhc_class_from_normalized_allele_name(allele_normalized)
         hla_type = HLAType(patient_id=patient_id, allele=allele_normalized,
             mhc_class=mhc_class)
         hla_types.append(hla_type)
