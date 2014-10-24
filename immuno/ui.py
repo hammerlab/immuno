@@ -19,7 +19,7 @@ from flask.ext.wtf.file import FileField, FileRequired, FileAllowed
 from jinja2 import ChoiceLoader, FileSystemLoader
 from os import environ, getcwd
 from os.path import exists, join
-from pandas import DataFrame, Series, concat
+from pandas import DataFrame, Series, concat, merge
 from vcf import load_vcf
 from werkzeug import secure_filename
 from wtforms import SubmitField, TextField, TextAreaField, validators
@@ -164,7 +164,12 @@ def patient(display_id):
     scored_epitopes = mhc_random.generate_scored_epitopes(transcripts_df, alleles)
     imm = ImmunogenicityPredictor(alleles = alleles)
     scored_epitopes = imm.predict(scored_epitopes)
-    peptides = group_epitopes(scored_epitopes)
+
+    short_transcripts_df = transcripts_df[['chr', 'pos', 'ref',
+        'alt', 'TranscriptId']]
+    scored_epitopes_expanded = merge(scored_epitopes, short_transcripts_df,
+        on='TranscriptId', how='left')
+    peptides = group_epitopes(scored_epitopes_expanded)
 
     return render_template('patient.html',
         display_id=display_id,
