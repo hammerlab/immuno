@@ -8,6 +8,7 @@ var WIDTH = 1200,
     SLIDER_TYPE = 'ic50',       // global & mutable
     SLIDER_BINDING_SCORE = 500, // global & mutable
     SLIDER_PERCENTILE = 2,      // global & mutable
+    GENE_COLLAPSED = false,     // global & mutable
     GENE_LETTER_WIDTH = 9.5,
     GENE_WIDTH,
     EPITOPE_INFO_HEIGHT = 125,
@@ -38,15 +39,7 @@ function main(data) {
   data = sortPeptides(data, getSliderAttr(), getSliderValue());
   renderPeptides(data);
   initializeSliderHandler(data);
-  initializeCollapseHandler(data);
-}
-
-function initializeCollapseHandler(data) {
-  d3.select('#collapse-gene')
-    .on('click', function() {
-      collapseGenes(data);
-      renderPeptides(data);
-    });
+  initializeTranscripToggle(data);
 }
 
 function renderPeptides(data) {
@@ -92,6 +85,15 @@ function collapseGenes(data) {
 
   var genes = d3.selectAll('.gene')
       .text(function(d) { return d.gene; })
+      .attr('dx', -GENE_WIDTH);
+}
+
+function expandGenes(data) {
+  GENE_WIDTH = d3.max(data,
+    function(d) { return d.description.length; }) * GENE_LETTER_WIDTH;
+
+  var genes = d3.selectAll('.gene')
+      .text(function(d) { return d.description; })
       .attr('dx', -GENE_WIDTH);
 }
 
@@ -594,7 +596,22 @@ function initializeSliderHandler(peptides) {
       });
 }
 
-
+function initializeTranscripToggle(data) {
+  var button = d3.select('#toggle-transcripts');
+  button.on('click', function() {
+      if (!GENE_COLLAPSED) {
+        collapseGenes(data);
+        GENE_COLLAPSED = true;
+        button.text("Show Transcript");
+      }
+      else {
+        expandGenes(data);
+        GENE_COLLAPSED = false;
+        button.text("Hide Transcript");
+      }
+      renderPeptides(data);
+    });
+}
 
 
 /************************************************
