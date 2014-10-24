@@ -67,7 +67,7 @@ function renderPeptides(data) {
       .call(renderGenes)
       .call(createEpitopeContainers)
       .call(renderPeptideSequences)
-      .call(initializePeptideHandlers)
+      .call(initializePeptideHandlers);
 }
 
 function renderGenes(peptides) {
