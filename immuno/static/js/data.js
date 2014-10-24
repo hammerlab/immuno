@@ -18,9 +18,10 @@ var peptides = _.range(NUM_PEPTIDES).map(function() {
       sequence = randomSample(ALPHABET, length).join(''),
       gene = randomSample(ALPHABET + "1234567890", _.random(3, 6)).join(''),
       mutStart = _.random(length-2),
-      mutation = "" + randomSample(ALPHABET, 1) + mutStart + sequence[mutStart];
+      mutation = "" + randomSample(ALPHABET, 1) + mutStart + sequence[mutStart],
+      description = ""
   return {sequence: sequence, gene: gene, length: length,
-          mutStart: mutStart, mutEnd: mutStart+1, mutation: mutation};
+          mutStart: mutStart, mutEnd: mutStart+1, mutation: mutation, description: description};
 });
 
 _.flatMap = _.compose(_.flatten, _.map);
