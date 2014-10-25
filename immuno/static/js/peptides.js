@@ -15,6 +15,7 @@ var WIDTH = 1200,
     MAX_PERCENTILE = 50,
     MIN_IC50 = 1,
     MAX_IC50 = 2500,
+    SCORE_CHART_WIDTH = 10,
     residueXScale = d3.scale.ordinal();
 
 function main(data) {
@@ -269,7 +270,7 @@ function renderEpitopeScores(epitopes) {
       .attr('x', function(d, i) { return i*10; })
       .attr('y', function(d, i) { return -d.percentile/10; })
       .attr('height', function(d, i) { return d.percentile/10; })
-      .attr('width', 10);
+      .attr('width', SCORE_CHART_WIDTH);
 }
 
 function renderEpitopeSequence(epitopes) {
@@ -585,8 +586,11 @@ function initializeSliderHandler(peptides) {
 }
 
 function collapseLeftColumnName(data) {
-  GENE_WIDTH = d3.max(data,
-    function(d) { return d.gene.length + 2; }) * GENE_LETTER_WIDTH;
+  GENE_WIDTH = Math.max(
+    d3.max(data,
+      function(d) { return d.gene.length + 2; }),
+      SCORE_CHART_WIDTH)
+    * GENE_LETTER_WIDTH;
 
   var genes = d3.selectAll('.gene')
       .text(function(d) { return d.gene; })
@@ -594,8 +598,11 @@ function collapseLeftColumnName(data) {
 }
 
 function expandLeftColumnName(data) {
-  GENE_WIDTH = d3.max(data,
-    function(d) { return d.description.length; }) * GENE_LETTER_WIDTH;
+  GENE_WIDTH = Math.max(
+    d3.max(data,
+      function(d) { return d.description.length; }),
+      SCORE_CHART_WIDTH)
+    * GENE_LETTER_WIDTH;
 
   var genes = d3.selectAll('.gene')
       .text(function(d) { return d.description; })
