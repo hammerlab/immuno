@@ -125,7 +125,7 @@ def compact_hla_allele_name(hla):
     # turn HLA-A*02:01 into A0201
     return long_name[4:].replace("*", "").replace(":", "")
 
-def mhc_class_from_normalized(normalized_hla):
+def mhc_class_from_normalized_allele_name(normalized_hla):
     """
     Given a normalized HLA allele name, returns 1 or 2 (corresponding to the
     MHC class).

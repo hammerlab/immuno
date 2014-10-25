@@ -49,6 +49,7 @@ Patient: {{ display_id }}
   &nbsp;&nbsp;
   <span id="slider-type"></span>
   <span id="tval">500</span><span id="suffix">nM</span>&nbsp;
+  <button id="toggle-transcripts">Hide Details</button>
   <select name="sort-value">
       <option selected value="ic50">IC50</option>
       <option value="percentile">Percentile</option>
@@ -65,6 +66,10 @@ Patient: {{ display_id }}
 vaccine_peptide_array = [
   {% for peptide in peptides %}
     {
+      chr: "{{ peptide['chr'] }}",
+      pos: {{ peptide['pos'] }},
+      ref: "{{ peptide['ref'] }}",
+      alt: "{{ peptide['alt'] }}",
       sequence: "{{ peptide['Peptide'] }}",
       length : "{{ peptide['Peptide']|length }}",
       mutation : "{{ peptide['PeptideMutationInfo'] }}",

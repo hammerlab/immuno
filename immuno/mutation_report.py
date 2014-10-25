@@ -130,45 +130,53 @@ def print_mutation_report(
 def group_epitopes(scored_epitopes):
     """
     Given a DataFrame with fields:
-      - TranscriptId
-      - SourceSequence
-      - MutationStart
-      - MutationEnd
-      - GeneMutationInfo
-      - PeptideMutationInfo
-      - Gene
-      - GeneInfo
-      - Epitope
-      - EpitopeStart
-      - EpitopeEnd
-      - MHC_IC50
-      - MHC_PercentileRank
+        - chr
+        - pos
+        - ref
+        - alt
+        - TranscriptId
+        - SourceSequence
+        - MutationStart
+        - MutationEnd
+        - GeneMutationInfo
+        - PeptideMutationInfo
+        - Gene
+        - GeneInfo
+        - Epitope
+        - EpitopeStart
+        - EpitopeEnd
+        - MHC_IC50
+        - MHC_PercentileRank
 
     Group epitopes under their originating transcript and
     make nested lists of dictionaries to contain the binding scores
     for MHC alleles.
 
     Return a list of dictionaries for each mutated transcript with fields:
-      - TranscriptId
-      - SourceSequence
-      - MutationStart
-      - MutationEnd
-      - GeneMutationInfo
-      - PeptideMutationInfo
-      - Gene
-      - GeneInfo
-      - Epitopes : list of dictionaries
+        - chr
+        - pos
+        - ref
+        - alt
+        - TranscriptId
+        - SourceSequence
+        - MutationStart
+        - MutationEnd
+        - GeneMutationInfo
+        - PeptideMutationInfo
+        - Gene
+        - GeneInfo
+        - Epitopes : list of dictionaries
 
     Each entry of the 'Epitopes' list contains the following fields:
-      - 'Epitope'
-      - 'EpitopeStart'
-      - 'EpitopeEnd'
-      - 'MHC_AlleleScores' : list of allele-specific entries
+        - 'Epitope'
+        - 'EpitopeStart'
+        - 'EpitopeEnd'
+        - 'MHC_AlleleScores' : list of allele-specific entries
 
     Each entry of 'MHC_AlleleScores' the following fields:
-      - 'Allele'
-      - 'MHC_PercentileRank'
-      - 'MHC_IC50'
+        - 'Allele'
+        - 'MHC_PercentileRank'
+        - 'MHC_IC50'
     """
     peptides = []
     for (transcript_id, seq), transcript_group in \
@@ -177,14 +185,19 @@ def group_epitopes(scored_epitopes):
         peptide_entry["Peptide"] = seq
         peptide_entry['TranscriptId'] = transcript_id
         head = transcript_group.to_records()[0]
+        peptide_entry['chr'] = head.chr
+        peptide_entry['pos'] = head.pos
+        peptide_entry['ref'] = head.ref
+        peptide_entry['alt'] = head.alt
         peptide_entry["MutationStart"] = head.MutationStart
         peptide_entry["MutationEnd"] = head.MutationEnd
         peptide_entry["GeneMutationInfo"] = head.GeneMutationInfo
         peptide_entry["PeptideMutationInfo"] = head.PeptideMutationInfo
         peptide_entry["GeneInfo"] = head.GeneInfo
         peptide_entry['Gene'] = head.Gene
-        peptide_entry['Description'] = "%s (%s) : %s" % (
-                head.Gene, head.TranscriptId, head.PeptideMutationInfo
+        peptide_entry['Description'] = "%s %s %s %s %s (%s) : %s" % (
+                head.chr, head.pos, head.ref, head.alt, head.Gene,
+                head.TranscriptId, head.PeptideMutationInfo
         )
         peptide_entry['Epitopes'] = []
         for (epitope, epitope_start, epitope_end), epitope_group in \

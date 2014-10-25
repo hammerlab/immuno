@@ -1,7 +1,7 @@
 from common import str2bool
 from hla_file import read_hla_file
 from immunogenicity import ImmunogenicityPredictor
-from mhc_common import normalize_hla_allele_name, mhc_class_from_normalized
+from mhc_common import normalize_hla_allele_name, mhc_class_from_normalized_allele_name
 import mhc_random
 from mutation_report import group_epitopes
 from load_file import expand_transcripts
@@ -19,7 +19,7 @@ from flask.ext.wtf.file import FileField, FileRequired, FileAllowed
 from jinja2 import ChoiceLoader, FileSystemLoader
 from os import environ, getcwd
 from os.path import exists, join
-from pandas import DataFrame, Series, concat
+from pandas import DataFrame, Series, concat, merge
 from vcf import load_vcf
 from werkzeug import secure_filename
 from wtforms import SubmitField, TextField, TextAreaField, validators
@@ -164,7 +164,12 @@ def patient(display_id):
     scored_epitopes = mhc_random.generate_scored_epitopes(transcripts_df, alleles)
     imm = ImmunogenicityPredictor(alleles = alleles)
     scored_epitopes = imm.predict(scored_epitopes)
-    peptides = group_epitopes(scored_epitopes)
+
+    short_transcripts_df = transcripts_df[['chr', 'pos', 'ref',
+        'alt', 'TranscriptId']]
+    scored_epitopes_expanded = merge(scored_epitopes, short_transcripts_df,
+        on='TranscriptId', how='left')
+    peptides = group_epitopes(scored_epitopes_expanded)
 
     return render_template('patient.html',
         display_id=display_id,
@@ -232,7 +237,7 @@ def create_hla_types(file, patient_id):
     hla_types = []
     for allele in alleles:
         allele_normalized = normalize_hla_allele_name(allele)
-        mhc_class = mhc_class_from_normalized(allele_normalized)
+        mhc_class = mhc_class_from_normalized_allele_name(allele_normalized)
         hla_type = HLAType(patient_id=patient_id, allele=allele_normalized,
             mhc_class=mhc_class)
         hla_types.append(hla_type)

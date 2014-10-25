@@ -12,7 +12,6 @@ body {
   margin-bottom: 20px;
 }
 
-
 .peptide text.sequence {
   font-family: monospace;
   font-size: 1.2em;
@@ -110,4 +109,8 @@ body.epitope-body thead {
 
 body.epitope-body td {
   padding: 1px 5px;
+}
+
+button#toggle-transcripts {
+  width: 120px;
 }
