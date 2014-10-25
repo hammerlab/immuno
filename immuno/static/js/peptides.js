@@ -8,7 +8,6 @@ var WIDTH = 1200,
     SLIDER_TYPE = 'ic50',       // global & mutable
     SLIDER_BINDING_SCORE = 500, // global & mutable
     SLIDER_PERCENTILE = 2,      // global & mutable
-    GENE_COLLAPSED = false,     // global & mutable
     GENE_LETTER_WIDTH = 9.5,
     GENE_WIDTH,
     EPITOPE_INFO_HEIGHT = 125,
@@ -17,7 +16,6 @@ var WIDTH = 1200,
     MIN_IC50 = 1,
     MAX_IC50 = 2500,
     residueXScale = d3.scale.ordinal();
-
 
 function main(data) {
   GENE_WIDTH = d3.max(data, function(d) { return d.description.length; }) * GENE_LETTER_WIDTH;
@@ -37,11 +35,18 @@ function main(data) {
          .attr('id', 'svg');
 
   data = sortPeptides(data, getSliderAttr(), getSliderValue());
-  renderPeptides(data);
+  var peptides = renderPeptides(data);
+
+  initializePeptideHandlers(peptides);
+  initializeLeftColumnToggleHandler(peptides);
+
   initializeSliderHandler(data);
-  initializeTranscripToggle(data);
 }
 
+/**
+ * This function is intended to be called multiple times (during expand, collapse,
+ * etc.), and not just on initialization.
+ */
 function renderPeptides(data) {
   var peptides = d3.select('#svg')
     .selectAll('.peptide')
@@ -65,8 +70,9 @@ function renderPeptides(data) {
   peptides
       .call(renderGenes)
       .call(createEpitopeContainers)
-      .call(renderPeptideSequences)
-      .call(initializePeptideHandlers);
+      .call(renderPeptideSequences);
+
+  return peptides;
 }
 
 function renderGenes(peptides) {
@@ -79,7 +85,7 @@ function renderGenes(peptides) {
       .text(function(d) { return d.description; });
 }
 
-function collapseGenes(data) {
+function collapseLeftColumnName(data) {
   GENE_WIDTH = d3.max(data,
     function(d) { return d.gene.length + 2; }) * GENE_LETTER_WIDTH;
 
@@ -88,7 +94,7 @@ function collapseGenes(data) {
       .attr('dx', -GENE_WIDTH);
 }
 
-function expandGenes(data) {
+function expandLeftColumnName(data) {
   GENE_WIDTH = d3.max(data,
     function(d) { return d.description.length; }) * GENE_LETTER_WIDTH;
 
@@ -596,21 +602,46 @@ function initializeSliderHandler(peptides) {
       });
 }
 
-function initializeTranscripToggle(data) {
-  var button = d3.select('#toggle-transcripts');
-  button.on('click', function() {
-      if (!GENE_COLLAPSED) {
-        collapseGenes(data);
-        GENE_COLLAPSED = true;
-        button.text("Show Transcript");
-      }
-      else {
-        expandGenes(data);
-        GENE_COLLAPSED = false;
-        button.text("Hide Transcript");
-      }
-      renderPeptides(data);
+function collapseEpitopesWhenNeeded(peptides) {
+  var epitope = d3.select('.ep-sequence');
+  if (!epitope.empty()) {
+    peptides.selectAll('.clickbox').each(function(d, i) {
+      collapseEpitopes(peptides, this.parentNode, this, d);
     });
+    d3.select('#close-inspector')
+      .style('display', 'none');
+  }
+}
+
+function collapseLeftColumn(peptides, button) {
+  var data = peptides.data();
+  collapseEpitopesWhenNeeded(peptides);
+  collapseLeftColumnName(data);
+  renderPeptides(data);
+
+  button.text("Show Details");
+  button.on('click', function(d) {
+    expandLeftColumn(peptides, button);
+  });
+}
+
+function expandLeftColumn(peptides, button) {
+  var data = peptides.data();
+  collapseEpitopesWhenNeeded(peptides);
+  expandLeftColumnName(data);
+  renderPeptides(data);
+
+  button.text("Hide Details");
+  button.on('click', function(d) {
+    collapseLeftColumn(peptides, button);
+  });
+}
+
+function initializeLeftColumnToggleHandler(peptides) {
+  var button = d3.select('#toggle-transcripts');
+  button.on('click', function(d) {
+    collapseLeftColumn(peptides, button);
+  });
 }
 
 
