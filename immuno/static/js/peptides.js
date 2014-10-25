@@ -29,8 +29,7 @@ function main(data) {
 
   d3.select('#peptides')
       .append('svg')
-        .attr('width', WIDTH)
-        .attr('height', HEIGHT)
+        .attr('viewBox', '0 0 ' + WIDTH + ' ' + HEIGHT)
       .append('g')
          .attr('transform', 'translate(0,' + PEPTIDE_HEIGHT + ')')
          .attr('id', 'svg');
