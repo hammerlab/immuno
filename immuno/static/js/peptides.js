@@ -85,24 +85,6 @@ function renderGenes(peptides) {
       .text(function(d) { return d.description; });
 }
 
-function collapseLeftColumnName(data) {
-  GENE_WIDTH = d3.max(data,
-    function(d) { return d.gene.length + 2; }) * GENE_LETTER_WIDTH;
-
-  var genes = d3.selectAll('.gene')
-      .text(function(d) { return d.gene; })
-      .attr('dx', -GENE_WIDTH);
-}
-
-function expandLeftColumnName(data) {
-  GENE_WIDTH = d3.max(data,
-    function(d) { return d.description.length; }) * GENE_LETTER_WIDTH;
-
-  var genes = d3.selectAll('.gene')
-      .text(function(d) { return d.description; })
-      .attr('dx', -GENE_WIDTH);
-}
-
 function createEpitopeContainers(peptides) {
   var epitopes = peptides.selectAll('.epitope')
       .data(function(d, i) {
@@ -600,6 +582,24 @@ function initializeSliderHandler(peptides) {
         renderPeptides(peptides);
         setSliderText();
       });
+}
+
+function collapseLeftColumnName(data) {
+  GENE_WIDTH = d3.max(data,
+    function(d) { return d.gene.length + 2; }) * GENE_LETTER_WIDTH;
+
+  var genes = d3.selectAll('.gene')
+      .text(function(d) { return d.gene; })
+      .attr('dx', -GENE_WIDTH);
+}
+
+function expandLeftColumnName(data) {
+  GENE_WIDTH = d3.max(data,
+    function(d) { return d.description.length; }) * GENE_LETTER_WIDTH;
+
+  var genes = d3.selectAll('.gene')
+      .text(function(d) { return d.description; })
+      .attr('dx', -GENE_WIDTH);
 }
 
 function collapseEpitopesWhenNeeded(peptides) {
