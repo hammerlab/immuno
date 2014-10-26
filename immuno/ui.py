@@ -214,8 +214,9 @@ def variants(display_id):
         Variant.ref, Variant.alt).filter_by(patient_id=patient_id).all()
 
     # Sort variants with a natural alphanumeric sort on chr name + position
+    # TODO(tavi) Make this two-column sort less hacky
     variants = natsorted(variants,
-        key=lambda variant: variant[0].lower() + str(variant[1]))
+        key=lambda variant: variant[0].lower() + ' ' + str(variant[1]))
     return render_template('variants.html',
         display_id=display_id,
         variants=variants)
