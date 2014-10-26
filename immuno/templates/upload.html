@@ -11,21 +11,29 @@ Add Patient
 {% block content %}
 {{ form.errors }}
 
-<form action="" method="POST" enctype="multipart/form-data">
-  <div>
-  {{ form.display_id.label }}
-  {{ form.display_id }}
+<form role="form" action="" method="POST" enctype="multipart/form-data">
+  <div class="row">
+    <div class="form-group col-lg-1">
+      {{ form.display_id.label }}
+      {{ form.display_id }}
+    </div>
   </div>
-  <div>
-  {{ form.vcf_file.label }}
-  {{ form.vcf_file }}
+  <div class="row">
+    <div class="form-group col-lg-1">
+    {{ form.vcf_file.label }}
+    {{ form.vcf_file }}
+    </div>
   </div>
-  <div>
-  {{ form.hla_file.label }}
-  {{ form.hla_file }}
+  <div class="row">
+    <div class="form-group col-lg-1">
+    {{ form.hla_file.label }}
+    {{ form.hla_file }}
+    </div>
   </div>
-  <div>
-  {{ form.submit}}
+  <div class="row">
+    <div class="form-group col-lg-1">
+    {{ form.submit }}
+    </div>
   </div>
 </form>
 {% endblock %}
