@@ -1,7 +1,8 @@
 from common import str2bool
 from hla_file import read_hla_file
 from immunogenicity import ImmunogenicityPredictor
-from mhc_common import normalize_hla_allele_name, mhc_class_from_normalized_allele_name
+from mhc_common import (normalize_hla_allele_name,
+    mhc_class_from_normalized_allele_name)
 import mhc_random
 from mutation_report import group_epitopes
 from load_file import expand_transcripts
@@ -9,7 +10,7 @@ from vcf import load_vcf
 
 from flask import Flask
 from flask import (redirect, request, render_template, url_for,
-    send_from_directory, flash)
+    send_from_directory, flash, make_response)
 from flask.ext.sqlalchemy import SQLAlchemy
 from flask.ext.user import (current_user, login_required, UserManager,
     UserMixin, SQLAlchemyAdapter)
@@ -17,6 +18,7 @@ from flask_mail import Mail, Message
 from flask.ext.wtf import Form
 from flask.ext.wtf.file import FileField, FileRequired, FileAllowed
 from jinja2 import ChoiceLoader, FileSystemLoader
+from json import loads, dumps
 from os import environ, getcwd
 from os.path import exists, join
 from pandas import DataFrame, Series, concat, merge
@@ -109,6 +111,15 @@ class HLAType(db.Model):
         self.allele = allele
         self.mhc_class = mhc_class
 
+class Run(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'))
+    output = db.Column(db.Text, nullable=False)
+
+    def __init__(self, patient_id, output):
+        self.patient_id = patient_id
+        self.output = output
+
 db_adapter = SQLAlchemyAdapter(db, User)
 user_manager = UserManager(db_adapter, app)
 
@@ -136,30 +147,26 @@ def get_vcf_df(patient_id):
     vcf_df['info'] = Series([None] * len(vcf_df))
     return vcf_df
 
-@app.route('/patient/<display_id>')
-@login_required
-def patient(display_id):
-    """This is version of the patient page that literally runs the mutation report
-    pipeline synchronously. This is not good.
-    """
-    id, display_id = Patient.query.with_entities(Patient.id,
-        Patient.display_id).filter_by(display_id=display_id).one()
+def run_pipeline(patient_id):
+    """Run the pipeline for this patient, and save the output to the DB as a
+    Run."""
     hla_types = HLAType.query.with_entities(HLAType.allele,
-        HLAType.mhc_class).filter_by(patient_id=id).all()
+        HLAType.mhc_class).filter_by(patient_id=patient_id).all()
 
     peptide_length = 9
     alleles = [normalize_hla_allele_name(
         allele) for allele, mhc_class in hla_types]
 
-    vcf_df = get_vcf_df(id)
+    vcf_df = get_vcf_df(patient_id)
     transcripts_df, vcf_df, variant_report = expand_transcripts(
         vcf_df,
-        id,
+        patient_id,
         min_peptide_length = peptide_length,
         max_peptide_length = peptide_length)
 
     # TODO: Don't use MHC random
-    scored_epitopes = mhc_random.generate_scored_epitopes(transcripts_df, alleles)
+    scored_epitopes = mhc_random.generate_scored_epitopes(transcripts_df,
+        alleles)
     imm = ImmunogenicityPredictor(alleles = alleles)
     scored_epitopes = imm.predict(scored_epitopes)
 
@@ -169,17 +176,29 @@ def patient(display_id):
         on='TranscriptId', how='left')
     peptides = group_epitopes(scored_epitopes_expanded)
 
+    run = Run(patient_id=patient_id, output=dumps(peptides))
+    db.session.add(run)
+    db.session.commit()
+
+@app.route('/patient/<display_id>')
+@login_required
+def patient(display_id):
+    patient_id, display_id = Patient.query.with_entities(Patient.id,
+        Patient.display_id).filter_by(display_id=display_id).one()
+    output = Run.query.with_entities(Run.output).filter_by(
+        patient_id=patient_id).one()
+
     return render_template('patient.html',
         display_id=display_id,
-        peptides=peptides)
+        peptides=loads(output[0]))
 
 @app.route('/patient/hla_types/<display_id>')
 @login_required
 def hla_types(display_id):
-    id, display_id = Patient.query.with_entities(Patient.id,
+    patient_id, display_id = Patient.query.with_entities(Patient.id,
         Patient.display_id).filter_by(display_id=display_id).one()
     hla_types = HLAType.query.with_entities(HLAType.allele,
-        HLAType.mhc_class).filter_by(patient_id=id).all()
+        HLAType.mhc_class).filter_by(patient_id=patient_id).all()
 
     return render_template('hla.html',
         display_id=display_id,
@@ -188,14 +207,26 @@ def hla_types(display_id):
 @app.route('/patient/variants/<display_id>')
 @login_required
 def variants(display_id):
-    id, display_id = Patient.query.with_entities(Patient.id,
+    patient_id, display_id = Patient.query.with_entities(Patient.id,
         Patient.display_id).filter_by(display_id=display_id).one()
     variants = Variant.query.with_entities(Variant.chr, Variant.pos,
-        Variant.ref, Variant.alt).filter_by(patient_id=id).all()
+        Variant.ref, Variant.alt).filter_by(patient_id=patient_id).all()
 
     return render_template('variants.html',
         display_id=display_id,
         variants=variants)
+
+@app.route('/patient/export/<display_id>')
+@login_required
+def export(display_id):
+    patient_id, display_id = Patient.query.with_entities(Patient.id,
+        Patient.display_id).filter_by(display_id=display_id).one()
+    output = Run.query.with_entities(Run.output).filter_by(
+        patient_id=patient_id).one()
+    response = make_response(output[0])
+    response.headers['Content-Disposition'] = ('attachment;' +
+        'filename=epitopes.json')
+    return response
 
 class NewPatientForm(Form):
     display_id = TextField('Patient ID',
@@ -204,7 +235,7 @@ class NewPatientForm(Form):
         validators=[FileRequired(), FileAllowed(['vcf'], 'VCF Only')])
     hla_file = FileField('HLA File',
         validators=[FileRequired(), FileAllowed(['hla'], 'HLA Only')])
-    submit = SubmitField("Send")
+    submit = SubmitField('Send')
 
 def flash_errors(form):
     for field, errors in form.errors.items():
@@ -218,7 +249,10 @@ def flash_errors(form):
 @app.route('/patient/new', methods=['GET', 'POST'])
 @login_required
 def new_patient():
-    """TODO: Implement streaming, or at least delete the file when done."""
+    """Upload files and run the pipeline for a new patient.
+    TODO: Don't run the pipeline synchronously.
+    TODO: Implement streaming, or at least delete the file when done.
+    """
     form = NewPatientForm(csrf_enabled=False)
     if form.validate_on_submit():
         patient = create_patient(request=request, user_id=current_user.id)
@@ -234,6 +268,8 @@ def new_patient():
             patient_id=patient.id)
         db.session.add_all(hla_types)
         db.session.commit()
+
+        run_pipeline(patient.id)
         return redirect(url_for('patient', display_id=patient.display_id))
     flash_errors(form)
     return render_template('upload.html', form=form)
