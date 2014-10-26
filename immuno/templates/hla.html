@@ -12,6 +12,7 @@ HLA Types
 <li><a href="{{ url_for('patient', display_id=display_id) }}">{{ display_id }}</a></li>
 <li class="active"><a href="{{ url_for('hla_types', display_id=display_id) }}">HLA Types</a></li>
 <li><a href="{{ url_for('variants', display_id=display_id) }}">Variants</a></li>
+<li><a href="{{ url_for('export', display_id=display_id) }}">Export Peptides</a></li>
 {% endblock %}
 
 {% block content %}
