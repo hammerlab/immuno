@@ -2,47 +2,28 @@
 'use strict';
 
 var WIDTH = 1200,
-    HEIGHT = 12000,
-    PEPTIDE_HEIGHT = 20,
-    ACID_DIM = 12,
-    SLIDER_TYPE = 'ic50',       // global & mutable
-    SLIDER_BINDING_SCORE = 500, // global & mutable
-    SLIDER_PERCENTILE = 2,      // global & mutable
-    LEFT_COLUMN_LETTER_WIDTH = 9.5,
-    LEFT_COLUMN_WIDTH,          // global & mutable
-    CHR_WIDTH,                  // global & mutable
-    POS_WIDTH,                  // global & mutable
-    REF_WIDTH,                  // global & mutable
-    ALT_WIDTH,                  // global & mutable
-    GENE_WIDTH,                 // global & mutable
-    TRANSCRIPT_ID_WIDTH,        // global & mutable
-    MUTATION_WIDTH,             // global & mutable
-    EPITOPE_INFO_HEIGHT = 125,
-    MIN_PERCENTILE = 1,
-    MAX_PERCENTILE = 50,
-    MIN_IC50 = 1,
-    MAX_IC50 = 2500,
-    SCORE_CHART_WIDTH = 10,
-    residueXScale = d3.scale.ordinal();
+  HEIGHT = 12000,
+  PEPTIDE_HEIGHT = 20,
+  ACID_DIM = 12,
+  SLIDER_TYPE = 'ic50',       // global & mutable
+  SLIDER_BINDING_SCORE = 500, // global & mutable
+  SLIDER_PERCENTILE = 2,      // global & mutable
+  LEFT_COLUMN_LETTER_WIDTH = 9.5,
+  LEFT_COLUMN_WIDTH,          // global & mutable
+  EPITOPE_INFO_HEIGHT = 125,
+  MIN_PERCENTILE = 1,
+  MAX_PERCENTILE = 50,
+  MIN_IC50 = 1,
+  MAX_IC50 = 2500,
+  SCORE_CHART_WIDTH = 10,
+  residueXScale = d3.scale.ordinal(),
+  ALL_COL_NAMES = ['chr', 'pos', 'ref', 'alt', 'gene', 'transcriptId', 'mutation'],
+  COLLAPSED_COL_NAMES = ['gene', 'mutation'];
 
 function main(data) {
-  CHR_WIDTH = d3.max(data,
-    function(d) { return Math.max('chr'.length, d.chr.length); }) * LEFT_COLUMN_LETTER_WIDTH;
-  POS_WIDTH = d3.max(data,
-    function(d) { return Math.max('pos'.length, d.pos.toString().length); }) * LEFT_COLUMN_LETTER_WIDTH;
-  REF_WIDTH = d3.max(data,
-    function(d) { return Math.max('ref'.length, d.ref.length); }) * LEFT_COLUMN_LETTER_WIDTH;
-  ALT_WIDTH = d3.max(data,
-    function(d) { return Math.max('alt'.length, d.alt.length); }) * LEFT_COLUMN_LETTER_WIDTH;
-  GENE_WIDTH = d3.max(data,
-    function(d) { return Math.max('gene'.length, d.gene.length); }) * LEFT_COLUMN_LETTER_WIDTH;
-  TRANSCRIPT_ID_WIDTH = d3.max(data,
-    function(d) { return Math.max('transcriptId'.length, d.transcriptId.length); }) * LEFT_COLUMN_LETTER_WIDTH;
-  MUTATION_WIDTH = d3.max(data,
-    function(d) { return Math.max('mutation'.length, d.mutation.length); }) * LEFT_COLUMN_LETTER_WIDTH;
-
-  LEFT_COLUMN_WIDTH = CHR_WIDTH + POS_WIDTH + REF_WIDTH +
-    ALT_WIDTH + GENE_WIDTH + TRANSCRIPT_ID_WIDTH + MUTATION_WIDTH;
+  var colNames = ALL_COL_NAMES;
+  var col2Width = createCol2Width(colNames, data);
+  LEFT_COLUMN_WIDTH = getLeftColumnWidth(col2Width);
 
   residueXScale
     .rangeBands([0, WIDTH - LEFT_COLUMN_WIDTH])
@@ -61,40 +42,12 @@ function main(data) {
         .attr('class', 'peptide-header')
         .attr('transform', 'translate(' + LEFT_COLUMN_WIDTH + ',0)');
 
-  peptideHeaderEl.append('text')
-      .attr('class', 'left-col')
-      .attr('dx', -LEFT_COLUMN_WIDTH)
-      .text(function(d) { return 'chr'; });
-
-  peptideHeaderEl.append('text')
-      .attr('class', 'left-col')
-      .attr('dx', CHR_WIDTH - LEFT_COLUMN_WIDTH)
-      .text(function(d) { return 'pos'; });
-
-  peptideHeaderEl.append('text')
-      .attr('class', 'left-col')
-      .attr('dx', CHR_WIDTH + POS_WIDTH - LEFT_COLUMN_WIDTH)
-      .text(function(d) { return 'ref'; });
-
-  peptideHeaderEl.append('text')
-      .attr('class', 'left-col')
-      .attr('dx', CHR_WIDTH + POS_WIDTH + REF_WIDTH - LEFT_COLUMN_WIDTH)
-      .text(function(d) { return 'alt'; });
-
-  peptideHeaderEl.append('text')
-      .attr('class', 'left-col')
-      .attr('dx', CHR_WIDTH + POS_WIDTH + REF_WIDTH + ALT_WIDTH - LEFT_COLUMN_WIDTH)
-      .text(function(d) { return 'gene'; });
-
-  peptideHeaderEl.append('text')
-      .attr('class', 'left-col')
-      .attr('dx', CHR_WIDTH + POS_WIDTH + REF_WIDTH + ALT_WIDTH + GENE_WIDTH - LEFT_COLUMN_WIDTH)
-      .text(function(d) { return 'transcriptId'; });
-
-  peptideHeaderEl.append('text')
-      .attr('class', 'left-col')
-      .attr('dx', CHR_WIDTH + POS_WIDTH + REF_WIDTH + ALT_WIDTH + GENE_WIDTH + TRANSCRIPT_ID_WIDTH - LEFT_COLUMN_WIDTH)
-      .text(function(d) { return 'mutation'; });
+  colNames.forEach(function(colName, i) {
+    peptideHeaderEl.append('text')
+        .attr('class', 'left-col')
+        .attr('dx', getColumnDx(colNames, col2Width, i))
+        .text(function(d) { return colName; });
+  });
 
   data = sortPeptides(data, getSliderAttr(), getSliderValue());
   var peptides = renderPeptides(data);
@@ -106,8 +59,60 @@ function main(data) {
 }
 
 /**
- * This function is intended to be called multiple times (during expand, collapse,
- * etc.), and not just on initialization.
+ * Given a column name and some data, return the max width of the column
+ * (including the width of the header, via colName.length).
+ */
+function calculateColWidth(colName, data) {
+  return d3.max(data,
+    function(d) {
+      var col = (typeof d[colName] == 'string') ?
+        d[colName] : d[colName].toString();
+      return Math.max(colName.length, col.length);
+    }) * LEFT_COLUMN_LETTER_WIDTH;
+}
+
+/**
+ * Given an array of column names, return a map from column name to column
+ * width.
+ */
+function createCol2Width(colNames, data) {
+  var col2Width = {};
+  colNames.forEach(function(colName) {
+    col2Width[colName] = calculateColWidth(colName, data);
+  });
+
+  return col2Width;
+}
+
+/**
+ * Given a dictionary of column names to column widths, sum up the widths.
+ */
+function getLeftColumnWidth(col2Width) {
+  var sum = 0;
+  for (var key in col2Width) {
+    sum += col2Width[key];
+  }
+
+  return sum;
+}
+
+/**
+ * Given an array of column names, a map from column name to column width,
+ * and the index of a specific column, returns the appropriate dx value
+ * (where column 0 starts at -LEFT_COLUMN_WIDTH).
+ */
+function getColumnDx(colNames, col2Width, colIndex) {
+  if (colIndex == 0) {
+    return -LEFT_COLUMN_WIDTH;
+  }
+
+  var prevColName = colNames[colIndex - 1];
+  return col2Width[prevColName] + getColumnDx(colNames, col2Width, colIndex - 1);
+}
+
+/**
+ * This function is intended to be called multiple times (during expand,
+ * collapse, etc.), and not just on initialization.
  */
 function renderPeptides(data) {
   var peptides = d3.select('#svg')
@@ -131,54 +136,30 @@ function renderPeptides(data) {
           ((i + 1) * (PEPTIDE_HEIGHT + 5)) + ')';
       });
 
+  renderLeftColumn(ALL_COL_NAMES, peptides);
+
   peptides
-      .call(renderGenes)
       .call(createEpitopeContainers)
       .call(renderPeptideSequences);
 
   return peptides;
 }
 
-function renderGenes(peptides) {
-  // renders column of gene names on left side of screen
+function renderLeftColumn(colNames, peptides) {
   var rows = peptides.selectAll('.left-col')
       .data(function(d, i) { return [d]; })
     .enter();
+  var leftCol = rows.append('g')
+    .attr('class', 'left-col');
 
-  rows.append('text')
-      .attr('class', 'left-col')
-      .attr('dx', -LEFT_COLUMN_WIDTH)
-      .text(function(d) { return d.chr; });
+  // TODO(tavi) Don't recalculate this multiple times.
+  var col2Width = createCol2Width(colNames, peptides.data());
 
-  rows.append('text')
-      .attr('class', 'left-col')
-      .attr('dx', CHR_WIDTH - LEFT_COLUMN_WIDTH)
-      .text(function(d) { return d.pos; });
-
-  rows.append('text')
-      .attr('class', 'left-col')
-      .attr('dx', CHR_WIDTH + POS_WIDTH - LEFT_COLUMN_WIDTH)
-      .text(function(d) { return d.ref; });
-
-  rows.append('text')
-      .attr('class', 'left-col')
-      .attr('dx', CHR_WIDTH + POS_WIDTH + REF_WIDTH - LEFT_COLUMN_WIDTH)
-      .text(function(d) { return d.alt; });
-
-  rows.append('text')
-      .attr('class', 'left-col')
-      .attr('dx', CHR_WIDTH + POS_WIDTH + REF_WIDTH + ALT_WIDTH - LEFT_COLUMN_WIDTH)
-      .text(function(d) { return d.gene; });
-
-  rows.append('text')
-      .attr('class', 'left-col')
-      .attr('dx', CHR_WIDTH + POS_WIDTH + REF_WIDTH + ALT_WIDTH + GENE_WIDTH - LEFT_COLUMN_WIDTH)
-      .text(function(d) { return d.transcriptId; });
-
-  rows.append('text')
-      .attr('class', 'left-col')
-      .attr('dx', CHR_WIDTH + POS_WIDTH + REF_WIDTH + ALT_WIDTH + GENE_WIDTH + TRANSCRIPT_ID_WIDTH - LEFT_COLUMN_WIDTH)
-      .text(function(d) { return d.mutation; });
+  colNames.forEach(function(colName, i) {
+    leftCol.append('text')
+        .attr('dx', getColumnDx(colNames, col2Width, i))
+        .text(function(d) { return d[colName]; });
+  });
 }
 
 function createEpitopeContainers(peptides) {
@@ -680,30 +661,6 @@ function initializeSliderHandler(peptides) {
       });
 }
 
-function collapseLeftColumnName(data) {
-  LEFT_COLUMN_WIDTH = Math.max(
-    d3.max(data,
-      function(d) { return d.chr.length; }),
-      SCORE_CHART_WIDTH)
-    * LEFT_COLUMN_LETTER_WIDTH;
-
-  var genes = d3.selectAll('.left-col')
-      .text(function(d) { return d.chr; })
-      .attr('dx', -LEFT_COLUMN_WIDTH);
-}
-
-function expandLeftColumnName(data) {
-  LEFT_COLUMN_WIDTH = Math.max(
-    d3.max(data,
-      function(d) { return d.chr.length + d.gene.length; }),
-      SCORE_CHART_WIDTH)
-    * LEFT_COLUMN_LETTER_WIDTH;
-
-  var genes = d3.selectAll('.left-col')
-      .text(function(d) { return d.chr; })
-      .attr('dx', -LEFT_COLUMN_WIDTH);
-}
-
 function collapseEpitopesWhenNeeded(peptides) {
   var epitope = d3.select('.ep-sequence');
   if (!epitope.empty()) {
@@ -718,7 +675,7 @@ function collapseEpitopesWhenNeeded(peptides) {
 function collapseLeftColumn(peptides, button) {
   var data = peptides.data();
   collapseEpitopesWhenNeeded(peptides);
-  collapseLeftColumnName(data);
+  renderLeftColumn(COLLAPSED_COL_NAMES, peptides);
   renderPeptides(data);
 
   button.text("Show Details");
@@ -730,7 +687,7 @@ function collapseLeftColumn(peptides, button) {
 function expandLeftColumn(peptides, button) {
   var data = peptides.data();
   collapseEpitopesWhenNeeded(peptides);
-  expandLeftColumnName(data);
+  renderLeftColumn(ALL_COL_NAMES, peptides);
   renderPeptides(data);
 
   button.text("Hide Details");
