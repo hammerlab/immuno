@@ -1,10 +1,21 @@
 body {
-  padding: 11px;
   font-family: "brandon-grotesque", verdana, helvetica, sans-serif;
 }
 
 pre {
   font-family: "inconsolata", monospace;
+}
+
+.navbar-inverse .navbar-brand {
+  color: #ddd;
+}
+
+.navbar-inverse .navbar-nav>li>a {
+  color: #ddd;
+}
+
+.navbar-inverse .navbar-text {
+  color: #aaa;
 }
 
 /* stolen gratuitously from

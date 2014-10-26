@@ -1,9 +1,14 @@
 {% extends "layout.html" %}
 
-{% block body %}
+{% block title %}
+Add Patient
+{% endblock %}
 
-<h1>New Patient</h1>
+{% block pagetitle %}
+Add Patient
+{% endblock %}
 
+{% block content %}
 {{ form.errors }}
 
 <form action="" method="POST" enctype="multipart/form-data">
@@ -23,5 +28,4 @@
   {{ form.submit}}
   </div>
 </form>
-
 {% endblock %}

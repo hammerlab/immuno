@@ -1,20 +1,17 @@
 {% extends "layout.html" %}
 
-{% block body %}
+{% block title %}
+Profile
+{% endblock %}
 
-<p>
-{{ current_user.email }}
-</p>
-<div>
-<a href="{{ url_for('new_patient') }}">Add Patient</a>
-</div>
+{% block pagetitle %}
+Profile
+{% endblock %}
 
-<h1>Patients</h1>
-
+{% block content %}
 {% for patient in patients %}
 <div>
 <a href="{{ url_for('patient', display_id=patient.display_id) }}">{{ patient.display_id }}</a>
 </div>
 {% endfor %}
-
 {% endblock %}
