@@ -13,38 +13,3 @@ pre {
 .navbar-inverse .navbar-text {
   color: #aaa;
 }
-
-/* stolen gratuitously from
-   http://demosthenes.info/blog/559/CSS-Design-Patterns-For-HTML5-Tables
-*/
-table {
-  border: 1px solid #777;
-  border-collapse: collapse;
-}
-
-caption {
-  font-size: larger; margin: 1em auto;
-}
-
-th, td {
-  padding: .65em;
-}
-
-th, thead {
-  background: #000;
-  border: 1px solid #000;
-  color: #fff;
-}
-
-tr:nth-child(odd) {
-  background: #ccc;
-}
-
-tr:hover {
-  background: #aaa;
-}
-
-td {
-  border-right: 1px solid #777;
-  text-align: center;
-}
