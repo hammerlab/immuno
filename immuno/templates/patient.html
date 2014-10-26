@@ -12,39 +12,13 @@ Patient {{ display_id }}
 <link rel="stylesheet" href="/static/css/peptides.css">
 {% endblock %}
 
+{% block sidebar %}
+<li class="active"><a href="{{ url_for('patient', display_id=display_id) }}">{{ display_id }}</a></li>
+<li><a href="{{ url_for('hla_types', display_id=display_id) }}">HLA Types</a></li>
+<li><a href="{{ url_for('variants', display_id=display_id) }}">Variants</a></li>
+{% endblock %}
+
 {% block content %}
-<h2>HLA Types</h2>
-<table>
-  <tr>
-    <th>Allele</th>
-      <th>MHC Class</th>
-  </tr>
-  {% for hla_type in hla_types %}
-  <tr>
-    <td>{{ hla_type.allele }}</td>
-    <td>{{ hla_type.mhc_class }}</td>
-  </tr>
-  {% endfor %}
-</table>
-
-<h2>Variants</h2>
-<table>
-  <tr>
-    <th>chr</th>
-    <th>pos</th>
-    <th>ref</th>
-    <th>alt</th>
-  </tr>
-  {% for variant in variants %}
-  <tr>
-    <td>{{ variant.chr }}</td>
-    <td>{{ variant.pos }}</td>
-    <td>{{ variant.ref }}</td>
-    <td>{{ variant.alt }}</td>
-  </tr>
-  {% endfor %}
-</table>
-
 <div id="peptides-list">
   Binding threshold:
   <input type="range" id="slider" value="500" min="1" max="2500">

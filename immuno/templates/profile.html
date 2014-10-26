@@ -8,10 +8,25 @@ Profile
 Profile
 {% endblock %}
 
-{% block content %}
+{% block sidebarprofile %}
+<li class="active"><a href="{{ url_for('profile') }}">Profile</a></li>
+{% endblock %}
+
+{% block sidebar %}
 {% for patient in patients %}
-<div>
-<a href="{{ url_for('patient', display_id=patient.display_id) }}">{{ patient.display_id }}</a>
-</div>
+<li><a href="{{ url_for('patient', display_id=patient.display_id) }}">{{ patient.display_id }}</a></li>
 {% endfor %}
+{% endblock %}
+
+{% block content %}
+<p>
+You have uploaded the folllowing patients:
+</p>
+<ul>
+{% for patient in patients %}
+<li>
+<a href="{{ url_for('patient', display_id=patient.display_id) }}">{{ patient.display_id }}</a>
+</li>
+{% endfor %}
+</ul>
 {% endblock %}

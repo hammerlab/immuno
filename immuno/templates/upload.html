@@ -8,6 +8,10 @@ Add Patient
 Add Patient
 {% endblock %}
 
+{% block sidebaradd %}
+<li class="active"><a href="{{ url_for('new_patient') }}">Add Patient</a></li>
+{% endblock %}
+
 {% block content %}
 {{ form.errors }}
 
