@@ -19,6 +19,7 @@ from flask.ext.wtf import Form
 from flask.ext.wtf.file import FileField, FileRequired, FileAllowed
 from jinja2 import ChoiceLoader, FileSystemLoader
 from json import loads, dumps
+from natsort import natsorted
 from os import environ, getcwd
 from os.path import exists, join
 from pandas import DataFrame, Series, concat, merge
@@ -212,6 +213,9 @@ def variants(display_id):
     variants = Variant.query.with_entities(Variant.chr, Variant.pos,
         Variant.ref, Variant.alt).filter_by(patient_id=patient_id).all()
 
+    # Sort variants with a natural alphanumeric sort on chr name + position
+    variants = natsorted(variants,
+        key=lambda variant: variant[0].lower() + str(variant[1]))
     return render_template('variants.html',
         display_id=display_id,
         variants=variants)
