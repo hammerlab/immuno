@@ -1,0 +1,30 @@
+{% extends "layout.html" %}
+
+{% block title %}
+HLA Types
+{% endblock %}
+
+{% block pagetitle %}
+HLA Types
+{% endblock %}
+
+{% block sidebar %}
+<li><a href="{{ url_for('patient', display_id=display_id) }}">{{ display_id }}</a></li>
+<li class="active"><a href="{{ url_for('hla_types', display_id=display_id) }}">HLA Types</a></li>
+<li><a href="{{ url_for('variants', display_id=display_id) }}">Variants</a></li>
+{% endblock %}
+
+{% block content %}
+<table>
+  <tr>
+    <th>Allele</th>
+      <th>MHC Class</th>
+  </tr>
+  {% for hla_type in hla_types %}
+  <tr>
+    <td>{{ hla_type.allele }}</td>
+    <td>{{ hla_type.mhc_class }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

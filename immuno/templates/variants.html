@@ -1,0 +1,34 @@
+{% extends "layout.html" %}
+
+{% block title %}
+Variants
+{% endblock %}
+
+{% block pagetitle %}
+Variants
+{% endblock %}
+
+{% block sidebar %}
+<li><a href="{{ url_for('patient', display_id=display_id) }}">{{ display_id }}</a></li>
+<li><a href="{{ url_for('hla_types', display_id=display_id) }}">HLA Types</a></li>
+<li class="active"><a href="{{ url_for('variants', display_id=display_id) }}">Variants</a></li>
+{% endblock %}
+
+{% block content %}
+<table>
+  <tr>
+    <th>chr</th>
+    <th>pos</th>
+    <th>ref</th>
+    <th>alt</th>
+  </tr>
+  {% for variant in variants %}
+  <tr>
+    <td>{{ variant.chr }}</td>
+    <td>{{ variant.pos }}</td>
+    <td>{{ variant.ref }}</td>
+    <td>{{ variant.alt }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

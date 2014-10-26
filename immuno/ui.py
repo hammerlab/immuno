@@ -144,8 +144,6 @@ def patient(display_id):
     """
     id, display_id = Patient.query.with_entities(Patient.id,
         Patient.display_id).filter_by(display_id=display_id).one()
-    variants = Variant.query.with_entities(Variant.chr, Variant.pos,
-        Variant.ref, Variant.alt).filter_by(patient_id=id).all()
     hla_types = HLAType.query.with_entities(HLAType.allele,
         HLAType.mhc_class).filter_by(patient_id=id).all()
 
@@ -173,9 +171,31 @@ def patient(display_id):
 
     return render_template('patient.html',
         display_id=display_id,
-        variants=variants,
-        hla_types=hla_types,
         peptides=peptides)
+
+@app.route('/patient/hla_types/<display_id>')
+@login_required
+def hla_types(display_id):
+    id, display_id = Patient.query.with_entities(Patient.id,
+        Patient.display_id).filter_by(display_id=display_id).one()
+    hla_types = HLAType.query.with_entities(HLAType.allele,
+        HLAType.mhc_class).filter_by(patient_id=id).all()
+
+    return render_template('hla.html',
+        display_id=display_id,
+        hla_types=hla_types)
+
+@app.route('/patient/variants/<display_id>')
+@login_required
+def variants(display_id):
+    id, display_id = Patient.query.with_entities(Patient.id,
+        Patient.display_id).filter_by(display_id=display_id).one()
+    variants = Variant.query.with_entities(Variant.chr, Variant.pos,
+        Variant.ref, Variant.alt).filter_by(patient_id=id).all()
+
+    return render_template('variants.html',
+        display_id=display_id,
+        variants=variants)
 
 class NewPatientForm(Form):
     display_id = TextField('Patient ID',
