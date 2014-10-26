@@ -24,7 +24,7 @@ var peptides = _.range(NUM_PEPTIDES).map(function() {
       mutStart = _.random(length-2),
       mutation = '' + randomSample(ALPHABET, 1) + mutStart + sequence[mutStart];
   return {sequence: sequence, gene: gene, length: length,
-          mutStart: mutStart, mutEnd: mutStart+1, mutation: mutation, description: description};
+          mutStart: mutStart, mutEnd: mutStart+1, mutation: mutation};
 });
 
 _.flatMap = _.compose(_.flatten, _.map);
