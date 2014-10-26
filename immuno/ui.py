@@ -9,7 +9,7 @@ from vcf import load_vcf
 
 from flask import Flask
 from flask import (redirect, request, render_template, url_for,
-    send_from_directory)
+    send_from_directory, flash)
 from flask.ext.sqlalchemy import SQLAlchemy
 from flask.ext.user import (current_user, login_required, UserManager,
     UserMixin, SQLAlchemyAdapter)
@@ -206,6 +206,15 @@ class NewPatientForm(Form):
         validators=[FileRequired(), FileAllowed(['hla'], 'HLA Only')])
     submit = SubmitField("Send")
 
+def flash_errors(form):
+    for field, errors in form.errors.items():
+        for error in errors:
+            print error
+            flash('Error in the %s field. %s' % (
+                getattr(form, field).label.text,
+                error
+            ), 'error')
+
 @app.route('/patient/new', methods=['GET', 'POST'])
 @login_required
 def new_patient():
@@ -226,6 +235,7 @@ def new_patient():
         db.session.add_all(hla_types)
         db.session.commit()
         return redirect(url_for('patient', display_id=patient.display_id))
+    flash_errors(form)
     return render_template('upload.html', form=form)
 
 def create_patient(request, user_id):
@@ -262,8 +272,3 @@ def create_hla_types(file, patient_id):
             mhc_class=mhc_class)
         hla_types.append(hla_type)
     return hla_types
-
-@app.route('/uploads/<filename>')
-@login_required
-def uploaded_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
