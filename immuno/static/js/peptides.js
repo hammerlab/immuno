@@ -236,11 +236,10 @@ function explodeEpitopes(peptides, peptideEl, peptideClickBox, peptideData) {
 
   d3.select(peptideClickBox)
       .on('click', function(d, i) {
-        // TODO(ihodes): figure out and fix why we need "- 36"
-        var xPos = d3.event.x - LEFT_COLUMN_WIDTH - 36,
+        var coordinates = d3.mouse(this);
+        var xPos = coordinates[0],
             acidIdx = residueXScale.domain()[d3.bisect(residueXScale.range(), xPos) - 1],
             epitopes = peptideData.epitopes;
-
         showResidueGuideline(acidIdx, peptideEl, peptideClickBox, peptideData);
 
         epitopes = epitopesOverlapping(acidIdx, epitopes);
