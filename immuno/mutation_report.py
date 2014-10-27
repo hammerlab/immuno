@@ -185,6 +185,7 @@ def group_epitopes(scored_epitopes):
         peptide_entry["Peptide"] = seq
         peptide_entry['TranscriptId'] = transcript_id
         head = transcript_group.to_records()[0]
+        print "RECORD: %s" % head
         peptide_entry['chr'] = head.chr
         peptide_entry['pos'] = head.pos
         peptide_entry['ref'] = head.ref
