@@ -6,6 +6,8 @@ from hla_file import read_hla_file
 from immunogenicity import ImmunogenicityPredictor
 from mhc_common import (normalize_hla_allele_name,
     mhc_class_from_normalized_allele_name)
+from mhc_netmhcpan import PanBindingPredictor
+from mhc_netmhccons import ConsensusBindingPredictor
 import mhc_random
 from mutation_report import group_epitopes
 from load_file import expand_transcripts
@@ -26,8 +28,8 @@ from json import loads, dumps
 from natsort import natsorted
 from pandas import DataFrame, Series, concat, merge
 from werkzeug import secure_filename
-from wtforms import SubmitField, TextField, TextAreaField, validators
-
+from wtforms import (SubmitField, TextField, TextAreaField, SelectField,
+    validators)
 
 class ConfigClass(object):
     # Custom config
@@ -85,7 +87,7 @@ app.config.from_object(__name__ + '.ConfigClass')
 mail = Mail()
 mail.init_app(app)
 db = SQLAlchemy(app)
-print db
+print 'DB: %s' % db
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
@@ -162,7 +164,7 @@ def get_vcf_df(patient_id):
     vcf_df['info'] = Series([None] * len(vcf_df))
     return vcf_df
 
-def run_pipeline(patient_id):
+def run_pipeline(patient_id, score_epitopes):
     """Run the pipeline for this patient, and save the output to the DB as a
     Run."""
     hla_types = HLAType.query.with_entities(HLAType.allele,
@@ -179,21 +181,20 @@ def run_pipeline(patient_id):
         min_peptide_length = peptide_length,
         max_peptide_length = peptide_length)
 
-    # TODO: Don't use MHC random
-    scored_epitopes = mhc_random.generate_scored_epitopes(transcripts_df,
-        alleles)
-    imm = ImmunogenicityPredictor(alleles = alleles)
+    scored_epitopes = score_epitopes(transcripts_df, alleles)
+    imm = ImmunogenicityPredictor(alleles=alleles)
     scored_epitopes = imm.predict(scored_epitopes)
 
+    # TODO(tavi) Make this expansion more robust. It breaks the IEDB predictor,
+    # for example.
     short_transcripts_df = transcripts_df[['chr', 'pos', 'ref',
         'alt', 'TranscriptId']]
-    scored_epitopes_expanded = merge(scored_epitopes, short_transcripts_df,
+    scored_epitopes = merge(scored_epitopes, short_transcripts_df,
         on='TranscriptId', how='left')
-    peptides = group_epitopes(scored_epitopes_expanded)
+    peptides = group_epitopes(scored_epitopes)
 
     run = Run(patient_id=patient_id, output=dumps(peptides))
     db.session.add(run)
-    db.session.commit()
 
 @app.route('/patient/<display_id>')
 @login_required
@@ -248,6 +249,10 @@ def export(display_id):
     return response
 
 class NewPatientForm(Form):
+    binding_predictor_choices = {'random': 'Random',
+        'netmhccons': 'NetMHCCons',
+        'netmhcpan': 'NetMHCPan'}
+
     display_id = TextField('Patient ID',
         validators=[validators.required(), validators.length(max=1000)])
     vcf_file = FileField('VCF/MAF File',
@@ -258,6 +263,10 @@ class NewPatientForm(Form):
     )
     hla_file = FileField('HLA File',
         validators=[FileRequired(), FileAllowed(['hla'], 'HLA Only')])
+    binding_predictor = SelectField('MHC Binding Prediction',
+        choices=sorted(zip(binding_predictor_choices.keys(),
+            binding_predictor_choices.values())),
+        validators=[validators.required()])
     submit = SubmitField('Send')
 
 def flash_errors(form):
@@ -268,6 +277,17 @@ def flash_errors(form):
                 getattr(form, field).label.text,
                 error
             ), 'error')
+
+def score_epitopes_random(transcripts_df, alleles):
+    return mhc_random.generate_scored_epitopes(transcripts_df, alleles)
+
+def score_epitopes_mhc_cons(transcripts_df, alleles):
+    predictor = ConsensusBindingPredictor(alleles)
+    return predictor.predict(transcripts_df)
+
+def score_epitopes_mhc_pan(transcripts_df, alleles):
+    predictor = PanBindingPredictor(alleles)
+    return predictor.predict(transcripts_df)
 
 @app.route('/patient/new', methods=['GET', 'POST'])
 @login_required
@@ -280,19 +300,30 @@ def new_patient():
     if form.validate_on_submit():
         patient = create_patient(request=request, user_id=current_user.id)
         db.session.add(patient)
-        db.session.commit()
+        db.session.flush()
 
         variants = create_variants(file=request.files['vcf_file'],
             patient_id=patient.id)
         db.session.add_all(variants)
-        db.session.commit()
 
         hla_types = create_hla_types(file=request.files['hla_file'],
             patient_id=patient.id)
         db.session.add_all(hla_types)
-        db.session.commit()
 
-        run_pipeline(patient.id)
+        binding_predictor = request.form['binding_predictor']
+        assert binding_predictor in form.binding_predictor_choices, \
+            ('Binding predictor %s should have produced a form error') % (
+                binding_predictor)
+
+        if binding_predictor == 'random':
+            score_epitopes = score_epitopes_random
+        elif binding_predictor == 'netmhccons':
+            score_epitopes = score_epitopes_mhc_cons
+        else:
+            score_epitopes = score_epitopes_mhc_pan
+
+        run_pipeline(patient.id, score_epitopes)
+        db.session.commit()
         return redirect(url_for('patient', display_id=patient.display_id))
     flash_errors(form)
     return render_template('upload.html', form=form)
