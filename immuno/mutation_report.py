@@ -128,7 +128,8 @@ def print_mutation_report(
         len(transcripts_df.groupby(['chr', 'pos', 'ref', 'alt'])))
     logging.info("# transcripts: %d", len(transcripts_df))
 
-def group_epitopes(scored_epitopes, use_transcript_name = False):
+def group_epitopes(scored_epitopes, use_transcript_name = False,
+        no_thymic_deletion = False):
     """
     Given a DataFrame with fields:
         - chr
@@ -148,6 +149,7 @@ def group_epitopes(scored_epitopes, use_transcript_name = False):
         - EpitopeEnd
         - MHC_IC50
         - MHC_PercentileRank
+        - ThymicDeletion
 
     Group epitopes under their originating transcript and
     make nested lists of dictionaries to contain the binding scores
@@ -178,16 +180,18 @@ def group_epitopes(scored_epitopes, use_transcript_name = False):
         - 'Allele'
         - 'MHC_PercentileRank'
         - 'MHC_IC50'
+        - 'ThymicDeletion'
     """
     peptides = []
     for (transcript_id, seq), transcript_group in \
             scored_epitopes.groupby(["TranscriptId", "SourceSequence"]):
+        head = transcript_group.to_records()[0]
+        if no_thymic_deletion and head.ThymicDeletion:
+            continue
         peptide_entry = {}
-        peptide_entry["Peptide"] = seq
+        peptide_entry['Peptide'] = seq
         peptide_entry['TranscriptId'] = transcript_id_to_transcript_name(
             transcript_id) if use_transcript_name else transcript_id
-        head = transcript_group.to_records()[0]
-        print "RECORD: %s" % head
         peptide_entry['chr'] = head.chr
         peptide_entry['pos'] = head.pos
         peptide_entry['ref'] = head.ref
@@ -217,10 +221,12 @@ def group_epitopes(scored_epitopes, use_transcript_name = False):
                 seen_alleles.add(allele)
                 percentile_rank = epitope_allele_row['MHC_PercentileRank']
                 ic50 = epitope_allele_row['MHC_IC50']
+                thymic_deletion = epitope_allele_row['ThymicDeletion']
                 allele_entry = {
                     'Allele': allele,
                     'MHC_PercentileRank' : percentile_rank,
                     'MHC_IC50' : ic50,
+                    'ThymicDeletion' : 1 if thymic_deletion else 0
                 }
                 epitope_entry['MHC_Allele_Scores'].append(allele_entry)
             peptide_entry['Epitopes'].append(epitope_entry)

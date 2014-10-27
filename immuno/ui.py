@@ -24,9 +24,8 @@ from flask_mail import Mail, Message
 from flask.ext.wtf import Form
 from flask.ext.wtf.file import FileField, FileRequired, FileAllowed
 from jinja2 import ChoiceLoader, FileSystemLoader
-from json import loads, dumps
 from natsort import natsorted
-from pandas import DataFrame, Series, concat, merge
+from pandas import DataFrame, Series, concat, merge, read_json
 from werkzeug import secure_filename
 from wtforms import (SubmitField, TextField, TextAreaField, SelectField,
     validators)
@@ -191,9 +190,8 @@ def run_pipeline(patient_id, score_epitopes):
         'alt', 'TranscriptId']]
     scored_epitopes = merge(scored_epitopes, short_transcripts_df,
         on='TranscriptId', how='left')
-    peptides = group_epitopes(scored_epitopes, use_transcript_name = True)
 
-    run = Run(patient_id=patient_id, output=dumps(peptides))
+    run = Run(patient_id=patient_id, output=scored_epitopes.to_json())
     db.session.add(run)
 
 @app.route('/patient/<display_id>')
@@ -203,10 +201,16 @@ def patient(display_id):
         Patient.display_id).filter_by(display_id=display_id).one()
     output = Run.query.with_entities(Run.output).filter_by(
         patient_id=patient_id).one()
+    scored_epitopes = read_json(output[0])
+
+    peptides = group_epitopes(scored_epitopes, use_transcript_name=True)
+    peptides_no_thymic_deletion = group_epitopes(scored_epitopes,
+        use_transcript_name=True, no_thymic_deletion=True)
 
     return render_template('patient.html',
         display_id=display_id,
-        peptides=loads(output[0]))
+        peptides=peptides,
+        peptides_no_thymic_deletion=peptides_no_thymic_deletion)
 
 @app.route('/patient/hla_types/<display_id>')
 @login_required

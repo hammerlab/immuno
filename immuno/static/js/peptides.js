@@ -20,7 +20,7 @@ var WIDTH = 1200,
   ALL_COL_NAMES = ['chr', 'pos', 'ref', 'alt', 'gene', 'transcriptId', 'mutation'],
   COLLAPSED_COL_NAMES = ['gene', 'mutation'];
 
-function main(data) {
+function main(data, data_no_thymic_deletion) {
   var colNames = ALL_COL_NAMES;
   var col2Width = createCol2Width(colNames, data);
   LEFT_COLUMN_WIDTH = getLeftColumnWidth(col2Width);
@@ -50,11 +50,13 @@ function main(data) {
   });
 
   data = sortPeptides(data, getSliderAttr(), getSliderValue());
+  data_no_thymic_deletion = sortPeptides(data_no_thymic_deletion,
+    getSliderAttr(), getSliderValue());
   var peptides = renderPeptides(data);
 
   initializePeptideHandlers(peptides);
   initializeLeftColumnToggleHandler(peptides);
-
+  initializeThymicDeletionToggleHandler(data, data_no_thymic_deletion);
   initializeSliderHandler(data);
 }
 
@@ -491,6 +493,7 @@ function renderEpitopeInfoWindowChart(epitopeInfoWindow) {
   header.append('td').html('HLA Allele');
   header.append('td').html('Binding Score');
   header.append('td').html('Percentile');
+  header.append('td').html('Thymic Deletion');
 
   var rows = tbl.append('tbody').selectAll('tr')
       .data(scores)
@@ -502,6 +505,8 @@ function renderEpitopeInfoWindowChart(epitopeInfoWindow) {
       .html(function(d) { return d.bindingScore; });
   rows.append('td')
       .html(function(d) { return d.percentile; });
+  rows.append('td')
+      .html(function(d) { return d.thymicDeletion ? "True" : "False"; });
 }
 
 function showResidueGuideline(acidIdx, peptideEl, peptideClickBox, peptideData) {
@@ -677,7 +682,7 @@ function collapseLeftColumn(peptides, button) {
   renderLeftColumn(COLLAPSED_COL_NAMES, peptides);
   renderPeptides(data);
 
-  button.text("Show Details");
+  button.text('Show Details');
   button.on('click', function(d) {
     expandLeftColumn(peptides, button);
   });
@@ -689,16 +694,43 @@ function expandLeftColumn(peptides, button) {
   renderLeftColumn(ALL_COL_NAMES, peptides);
   renderPeptides(data);
 
-  button.text("Hide Details");
+  button.text('Hide Details');
   button.on('click', function(d) {
     collapseLeftColumn(peptides, button);
   });
 }
 
 function initializeLeftColumnToggleHandler(peptides) {
-  var button = d3.select('#toggle-transcripts');
+  var button = d3.select('#toggle-left-column');
   button.on('click', function(d) {
     collapseLeftColumn(peptides, button);
+  });
+}
+
+function noFilterThymicDeletion(data, data_no_thymic_deletion, button) {
+  var peptides = renderPeptides(data);
+  collapseEpitopesWhenNeeded(peptides);
+
+  button.text('Undo Filter by Thymic Deletion');
+  button.on('click', function(d) {
+    filterThymicDeletion(data, data_no_thymic_deletion, button);
+  });
+}
+
+function filterThymicDeletion(data, data_no_thymic_deletion, button) {
+  var peptides = renderPeptides(data_no_thymic_deletion);
+  collapseEpitopesWhenNeeded(peptides);
+
+  button.text('Filter by Thymic Deletion');
+  button.on('click', function(d) {
+    noFilterThymicDeletion(data, data_no_thymic_deletion, button);
+  });
+}
+
+function initializeThymicDeletionToggleHandler(data, data_no_thymic_deletion) {
+  var button = d3.select('#toggle-thymic-deletion');
+  button.on('click', function(d) {
+    filterThymicDeletion(data, data_no_thymic_deletion, button);
   });
 }
 

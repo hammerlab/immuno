@@ -151,4 +151,3 @@ class ImmunogenicityPredictor(object):
             (peptides_df["MHC_IC50"] <= self.binding_threshold)
 
         return peptides_df
-

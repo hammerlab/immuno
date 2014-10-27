@@ -26,11 +26,12 @@ Patient {{ display_id }}
   &nbsp;&nbsp;
   <span id="slider-type"></span>
   <span id="tval">500</span><span id="suffix">nM</span>&nbsp;
-  <button id="toggle-transcripts">Hide Details</button>
   <select name="sort-value">
       <option selected value="ic50">IC50</option>
       <option value="percentile">Percentile</option>
   </select>
+  <button id="toggle-left-column">Hide Details</button>
+  <button id="toggle-thymic-deletion">Filter by Thymic Deletion</button>
   <span id="close-inspector" title="Close inspector.">&times;</span>
   <div id="peptides"></div>
 </div>
@@ -39,8 +40,10 @@ Patient {{ display_id }}
 <script src="/static/js/underscore-min.js"></script>
 <script src="/static/js/peptides.js"></script>
 <script>
-vaccine_peptide_array = [
-  {% for peptide in peptides %}
+{% for array_name, data in [("peptide_array", peptides),
+  ("no_thymic_deletion_peptide_array", peptides_no_thymic_deletion)] %}
+{{ array_name }} = [
+  {% for peptide in data %}
     {
       chr: "{{ peptide['chr'] }}",
       pos: {{ peptide['pos'] }},
@@ -63,7 +66,8 @@ vaccine_peptide_array = [
               {% for score in epitope['MHC_Allele_Scores'] %}
                 "{{ score['Allele'] }}" : {
                    percentile : {{ score['MHC_PercentileRank'] }},
-                   bindingScore : {{ score['MHC_IC50'] }}
+                   bindingScore : {{ score['MHC_IC50'] }},
+                   thymicDeletion : {{ score['ThymicDeletion'] }}
                 },
               {% endfor %}
             },
@@ -74,6 +78,7 @@ vaccine_peptide_array = [
     },
   {% endfor %}
 ];
-peptides.run(vaccine_peptide_array);
+{% endfor %}
+peptides.run(peptide_array, no_thymic_deletion_peptide_array);
 </script>
 {% endblock %}
