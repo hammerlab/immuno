@@ -263,6 +263,8 @@ class NewPatientForm(Form):
     )
     hla_file = FileField('HLA File',
         validators=[FileRequired(), FileAllowed(['hla'], 'HLA Only')])
+    rna_file = FileField('RNA Expression Quantification File',
+        validators=[FileAllowed(['txt'], 'TXT Only')])
     binding_predictor = SelectField('MHC Binding Prediction',
         choices=sorted(zip(binding_predictor_choices.keys(),
             binding_predictor_choices.values())),
