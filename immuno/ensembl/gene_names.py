@@ -42,7 +42,7 @@ def gene_id_to_name(gene_id, _lookup_cache = [None]):
 	return d[gene_id]
 
 
-_BIOMART_QUERY = \
+_BIOMART_QUERY_TRANSCRIPT_ID_TO_GENE_ID = \
 """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE Query>
 <Query  virtualSchemaName = "default" formatter = "TSV" header = "1"
@@ -53,15 +53,17 @@ _BIOMART_QUERY = \
 </Dataset>
 </Query>
 """.replace("\n", "")
-_BIOMART_URL = \
+_BIOMART_URL_TRANSCRIPT_ID_TO_GENE_ID = \
 	"http://feb2014.archive.ensembl.org/biomart/martservice/result?query=%s" % \
-	_BIOMART_QUERY
+	_BIOMART_QUERY_TRANSCRIPT_ID_TO_GENE_ID
 
 def transcript_id_to_gene_id(transcript_id, _table_cache = [None]):
 	if _table_cache[0] is None:
-		print "Fetching Ensembl ID mappings from BioMart %s" % _BIOMART_URL
+		print ("Fetching Ensembl ID mappings from BioMart %s"
+			) % _BIOMART_URL_TRANSCRIPT_ID_TO_GENE_ID
 		biomart_filename = \
-			datacache.fetch_file(_BIOMART_URL, "biomart_transcript_gene.tsv")
+			datacache.fetch_file(_BIOMART_URL_TRANSCRIPT_ID_TO_GENE_ID,
+				"biomart_transcript_gene.tsv")
 		df = pd.read_csv(biomart_filename, sep='\t')
 		gene_ids = df['Ensembl Gene ID']
 		transcript_ids = df['Ensembl Transcript ID']
@@ -73,3 +75,33 @@ def transcript_id_to_gene_id(transcript_id, _table_cache = [None]):
 def transcript_id_to_gene_name(transcript_id):
 	gene_id = transcript_id_to_gene_id(transcript_id)
 	return gene_id_to_name(gene_id)
+
+_BIOMART_QUERY_TRANSCRIPT_ID_TO_TRANSCRIPT_NAME = \
+"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE Query>
+<Query  virtualSchemaName = "default" formatter = "TSV" header = "1"
+	uniqueRows = "0" count = "" datasetConfigVersion = "0.6" >
+<Dataset name = "hsapiens_gene_ensembl" interface = "default" >
+<Attribute name = "ensembl_transcript_id" />
+<Attribute name = "external_transcript_id" />
+</Dataset>
+</Query>
+""".replace("\n", "")
+_BIOMART_URL_TRANSCRIPT_ID_TO_TRANSCRIPT_NAME = \
+	"http://feb2014.archive.ensembl.org/biomart/martservice/result?query=%s" % \
+	_BIOMART_QUERY_TRANSCRIPT_ID_TO_TRANSCRIPT_NAME
+
+def transcript_id_to_transcript_name(transcript_id, _table_cache = [None]):
+	if _table_cache[0] is None:
+		print ("Fetching Ensembl ID mappings from BioMart %s"
+			) % _BIOMART_URL_TRANSCRIPT_ID_TO_TRANSCRIPT_NAME
+		biomart_filename = \
+			datacache.fetch_file(_BIOMART_URL_TRANSCRIPT_ID_TO_TRANSCRIPT_NAME,
+				"biomart_transcript_name.tsv")
+		df = pd.read_csv(biomart_filename, sep='\t')
+		transcript_ids = df['Ensembl Transcript ID']
+		transcript_names = df['Associated Transcript Name']
+		mapping = dict(zip(transcript_ids, transcript_names))
+		_table_cache[0] = mapping
+	mapping = _table_cache[0]
+	return mapping[transcript_id]

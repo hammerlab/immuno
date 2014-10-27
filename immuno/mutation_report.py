@@ -23,6 +23,7 @@ from Bio import SeqIO
 import numpy as np
 
 from common import peptide_substrings, init_logging
+from ensembl.gene_names import transcript_id_to_transcript_name
 from mhc_iedb import IEDBMHCBinding, normalize_hla_allele_name
 from mhc_netmhcpan import PanBindingPredictor
 from mhc_netmhccons import ConsensusBindingPredictor
@@ -127,7 +128,7 @@ def print_mutation_report(
         len(transcripts_df.groupby(['chr', 'pos', 'ref', 'alt'])))
     logging.info("# transcripts: %d", len(transcripts_df))
 
-def group_epitopes(scored_epitopes):
+def group_epitopes(scored_epitopes, use_transcript_name = False):
     """
     Given a DataFrame with fields:
         - chr
@@ -183,7 +184,8 @@ def group_epitopes(scored_epitopes):
             scored_epitopes.groupby(["TranscriptId", "SourceSequence"]):
         peptide_entry = {}
         peptide_entry["Peptide"] = seq
-        peptide_entry['TranscriptId'] = transcript_id
+        peptide_entry['TranscriptId'] = transcript_id_to_transcript_name(
+            transcript_id) if use_transcript_name else transcript_id
         head = transcript_group.to_records()[0]
         print "RECORD: %s" % head
         peptide_entry['chr'] = head.chr

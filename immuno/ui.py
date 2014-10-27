@@ -191,7 +191,7 @@ def run_pipeline(patient_id, score_epitopes):
         'alt', 'TranscriptId']]
     scored_epitopes = merge(scored_epitopes, short_transcripts_df,
         on='TranscriptId', how='left')
-    peptides = group_epitopes(scored_epitopes)
+    peptides = group_epitopes(scored_epitopes, use_transcript_name = True)
 
     run = Run(patient_id=patient_id, output=dumps(peptides))
     db.session.add(run)
