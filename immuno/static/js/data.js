@@ -12,16 +12,19 @@ function randomSample(lst, n) {
  //  Generate mock data.  //
 ///////////////////////////
 var NUM_PEPTIDES = 50;
-var ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+var ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 var peptides = _.range(NUM_PEPTIDES).map(function() {
   var length = _.random(55, 65),
+      chr = '2',
+      pos = 3219325,
+      ref = 'A',
+      alt = 'G',
       sequence = randomSample(ALPHABET, length).join(''),
-      gene = randomSample(ALPHABET + "1234567890", _.random(3, 6)).join(''),
+      gene = randomSample(ALPHABET + '1234567890', _.random(3, 6)).join(''),
       mutStart = _.random(length-2),
-      mutation = "" + randomSample(ALPHABET, 1) + mutStart + sequence[mutStart],
-      description = ""
+      mutation = '' + randomSample(ALPHABET, 1) + mutStart + sequence[mutStart];
   return {sequence: sequence, gene: gene, length: length,
-          mutStart: mutStart, mutEnd: mutStart+1, mutation: mutation, description: description};
+          mutStart: mutStart, mutEnd: mutStart+1, mutation: mutation};
 });
 
 _.flatMap = _.compose(_.flatten, _.map);

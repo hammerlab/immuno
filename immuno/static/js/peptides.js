@@ -2,37 +2,52 @@
 'use strict';
 
 var WIDTH = 1200,
-    HEIGHT = 12000,
-    PEPTIDE_HEIGHT = 20,
-    ACID_DIM = 12,
-    SLIDER_TYPE = 'ic50',       // global & mutable
-    SLIDER_BINDING_SCORE = 500, // global & mutable
-    SLIDER_PERCENTILE = 2,      // global & mutable
-    GENE_LETTER_WIDTH = 9.5,
-    GENE_WIDTH,
-    EPITOPE_INFO_HEIGHT = 125,
-    MIN_PERCENTILE = 1,
-    MAX_PERCENTILE = 50,
-    MIN_IC50 = 1,
-    MAX_IC50 = 2500,
-    SCORE_CHART_WIDTH = 10,
-    residueXScale = d3.scale.ordinal();
+  HEIGHT = 12000,
+  PEPTIDE_HEIGHT = 20,
+  ACID_DIM = 12,
+  SLIDER_TYPE = 'ic50',       // global & mutable
+  SLIDER_BINDING_SCORE = 500, // global & mutable
+  SLIDER_PERCENTILE = 2,      // global & mutable
+  LEFT_COLUMN_LETTER_WIDTH = 9.5,
+  LEFT_COLUMN_WIDTH,          // global & mutable
+  EPITOPE_INFO_HEIGHT = 125,
+  MIN_PERCENTILE = 1,
+  MAX_PERCENTILE = 50,
+  MIN_IC50 = 1,
+  MAX_IC50 = 2500,
+  SCORE_CHART_WIDTH = 10,
+  residueXScale = d3.scale.ordinal(),
+  ALL_COL_NAMES = ['chr', 'pos', 'ref', 'alt', 'gene', 'transcriptId', 'mutation'],
+  COLLAPSED_COL_NAMES = ['gene', 'mutation'];
 
 function main(data) {
-  GENE_WIDTH = d3.max(data, function(d) { return d.description.length; }) * GENE_LETTER_WIDTH;
+  var colNames = ALL_COL_NAMES;
+  var col2Width = createCol2Width(colNames, data);
+  LEFT_COLUMN_WIDTH = getLeftColumnWidth(col2Width);
 
   residueXScale
-    .rangeBands([0, WIDTH - GENE_WIDTH])
+    .rangeBands([0, WIDTH - LEFT_COLUMN_WIDTH])
     .domain(d3.range(0, d3.max(data, function(d) {
       return d.sequence.length;
     })));
 
-  d3.select('#peptides')
+  var transformEl = d3.select('#peptides')
       .append('svg')
         .attr('viewBox', '0 0 ' + WIDTH + ' ' + HEIGHT)
       .append('g')
          .attr('transform', 'translate(0,' + PEPTIDE_HEIGHT + ')')
          .attr('id', 'svg');
+
+  var peptideHeaderEl = transformEl.append('g')
+        .attr('class', 'peptide-header')
+        .attr('transform', 'translate(' + LEFT_COLUMN_WIDTH + ',0)');
+
+  colNames.forEach(function(colName, i) {
+    peptideHeaderEl.append('text')
+        .attr('class', 'left-col')
+        .attr('dx', getColumnDx(colNames, col2Width, i))
+        .text(function(d) { return colName; });
+  });
 
   data = sortPeptides(data, getSliderAttr(), getSliderValue());
   var peptides = renderPeptides(data);
@@ -44,45 +59,107 @@ function main(data) {
 }
 
 /**
- * This function is intended to be called multiple times (during expand, collapse,
- * etc.), and not just on initialization.
+ * Given a column name and some data, return the max width of the column
+ * (including the width of the header, via colName.length).
+ */
+function calculateColWidth(colName, data) {
+  return d3.max(data,
+    function(d) {
+      var col = (typeof d[colName] == 'string') ?
+        d[colName] : d[colName].toString();
+      return Math.max(colName.length, col.length);
+    }) * LEFT_COLUMN_LETTER_WIDTH;
+}
+
+/**
+ * Given an array of column names, return a map from column name to column
+ * width.
+ */
+function createCol2Width(colNames, data) {
+  var col2Width = {};
+  colNames.forEach(function(colName) {
+    col2Width[colName] = calculateColWidth(colName, data);
+  });
+
+  return col2Width;
+}
+
+/**
+ * Given a dictionary of column names to column widths, sum up the widths.
+ */
+function getLeftColumnWidth(col2Width) {
+  var sum = 0;
+  for (var key in col2Width) {
+    sum += col2Width[key];
+  }
+
+  return sum;
+}
+
+/**
+ * Given an array of column names, a map from column name to column width,
+ * and the index of a specific column, returns the appropriate dx value
+ * (where column 0 starts at -LEFT_COLUMN_WIDTH).
+ */
+function getColumnDx(colNames, col2Width, colIndex) {
+  if (colIndex == 0) {
+    return -LEFT_COLUMN_WIDTH;
+  }
+
+  var prevColName = colNames[colIndex - 1];
+  return col2Width[prevColName] + getColumnDx(colNames, col2Width, colIndex - 1);
+}
+
+/**
+ * This function is intended to be called multiple times (during expand,
+ * collapse, etc.), and not just on initialization.
  */
 function renderPeptides(data) {
   var peptides = d3.select('#svg')
     .selectAll('.peptide')
-      .data(data, function(d) { return d.sequence; });
+    .data(data, function(d) { return d.sequence; });
 
   peptides
     .enter().append('g')
       .attr('class', 'peptide')
       .attr('transform', function(d, i) {
-        return 'translate(' + GENE_WIDTH + ',' +
-          (i * (PEPTIDE_HEIGHT + 5)) + ')';
+        return 'translate(' + LEFT_COLUMN_WIDTH + ',' +
+          ((i + 1) * (PEPTIDE_HEIGHT + 5)) + ')';
       });
 
   peptides
     .transition().duration(600)
       .attr('transform', function(d, i) {
-        return 'translate(' + GENE_WIDTH + ',' +
-          (i * (PEPTIDE_HEIGHT + 5)) + ')';
+        // (i + 1) is used to skip over the header row
+        // TODO(tavi) Make this less hacky
+        return 'translate(' + LEFT_COLUMN_WIDTH + ',' +
+          ((i + 1) * (PEPTIDE_HEIGHT + 5)) + ')';
       });
 
+  renderLeftColumn(ALL_COL_NAMES, peptides);
+
   peptides
-      .call(renderGenes)
       .call(createEpitopeContainers)
       .call(renderPeptideSequences);
 
   return peptides;
 }
 
-function renderGenes(peptides) {
-  // renders column of gene names on left side of screen
-  peptides.selectAll('.gene')
+function renderLeftColumn(colNames, peptides) {
+  var rows = peptides.selectAll('.left-col')
       .data(function(d, i) { return [d]; })
-    .enter().append('text')
-      .attr('class', 'gene')
-      .attr('dx', -GENE_WIDTH)
-      .text(function(d) { return d.description; });
+    .enter();
+  var leftCol = rows.append('g')
+    .attr('class', 'left-col');
+
+  // TODO(tavi) Don't recalculate this multiple times.
+  var col2Width = createCol2Width(colNames, peptides.data());
+
+  colNames.forEach(function(colName, i) {
+    leftCol.append('text')
+        .attr('dx', getColumnDx(colNames, col2Width, i))
+        .text(function(d) { return d[colName]; });
+  });
 }
 
 function createEpitopeContainers(peptides) {
@@ -160,7 +237,7 @@ function explodeEpitopes(peptides, peptideEl, peptideClickBox, peptideData) {
   d3.select(peptideClickBox)
       .on('click', function(d, i) {
         // TODO(ihodes): figure out and fix why we need "- 36"
-        var xPos = d3.event.x - GENE_WIDTH - 36,
+        var xPos = d3.event.x - LEFT_COLUMN_WIDTH - 36,
             acidIdx = residueXScale.domain()[d3.bisect(residueXScale.range(), xPos) - 1],
             epitopes = peptideData.epitopes;
 
@@ -183,7 +260,7 @@ function explodeEpitopes(peptides, peptideEl, peptideClickBox, peptideData) {
   d3.select(peptideEl)
     .transition().duration(700)
       .attr('transform', function() {
-        return 'translate(' + GENE_WIDTH + ', 5)'
+        return 'translate(' + LEFT_COLUMN_WIDTH + ', 25)'
       });
 
   peptides.attr('class', 'peptide');
@@ -256,7 +333,7 @@ function renderEpitopeScores(epitopes) {
     .append('g')
       .attr('class', 'ep-score-chart')
       .attr('transform', function(d, i) {
-        return 'translate(' + (-residueXScale(d.start) - GENE_WIDTH) + ',0)';
+        return 'translate(' + (-residueXScale(d.start) - LEFT_COLUMN_WIDTH) + ',0)';
       })
 
   scores.selectAll('scoreBar')
@@ -333,10 +410,10 @@ function initializeEpitopeHandlers(epitopes) {
     .append('rect')
       .attr('class', 'epitope-clickbox')
       .attr('x', function(d, i) {
-        return -residueXScale(d.start)-GENE_WIDTH;
+        return -residueXScale(d.start)-LEFT_COLUMN_WIDTH;
       })
       .attr('y', -PEPTIDE_HEIGHT+8)
-      .attr('width', WIDTH+GENE_WIDTH)
+      .attr('width', WIDTH+LEFT_COLUMN_WIDTH)
       .attr('height', PEPTIDE_HEIGHT-4)
       .attr('opacity', 0)
       .attr('fill', '#ddd')
@@ -373,7 +450,7 @@ function renderEpitopeInfoWindow(epitopeEl, epitopeData) {
       .attr('id', 'epitope-info-window')
       .attr('transform', function(d, i) {
         return 'translate('
-          + (-residueXScale(d.start) - GENE_WIDTH) + ', '
+          + (-residueXScale(d.start) - LEFT_COLUMN_WIDTH) + ', '
           + (PEPTIDE_HEIGHT - 18) + ')';
       })
       .call(renderEpitopeInfoWindowChart);
@@ -404,7 +481,7 @@ function renderEpitopeInfoWindowChart(epitopeInfoWindow) {
 
   var scoreBody = epitopeInfoWindow
     .append('foreignObject')
-      .attr('width', WIDTH + GENE_WIDTH)
+      .attr('width', WIDTH + LEFT_COLUMN_WIDTH)
       .attr('height', EPITOPE_INFO_HEIGHT)
     .append('xhtml:body')
       .attr('class', 'epitope-body'),
@@ -584,30 +661,6 @@ function initializeSliderHandler(peptides) {
       });
 }
 
-function collapseLeftColumnName(data) {
-  GENE_WIDTH = Math.max(
-    d3.max(data,
-      function(d) { return d.gene.length + 2; }),
-      SCORE_CHART_WIDTH)
-    * GENE_LETTER_WIDTH;
-
-  var genes = d3.selectAll('.gene')
-      .text(function(d) { return d.gene; })
-      .attr('dx', -GENE_WIDTH);
-}
-
-function expandLeftColumnName(data) {
-  GENE_WIDTH = Math.max(
-    d3.max(data,
-      function(d) { return d.description.length; }),
-      SCORE_CHART_WIDTH)
-    * GENE_LETTER_WIDTH;
-
-  var genes = d3.selectAll('.gene')
-      .text(function(d) { return d.description; })
-      .attr('dx', -GENE_WIDTH);
-}
-
 function collapseEpitopesWhenNeeded(peptides) {
   var epitope = d3.select('.ep-sequence');
   if (!epitope.empty()) {
@@ -622,7 +675,7 @@ function collapseEpitopesWhenNeeded(peptides) {
 function collapseLeftColumn(peptides, button) {
   var data = peptides.data();
   collapseEpitopesWhenNeeded(peptides);
-  collapseLeftColumnName(data);
+  renderLeftColumn(COLLAPSED_COL_NAMES, peptides);
   renderPeptides(data);
 
   button.text("Show Details");
@@ -634,7 +687,7 @@ function collapseLeftColumn(peptides, button) {
 function expandLeftColumn(peptides, button) {
   var data = peptides.data();
   collapseEpitopesWhenNeeded(peptides);
-  expandLeftColumnName(data);
+  renderLeftColumn(ALL_COL_NAMES, peptides);
   renderPeptides(data);
 
   button.text("Hide Details");

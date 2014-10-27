@@ -5,6 +5,7 @@ Flask-SQLAlchemy
 Flask-User
 Flask-Mail
 Flask-WTF
+natsort
 nose
 numpy
 scipy

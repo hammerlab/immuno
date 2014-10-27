@@ -1,4 +1,7 @@
-from common import str2bool
+from os import environ, getcwd
+from os.path import exists, join
+
+from common import str2bool, env_var
 from hla_file import read_hla_file
 from immunogenicity import ImmunogenicityPredictor
 from mhc_common import (normalize_hla_allele_name,
@@ -6,6 +9,7 @@ from mhc_common import (normalize_hla_allele_name,
 import mhc_random
 from mutation_report import group_epitopes
 from load_file import expand_transcripts
+from load_file import load_variants
 from vcf import load_vcf
 
 from flask import Flask
@@ -19,24 +23,26 @@ from flask.ext.wtf import Form
 from flask.ext.wtf.file import FileField, FileRequired, FileAllowed
 from jinja2 import ChoiceLoader, FileSystemLoader
 from json import loads, dumps
-from os import environ, getcwd
-from os.path import exists, join
+from natsort import natsorted
 from pandas import DataFrame, Series, concat, merge
-from vcf import load_vcf
 from werkzeug import secure_filename
 from wtforms import SubmitField, TextField, TextAreaField, validators
 
+
 class ConfigClass(object):
     # Custom config
-    DEBUG = str2bool(environ.get('IMMUNO_DEBUG', 'False'))
-    PORT = int(environ.get('IMMUNO_PORT', 5000))
-    USE_RELOADER = str2bool(environ.get('IMMUNO_USE_RELOADER', False))
+    DEBUG = env_var('IMMUNO_DEBUG', str2bool, False)
+    PORT = env_var('IMMUNO_PORT', int, 5000)
+    USE_RELOADER = env_var('IMMUNO_USE_RELOADER', str2bool, False)
     UPLOAD_FOLDER = join(getcwd(), 'uploads')
 
     # Flask config
     SECRET_KEY = environ.get('IMMUNO_SECRET_KEY')
+    assert SECRET_KEY, \
+        "Environment variable IMMUNO_SECRET_KEY must be set"
     SQLALCHEMY_DATABASE_URI = environ.get('IMMUNO_DB')
-
+    assert SQLALCHEMY_DATABASE_URI, \
+        "Environment variable IMMUNO_DB must be set"
     # Flask-User config
     USER_PRODUCT_NAME = 'immuno'
     USER_ENABLE_EMAIL = True
@@ -59,18 +65,27 @@ class ConfigClass(object):
 
     # Flask-Mail config
     MAIL_SERVER = environ.get('IMMUNO_MAIL_SERVER')
-    MAIL_PORT = int(environ.get('IMMUNO_MAIL_PORT', 5000))
-    MAIL_USE_SSL = str2bool(environ.get('IMMUNO_MAIL_USE_SSL', 'False'))
-    MAIL_USE_TLS = str2bool(environ.get('IMMUNO_MAIL_USE_TLS', 'False'))
+    assert MAIL_SERVER, \
+        "Environment variable IMMUNO_MAIL_SERVER must be set"
+    MAIL_PORT = env_var('IMMUNO_MAIL_PORT', int, 5000)
+    MAIL_USE_SSL = env_var('IMMUNO_MAIL_USE_SSL', str2bool, False)
+    MAIL_USE_TLS = env_var('IMMUNO_MAIL_USE_TLS', str2bool, False)
     MAIL_USERNAME = environ.get('IMMUNO_MAIL_USERNAME')
+    assert MAIL_USERNAME, \
+        "Environment variable IMMUNO_MAIL_USERNAME must be set"
     MAIL_PASSWORD = environ.get('IMMUNO_MAIL_PASSWORD')
+    assert MAIL_PASSWORD, \
+        "Environment variable IMMUNO_MAIL_PASSWORD must be set"
     MAIL_DEFAULT_SENDER = environ.get('IMMUNO_MAIL_DEFAULT_SENDER')
+    assert MAIL_DEFAULT_SENDER, \
+        "Environment variable IMMUNO_MAIL_DEFAULT_SENDER must be set"
 
 app = Flask(__name__)
 app.config.from_object(__name__ + '.ConfigClass')
 mail = Mail()
 mail.init_app(app)
 db = SQLAlchemy(app)
+print db
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
@@ -153,7 +168,7 @@ def run_pipeline(patient_id):
     hla_types = HLAType.query.with_entities(HLAType.allele,
         HLAType.mhc_class).filter_by(patient_id=patient_id).all()
 
-    peptide_length = 9
+    peptide_length = 31
     alleles = [normalize_hla_allele_name(
         allele) for allele, mhc_class in hla_types]
 
@@ -212,6 +227,10 @@ def variants(display_id):
     variants = Variant.query.with_entities(Variant.chr, Variant.pos,
         Variant.ref, Variant.alt).filter_by(patient_id=patient_id).all()
 
+    # Sort variants with a natural alphanumeric sort on chr name + position
+    # TODO(tavi) Make this two-column sort less hacky
+    variants = natsorted(variants,
+        key=lambda variant: variant[0].lower() + ' ' + str(variant[1]))
     return render_template('variants.html',
         display_id=display_id,
         variants=variants)
@@ -231,8 +250,12 @@ def export(display_id):
 class NewPatientForm(Form):
     display_id = TextField('Patient ID',
         validators=[validators.required(), validators.length(max=1000)])
-    vcf_file = FileField('VCF File',
-        validators=[FileRequired(), FileAllowed(['vcf'], 'VCF Only')])
+    vcf_file = FileField('VCF/MAF File',
+        validators=[
+            FileRequired(),
+            FileAllowed(['vcf', 'maf'],
+            'Variant file must be VCF or MAF')]
+    )
     hla_file = FileField('HLA File',
         validators=[FileRequired(), FileAllowed(['hla'], 'HLA Only')])
     submit = SubmitField('Send')
@@ -283,7 +306,7 @@ def create_variants(file, patient_id):
     filename = secure_filename(file.filename)
     filepath = join(app.config['UPLOAD_FOLDER'], filename)
     file.save(filepath)
-    vcf_df = load_vcf(filepath)
+    vcf_df = load_variants(filepath)
     variants = []
     for index, row in vcf_df.iterrows():
         chr = row['chr']

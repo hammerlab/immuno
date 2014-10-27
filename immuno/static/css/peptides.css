@@ -1,3 +1,7 @@
+#slider {
+  width: 300px;
+}
+
 #tooltip {
   display: none;
 }
@@ -12,7 +16,7 @@
 }
 
 
-text.gene {
+text.left-col {
   font-weight: bold;
 }
 

@@ -102,3 +102,12 @@ def find_paths(filename_string = "", directory_string = "", extensions = None):
 
 def str2bool(value):
     return value.lower() in ('yes', 'true', 't', '1')
+
+def env_var(name, converter=None, default=None):
+    value = os.environ.get(name)
+    if value is None or (isinstance(value, str) and len(value) == 0):
+        return default
+    elif converter:
+        return converter(value)
+    else:
+        return value

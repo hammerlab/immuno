@@ -195,10 +195,6 @@ def group_epitopes(scored_epitopes):
         peptide_entry["PeptideMutationInfo"] = head.PeptideMutationInfo
         peptide_entry["GeneInfo"] = head.GeneInfo
         peptide_entry['Gene'] = head.Gene
-        peptide_entry['Description'] = "%s %s %s %s %s (%s) : %s" % (
-                head.chr, head.pos, head.ref, head.alt, head.Gene,
-                head.TranscriptId, head.PeptideMutationInfo
-        )
         peptide_entry['Epitopes'] = []
         for (epitope, epitope_start, epitope_end), epitope_group in \
                 transcript_group.groupby(
@@ -212,8 +208,9 @@ def group_epitopes(scored_epitopes):
             seen_alleles = set([])
             for epitope_allele_row in epitope_group.to_records():
                 allele = epitope_allele_row['Allele']
-                assert allele not in seen_alleles, \
-                    "Repeated entry %s" % epitope_allele_row
+                if allele in seen_alleles:
+                    logging.warn("Repeated entry %s", epitope_allele_row)
+                    continue
                 seen_alleles.add(allele)
                 percentile_rank = epitope_allele_row['MHC_PercentileRank']
                 ic50 = epitope_allele_row['MHC_IC50']
