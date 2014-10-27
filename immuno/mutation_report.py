@@ -208,8 +208,9 @@ def group_epitopes(scored_epitopes):
             seen_alleles = set([])
             for epitope_allele_row in epitope_group.to_records():
                 allele = epitope_allele_row['Allele']
-                assert allele not in seen_alleles, \
-                    "Repeated entry %s" % epitope_allele_row
+                if allele in seen_alleles:
+                    logging.warn("Repeated entry %s", epitope_allele_row)
+                    continue
                 seen_alleles.add(allele)
                 percentile_rank = epitope_allele_row['MHC_PercentileRank']
                 ic50 = epitope_allele_row['MHC_IC50']
