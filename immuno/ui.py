@@ -9,6 +9,8 @@ from mhc_common import (normalize_hla_allele_name,
 from mhc_netmhcpan import PanBindingPredictor
 from mhc_netmhccons import ConsensusBindingPredictor
 import mhc_random
+from mhc_iedb import IEDBMHC1Binding
+from mhc_netmhcpan import PanBindingPredictor
 from mutation_report import group_epitopes
 from load_file import expand_transcripts
 from load_file import load_variants

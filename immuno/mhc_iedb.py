@@ -21,6 +21,9 @@ import re
 import pandas as pd
 
 from mhc_common import normalize_hla_allele_name, seq_to_str, convert_str
+from peptide_binding_measure import (
+        IC50_FIELD_NAME, PERCENTILE_RANK_FIELD_NAME
+)
 
 
 class IEDBMHCBinding(object):
@@ -29,7 +32,7 @@ class IEDBMHCBinding(object):
         self,
         alleles=[],
         name="IEDB-MHC-Binding",
-        method=['consensus'],
+        method=['recommended'],
         lengths = [9],
         url='http://tools.iedb.org/tools_api/mhci/'):
     self.name = name
@@ -38,19 +41,21 @@ class IEDBMHCBinding(object):
     self._url = url
     self._alleles = alleles
 
-  def _get_iedb_request_params(self, sequence):
+  def _get_iedb_request_params(self, sequence, allele=None):
+    if not allele:
+        allele = seq_to_str(self._alleles)
     params = {
         "method" : seq_to_str(self._method),
         "length" : seq_to_str(self._lengths),
         "sequence_text" : sequence,
-        "allele" : seq_to_str(self._alleles)
+        "allele" : allele,
     }
     return params
 
-  def query_iedb(self, sequence, gene_info):
-    request_values = self._get_iedb_request_params(sequence)
-    logging.info("Calling iedb with {} {}, {}".format(
-        gene_info, sequence, self._alleles))
+  def query_iedb(self, sequence, gene_info, allele=None):
+    request_values = self._get_iedb_request_params(sequence, allele=allele)
+    logging.info("Calling IEDB with {} {}, {}".format(
+        gene_info, sequence, allele))
     try:
         data = urllib.urlencode(request_values)
         req = urllib2.Request(self._url, data)
@@ -92,24 +97,27 @@ class IEDBMHCBinding(object):
     # and general MHC binding scores for all k-mer substrings
     responses = {}
     for i, peptide in enumerate(data.SourceSequence):
-        if peptide not in responses:
-            response = self.query_iedb(peptide, data['GeneInfo'][i])
-            response.rename(
-                columns={
-                    'peptide': 'Epitope',
-                    'length' : 'EpitopeLength',
-                    'start' : 'EpitopeStart',
-                    'end' : 'EpitopeEnd',
-                    'allele' : 'Allele',
-                },
-                inplace=True)
-            response['EpitopeStart'] -= 1
-            response['EpitopeEnd'] -= 1
-            responses[peptide] = response
-        else:
-            logging.info(
-                "Skipping binding for peptide %s, already queried",
-                peptide)
+        for allele in self._alleles:
+            key = (peptide, allele)
+            if key not in responses:
+                gene_info = data['GeneInfo'][i]
+                response = self.query_iedb(peptide, gene_info, allele)
+                response.rename(
+                    columns={
+                        'peptide': 'Epitope',
+                        'length' : 'EpitopeLength',
+                        'start' : 'EpitopeStart',
+                        'end' : 'EpitopeEnd',
+                        'allele' : 'Allele',
+                    },
+                    inplace=True)
+                response['EpitopeStart'] -= 1
+                response['EpitopeEnd'] -= 1
+                responses[key] = response
+            else:
+                logging.info(
+                    "Skipping binding for peptide %s / allele %s, already queried",
+                    peptide, allele)
 
     # concatenating the responses makes a MultiIndex with two columns
     # - SourceSequence
@@ -127,10 +135,10 @@ class IEDBMHCBinding(object):
     responses['EpitopeEnd'] += 1
 
     assert 'ann_rank' in responses, responses.head()
-    responses['MHC_PercentileRank'] = responses['ann_rank']
+    responses[PERCENTILE_RANK_FIELD_NAME] = responses['ann_rank']
 
     assert 'ann_ic50' in responses, responses.head()
-    responses['MHC_IC50'] = responses['ann_ic50']
+    responses[IC50_FIELD_NAME] = responses['ann_ic50']
 
     # instead of just building up a new dataframe I'm expliciting
     # dropping fields here to document what other information is available

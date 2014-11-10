@@ -12,9 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import random
 
 import pandas as pd
-import random
+
+from peptide_binding_measure import IC50_FIELD_NAME, PERCENTILE_RANK_FIELD_NAME
+
 
 def generate_scored_epitopes(mutated_regions, alleles = ['HLA-A*02:01']):
     records = []
@@ -30,16 +33,12 @@ def generate_scored_epitopes(mutated_regions, alleles = ['HLA-A*02:01']):
                 record['EpitopeStart'] = i
                 record['EpitopeEnd'] = i + epitope_length
                 record['SourceSequence'] = seq
-                record['MutationStart'] = row['MutationStart']
-                record['MutationEnd'] = row['MutationEnd']
-                record['GeneMutationInfo'] = row['GeneMutationInfo']
-                record['GeneInfo'] = row['GeneInfo']
-                record['PeptideMutationInfo'] = row['PeptideMutationInfo']
-                record['TranscriptId'] = row['TranscriptId']
-                record['Gene'] = row['Gene']
-                record['MHC_PercentileRank'] = random.randint(0,99)
-                record['MHC_IC50'] = random.random() * 10000.0
+                record[PERCENTILE_RANK_FIELD_NAME] = random.randint(0,99)
+                record[IC50_FIELD_NAME] = random.random() * 10000.0
                 record['Allele'] = allele
+                for k,v in row.iteritems():
+                    if k not in record:
+                        record[k] = v
                 records.append(record)
     scored_epitopes = pd.DataFrame.from_records(records)
     return scored_epitopes

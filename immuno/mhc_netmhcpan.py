@@ -95,9 +95,9 @@ class PanBindingPredictor(object):
                 files = [output_file]):
             run_command(command)
             results = parse_xls_file(
-                output_file.read(), peptide_entries,
-                mutation_window_size=mutation_window_size
-            )
+                output_file.read(),
+                peptide_entries,
+                mutation_window_size=mutation_window_size)
 
         assert len(results) > 0, "No epitopes from netMHCpan"
         return pd.DataFrame.from_records(results)

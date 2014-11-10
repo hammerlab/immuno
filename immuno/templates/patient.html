@@ -62,7 +62,7 @@ vaccine_peptide_array = [
             scores: {
               {% for score in epitope['MHC_Allele_Scores'] %}
                 "{{ score['Allele'] }}" : {
-                   percentile : {{ score['MHC_PercentileRank'] }},
+                   percentile : {{ score['MHC_Percentile_Rank'] }},
                    bindingScore : {{ score['MHC_IC50'] }}
                 },
               {% endfor %}
