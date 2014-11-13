@@ -17,9 +17,14 @@ from os import environ, listdir
 from os.path import exists, split, join
 
 from mhc_common import compact_hla_allele_name
+from peptide_binding_measure import IC50_FIELD_NAME
+
+
 DEFAULT_PEPTIDE_DIR = environ.get(
     "IMMUNO_THYMIC_PEPTIDES",
     join(split(__file__)[0], "thymic_peptides"))
+
+THYMIC_DELETION_FIELD_NAME = 'ThymicDeletion'
 
 def _load_allele_mapping_dict(path):
     """
@@ -35,8 +40,6 @@ def _load_allele_mapping_dict(path):
             result[k] = v
     return result
 
-
-THYMIC_DELETION_FIELD_NAME = 'ThymicDeletion'
 
 class ImmunogenicityPredictor(object):
 
@@ -150,7 +153,7 @@ class ImmunogenicityPredictor(object):
 
         peptides_df["Immunogenic"] = \
             ~peptides_df[THYMIC_DELETION_FIELD_NAME] & \
-            (peptides_df["MHC_IC50"] <= self.binding_threshold)
+            (peptides_df[IC50_FIELD_NAME] <= self.binding_threshold)
 
         return peptides_df
 

@@ -31,7 +31,8 @@ from epitope_scoring import (
 from group_epitopes import group_epitopes_dataframe
 from immunogenicity import (ImmunogenicityPredictor, THYMIC_DELETION_FIELD_NAME)
 from load_file import load_file
-from mhc_iedb import IEDBMHCBinding, normalize_hla_allele_name
+from mhc_common import normalize_hla_allele_name
+from mhc_iedb import IEDB_MHC1
 from mhc_netmhcpan import PanBindingPredictor
 from mhc_netmhccons import ConsensusBindingPredictor
 import mhc_random
@@ -140,7 +141,7 @@ vaccine_peptide_arg_parser.add_argument("--vaccine-peptide-padding",
     type=int,
     help="Minimum number of wildtype residues before or after a mutation")
 
-vaccine_peptide_arg_parser.add_argument("--print-peptides",
+vaccine_peptide_arg_parser.add_argument("--print-vaccine-peptides",
     default=False,
     help="Print vaccine peptides and scores",
     action="store_true")
@@ -204,7 +205,7 @@ def mhc_binding_prediction(mutated_regions, alleles):
     if args.random_mhc:
         return mhc_random.generate_scored_epitopes(mutated_regions, alleles)
     elif args.iedb_mhc:
-        mhc = IEDBMHCBinding(name = 'mhc', alleles=alleles)
+        mhc = IEDB_MHC1(alleles=alleles)
         return mhc.predict(mutated_regions)
     elif args.netmhc_cons:
         predictor = ConsensusBindingPredictor(alleles)
@@ -280,7 +281,7 @@ if __name__ == '__main__':
     if args.print_epitopes:
         print_epitopes(source_sequences)
 
-    if args.print_peptides or args.vaccine_peptide_file:
+    if args.print_vaccine_peptides or args.vaccine_peptide_file:
         padding = args.vaccine_peptide_padding
         if args.vaccine_peptide_logistic_epitope_scoring:
             epitope_scorer = logistic_ic50_epitope_scorer
@@ -312,7 +313,7 @@ if __name__ == '__main__':
             string_lines.append(line)
             string_lines.append(record['VaccinePeptide'])
 
-        if args.print_peptides:
+        if args.print_vaccine_peptides:
             for line in string_lines:
                 print line
 

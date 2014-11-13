@@ -36,7 +36,7 @@ def generate_scored_epitopes(mutated_regions, alleles = ['HLA-A*02:01']):
                 record[PERCENTILE_RANK_FIELD_NAME] = random.randint(0,99)
                 record[IC50_FIELD_NAME] = random.random() * 10000.0
                 record['Allele'] = allele
-                for k,v in row.iteritems():
+                for k, v in row.iteritems():
                     if k not in record:
                         record[k] = v
                 records.append(record)

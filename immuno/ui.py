@@ -2,18 +2,21 @@ from os import environ, getcwd
 from os.path import exists, join
 
 from common import str2bool, env_var
+from group_epitopes import group_epitopes_dataframe
 from hla_file import read_hla_file
 from immunogenicity import ImmunogenicityPredictor
-from mhc_common import (normalize_hla_allele_name,
-    mhc_class_from_normalized_allele_name)
+from load_file import expand_transcripts
+from load_file import load_variants
+from mhc_common import (
+    normalize_hla_allele_name,
+    mhc_class_from_normalized_allele_name
+)
 from mhc_netmhcpan import PanBindingPredictor
 from mhc_netmhccons import ConsensusBindingPredictor
 import mhc_random
 from mhc_iedb import IEDBMHC1Binding
 from mhc_netmhcpan import PanBindingPredictor
-from mutation_report import group_epitopes
-from load_file import expand_transcripts
-from load_file import load_variants
+from peptide_binding_measure import IC50_FIELD_NAME, PERCENTILE_RANK_FIELD_NAME
 from vcf import load_vcf
 
 from flask import Flask
@@ -154,7 +157,9 @@ def patients():
 def profile():
     patients = Patient.query.with_entities(Patient.display_id).filter_by(
         user_id=current_user.id).all()
-    return render_template('profile.html', patients=patients)
+    return render_template(
+        'profile.html',
+        patients=patients)
 
 def get_vcf_df(patient_id):
     variants = Variant.query.with_entities(Variant.chr, Variant.pos,
@@ -193,7 +198,8 @@ def run_pipeline(patient_id, score_epitopes):
         'alt', 'TranscriptId']]
     scored_epitopes = merge(scored_epitopes, short_transcripts_df,
         on='TranscriptId', how='left')
-    peptides = group_epitopes(scored_epitopes, use_transcript_name = True)
+    peptides = group_epitopes_dataframe(
+        scored_epitopes, use_transcript_name = True)
 
     run = Run(patient_id=patient_id, output=dumps(peptides))
     db.session.add(run)
@@ -208,7 +214,9 @@ def patient(display_id):
 
     return render_template('patient.html',
         display_id=display_id,
-        peptides=loads(output[0]))
+        peptides=loads(output[0]),
+        IC50_FIELD_NAME=IC50_FIELD_NAME,
+        PERCENTILE_RANK_FIELD_NAME=PERCENTILE_RANK_FIELD_NAME)
 
 @app.route('/patient/hla_types/<display_id>')
 @login_required

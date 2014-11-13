@@ -62,6 +62,8 @@ def test_logistic_ic50_scorer_binding_record_score():
     assert logistic_ic50_epitope_scorer.binding_record_score(
         binder_prediction_record) > 0.9
 
+# epitope which binds to one allele and not to the other
+
 epitope = {
     'Epitope': 'SIINFKEL',
     'MHC_Allele_Scores' : [
@@ -80,9 +82,9 @@ epitope = {
 
 def test_simple_ic50_scorer_epitope():
     score = simple_ic50_epitope_scorer.epitope_score(epitope)
-    assert score == 0.5
+    assert score == 1, "Expected score 1, got %0.4" % score
 
 def test_logistic_ic50_scorer_epitope():
     score = logistic_ic50_epitope_scorer.epitope_score(epitope)
-    assert score > 0.25
-    assert score < 0.5
+    assert .8 < score < 1, \
+        "Expected score between 0.8 and 1, got %0.4f" % score

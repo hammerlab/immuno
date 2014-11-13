@@ -1,4 +1,4 @@
-from nose.tools import raises, istest
+from nose.tools import assert_raises, istest
 
 from immuno.peptide_binding_measure import (
     ic50_binding_measure,
@@ -19,20 +19,18 @@ def test_percentile_value_cutoff():
     assert not percentile_binding_measure.value_is_binder(3.0,
         cutoff=percentile_cutoff)
 
-@istest
-@raises(Exception)
-def raises_on_negative_ic50():
-    ic50_binding_measure.value_is_binder(-1, cutoff=ic50_cutoff)
+def test_raises_on_negative_ic50():
+    with assert_raises(Exception):
+        ic50_binding_measure.value_is_binder(-1, cutoff=ic50_cutoff)
 
-@istest
-@raises(Exception)
-def raises_on_negative_percentile():
-    percentile_binding_measure.value_is_binder(-1, cutoff=percentile_cutoff)
 
-@istest
-@raises(Exception)
-def raises_on_percentile_greater_than_100():
-    percentile_binding_measure.value_is_binder(101, cutoff=percentile_cutoff)
+def test_raises_on_negative_percentile():
+    with assert_raises(Exception):
+        percentile_binding_measure.value_is_binder(-1, cutoff=percentile_cutoff)
+
+def test_raises_on_percentile_greater_than_100():
+    with assert_raises(Exception):
+        percentile_binding_measure.value_is_binder(101, cutoff=percentile_cutoff)
 
 binder_prediction_record = {
     'MHC_IC50' : 39.0,

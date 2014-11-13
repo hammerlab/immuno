@@ -33,7 +33,7 @@ from immunogenicity import THYMIC_DELETION_FIELD_NAME
 # and a somatic variant results in the a single amino acid change
 # of the first 'A' for a 'Q', then our mutated protein will be:
 #
-#   TQADMAAQTTKHKWEAAHVAEQLRAYLEGTCVEWLRRYLENGKETLQR
+#   T[Q]ADMAAQTTKHKWEAAHVAEQLRAYLEGTCVEWLRRYLENGKETLQR
 #
 # now either this full protein or some subset of it will become
 # the 'SourceSequence' depending on how large of a vaccine peptide
@@ -43,15 +43,15 @@ from immunogenicity import THYMIC_DELETION_FIELD_NAME
 # case, since the change was near the start of the protein, there
 # are only two such windows, yielding a SourceSequence of length 16:
 #
-#  TQADMAAQTTKHKWEA
+#  T[Q]ADMAAQTTKHKWEA
 #
 # From this source sequence, we generate shorter substrings we
 # expect to bind to MHC molecules (typically 8-11 residues).
 # Assuming for simplicity that epitopes will all be 9-mers,
 # the set of epitopes will be:
 #
-#  TQADMAAQT
-#  QADMAAQTT
+#  T[Q]ADMAAQT
+#  [Q]ADMAAQTT
 #  ADMAAQTTK
 #  DMAAQTTKH
 #  MAAQTTKHK
@@ -88,15 +88,31 @@ def is_mutant_epitope(epitope, mutation_start, mutation_end):
     else:
         return overlaps
 
-def optimize_vaccine_peptide(
+def clamp(i, last_pos):
+    """
+    Given a number between [-inf, inf], clamp it between [0,last_pos]
+
+    Parameters
+    ----------
+
+    i : int
+
+    last_pos : int
+    """
+    return min(max(i, 0), last_pos)
+
+
+def generate_candidate_vaccine_peptides(
         seq,
         epitopes,
         mutation_start,
         mutation_end,
         epitope_scorer,
-        result_length=31,
-        padding=5):
+        result_length,
+        padding):
     """
+    Generate all possible vaccine peptides tiling over an amino acid sequence.
+
     Parameters
     ----------
 
@@ -123,29 +139,29 @@ def optimize_vaccine_peptide(
 
     if n <= result_length:
         # if source sequence is too short, just return whatever we have
-        start = 0
+        first_pos = 0
         n_candidates = 1
     elif n <= result_length + 2 * padding:
         # if the source sequence is too short for the full amount of requested
         # padding, then center as best as we can
         actual_combined_padding = n - result_length
-        start = actual_combined_padding / 2
+        first_pos = actual_combined_padding / 2
         # if there are two equally good ways to center the insufficiently
         # padded sequence, try them both
         n_candidates = 1 if actual_combined_padding % 2 == 1 else 2
     else:
-        start = padding
-        n_candidates = n - result_length - 2 * padding
+        first_pos = padding
+        n_candidates = n - result_length - 2 * padding + 1
 
     # in case the mutation is at the beginning or end of the peptide,
     # make sure we cover it
-    if mutation_start < start:
-        difference = start - mutation_start
-        start = mutation_start
+    if mutation_start < first_pos:
+        difference = first_pos - mutation_start
+        first_pos = mutation_start
         n_candidates += difference
 
-    if mutation_start > start + result_length + n_candidates:
-        difference = mutation_start - (start + result_length + n_candidates)
+    if mutation_start > first_pos + result_length + n_candidates:
+        difference = mutation_start - (first_pos + result_length + n_candidates)
         n_candidates += difference
 
     # we're going to lexically sort each peptide by four criteria:
@@ -155,42 +171,107 @@ def optimize_vaccine_peptide(
     #   - distance from the edge of the spurce sequence
     candidate_peptides = []
 
-    for i in xrange(start, start+n_candidates):
+    for peptide_start in xrange(first_pos, first_pos + n_candidates):
 
-        peptide_seq = seq[i:i+result_length]
-        peptide_seq_len = len(peptide_seq)
-        end = start + peptide_seq_len
+        peptide_seq = seq[peptide_start : peptide_start+result_length]
 
-        number_mutant_residues = \
-            min(mutation_end, end) - max(mutation_start, start)
-        peptide_mutation_start = mutation_start - i
-        peptide_mutation_end = mutation_end - i
+        # use this instead of 'result_length' just in case
+        # we're dealing with a source sequence shorter than
+        # the desired full length
+        peptide_length = len(peptide_seq)
+        peptide_end = peptide_start + peptide_length
 
-        half_len = peptide_seq_len / 2
+        peptide_mutation_start = clamp(
+            mutation_start - peptide_start, peptide_length)
+        peptide_mutation_end = clamp(
+            mutation_end - peptide_start, peptide_length)
+        number_mutant_residues = peptide_mutation_end - peptide_mutation_start
+
         mutation_distance_from_edge = min(
             peptide_mutation_start,
-            peptide_seq_len - peptide_mutation_start)
+            peptide_length - peptide_mutation_start)
 
         mutant_score = 0.0
         wildtype_score = 0.0
         for epitope in epitopes:
-            score = epitope_scorer.epitope_score(epitope)
-            if is_mutant_epitope(epitope, mutation_start, mutation_end):
-                mutant_score += score
-            else:
-                wildtype_score += score
+            epitope_start = epitope['EpitopeStart']
+            epitope_end = epitope['EpitopeEnd']
+            overlaps = (
+                epitope_start >= peptide_start
+                and epitope_end <= peptide_end
+            )
+            mutant = is_mutant_epitope(epitope, mutation_start, mutation_end)
+
+            if overlaps:
+                score = epitope_scorer.epitope_score(epitope)
+                if is_mutant_epitope(epitope, mutation_start, mutation_end):
+                    mutant_score += score
+                else:
+                    wildtype_score += score
 
         vaccine_peptide_record = {
             'VaccinePeptide' : peptide_seq,
             'VaccinePeptideMutationStart' : peptide_mutation_start,
             'VaccinePeptideMutationEnd' : peptide_mutation_end,
             'MutantEpitopeScore' : mutant_score,
-            'VaccinePeptideStart' : i,
             'WildtypeEpitopeScore' : wildtype_score,
+            'VaccinePeptideStart' : peptide_start,
+            'VaccinePeptideEnd' : peptide_end,
+            'VaccinePeptideLength' : peptide_end - peptide_start,
             'NumMutantResidues' : number_mutant_residues,
             'MutationDistanceFromEdge' : mutation_distance_from_edge,
         }
         candidate_peptides.append(vaccine_peptide_record)
+
+    return candidate_peptides
+
+def select_vaccine_peptide(
+        seq,
+        epitopes,
+        mutation_start,
+        mutation_end,
+        epitope_scorer,
+        result_length,
+        padding):
+    """
+    Choose the best vaccine peptide from a longer amino acid sequence.
+    The score of each candidate vaccine peptide is determined by
+        - sum of mutant epitope scores
+        - negative sum of wildtype epitope scores
+        - total number of mutant residues in the vaccine peptide
+        - mutation start placed closest to the center
+
+    Parameters
+    ----------
+
+    seq : str
+
+    epitopes : list
+        List of epitope records, each containing a nested list of per-allele
+        binding predictions
+
+    mutation_start : int
+        Where in the given sequence is the first mutated residue?
+
+    mutation_end : int
+        Where in the given sequence is the last mutated residue?
+
+    epitope_scorer : EpitopeScorer
+
+    result_length : int
+        How big of a substring are we looking to pull out as a vaccine peptide?
+
+    padding : int
+    """
+
+    candidate_peptides = generate_candidate_vaccine_peptides(
+        seq,
+        epitopes,
+        mutation_start,
+        mutation_end,
+        epitope_scorer,
+        result_length,
+        padding)
 
     def score_tuple(record):
         """
@@ -212,10 +293,10 @@ def select_vaccine_peptides(
         source_peptides,
         epitope_scorer=simple_ic50_epitope_scorer,
         vaccine_peptide_length=31,
-        padding=5):
+        padding=10):
     """
     Given a set of longer peptides and their associated predicted epitopes,
-    find the best vaccine peptide overlapping each mutation.
+    find the best set of vaccine peptides overlapping each mutation.
 
     Parameters
     ----------
@@ -239,7 +320,7 @@ def select_vaccine_peptides(
         mutation_end = peptide_record["MutationEnd"]
         epitopes = peptide_record['Epitopes']
 
-        vaccine_peptide_record = optimize_vaccine_peptide(
+        vaccine_peptide_record = select_vaccine_peptide(
             seq,
             epitopes,
             mutation_start,

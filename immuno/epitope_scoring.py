@@ -59,12 +59,12 @@ class EpitopeScorer(object):
         if not self.binding_measure.value_is_binder(value, self.cutoff):
             return 0.0
 
-        allele_weight = self.allele_weight(allele_name) if allele_name else 1.0
-
         if self.transformation_function:
             score = self.transformation_function(value)
         else:
             score = 1.0
+
+        allele_weight = self.allele_weight(allele_name) if allele_name else 1.0
 
         return allele_weight * score
 
@@ -72,7 +72,7 @@ class EpitopeScorer(object):
         value = self.binding_measure.extract_value(record)
         return self.binding_value_score(value, allele_name=allele_name)
 
-    def mean_binding_record_scores(self, epitope_binding_prediction_records):
+    def sum_binding_record_scores(self, epitope_binding_prediction_records):
         """
 
         Parameters
@@ -94,33 +94,47 @@ class EpitopeScorer(object):
                 for item in epitope_binding_prediction_records
             ]
 
-        for allele, record in items:
-            total += self.binding_record_score(record, allele_name=allele)
-        return total / len(epitope_binding_prediction_records)
-
+        return sum(
+            self.binding_record_score(record, allele_name=allele)
+            for allele, record in items
+        )
 
     def epitope_score(self, epitope):
         binding_records = epitope['MHC_Allele_Scores']
-        return self.mean_binding_record_scores(binding_records)
+        return self.sum_binding_record_scores(binding_records)
 
 
 class DecreasingLogisticFunction(object):
     def __init__(self, midpoint, width):
         assert width > 0
-        self.midpoint = midpoint
-        self.width = width
+        self.midpoint = float(midpoint)
+        self.width = float(width)
 
     def __call__(self, value):
-        normalized = (float(value) - self.midpoint) / self.width
+        rescaled = (float(value) - self.midpoint) / self.width
         # simplification of 1.0 - logistic(x) = logistic(-x)
-        return 1.0 / (1.0 + np.exp(normalized))
+        logistic = 1.0 / (1.0 + np.exp(rescaled))
+
+        # since we're scoring IC50 values, let's normalize the output
+        # so IC50 near 0.0 always returns a score of 1.0
+        normalizer = 1.0 / (1.0 + np.exp(-self.midpoint/self.width))
+
+        return logistic / normalizer
 
 # add up all the epitopes with IC50 <= 500nM
 simple_ic50_epitope_scorer = EpitopeScorer(
     binding_measure=ic50_binding_measure,
     cutoff=500.0)
 
-logistic_fn = DecreasingLogisticFunction(midpoint=300.0, width=75.0)
+# default midpoint and width for logistic determined by max likelihood fit
+# for data from Alessandro Sette's 1994 paper:
+#
+#   "The relationship between class I binding affinity
+#    and immunogenicity of potential cytotoxic T cell epitopes.
+#
+# TODO: Use a large dataset to find MHC binding range predicted to #
+# correlate with immunogenicity
+logistic_fn = DecreasingLogisticFunction(midpoint=350.0, width=150.0)
 
 logistic_ic50_epitope_scorer = EpitopeScorer(
     binding_measure=ic50_binding_measure,
