@@ -1,4 +1,8 @@
 from immuno.mhc_formats import parse_netmhc_stdout
+from immuno.peptide_binding_measure import (
+    IC50_FIELD_NAME,
+    PERCENTILE_RANK_FIELD_NAME,
+)
 
 def test_mhc_stdout():
     s = """
@@ -24,6 +28,7 @@ def test_mhc_stdout():
     """
     class MutationEntry(object):
     	pass
+
     mutation_entry = MutationEntry()
     mutation_entry.SourceSequence = "QQQQQYFPEITHIIASSSL"
     mutation_entry.MutationStart = 2
@@ -33,11 +38,20 @@ def test_mhc_stdout():
     mutation_entry.GeneMutationInfo = "g.2 some mutation info"
     mutation_entry.PeptideMutationInfo = "p.2 T>Q"
     mutation_entry.TranscriptId = "TID0"
+    mutation_entry.chr = 'X'
+    mutation_entry.pos = 39393
+    mutation_entry.ref = 'A'
+    mutation_entry.alt = 'T'
+
     peptide_entries = {"id0": mutation_entry}
+
     rows = parse_netmhc_stdout(s, peptide_entries)
+
     assert len(rows) == 12
+
     for i in xrange(len(rows)):
         assert rows[i]['EpitopeStart'] == i
         assert rows[i]['Allele'] == 'HLA-A*02:03'
-    assert rows[0]['MHC_IC50'] == 38534.25
-    assert rows[0]['MHC_PercentileRank'] == 50.00
+
+    assert rows[0][IC50_FIELD_NAME] == 38534.25
+    assert rows[0][PERCENTILE_RANK_FIELD_NAME] == 50.00

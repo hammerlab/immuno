@@ -16,6 +16,7 @@ import numpy as np
 import tempfile
 
 from mhc_common import normalize_hla_allele_name
+from peptide_binding_measure import IC50_FIELD_NAME, PERCENTILE_RANK_FIELD_NAME
 
 def create_input_fasta_file(df, mutation_window_size = None):
     """
@@ -38,10 +39,10 @@ def create_input_fasta_file(df, mutation_window_size = None):
         seq =  mutation_entry['SourceSequence']
         if mutation_window_size:
             start = max(
-                0, 
+                0,
                 mutation_entry.MutationStart - mutation_window_size)
             stop = min(
-                len(seq), 
+                len(seq),
                 mutation_entry.MutationEnd + mutation_window_size)
             seq = seq[start:stop]
         identifier = "%s_%s" % (i, mutation_entry['Gene'][:5])
@@ -98,7 +99,13 @@ def create_binding_result_row(
     # keep track of original genetic variant that
     # gave rise to this epitope
     new_row = {}
+
     # fields shared by all epitopes from this sequence
+    new_row['chr'] = mutation_entry.chr
+    new_row['pos'] = mutation_entry.pos
+    new_row['ref'] = mutation_entry.ref
+    new_row['alt'] = mutation_entry.alt
+
     new_row['SourceSequence'] = mutation_entry.SourceSequence
     new_row['MutationStart'] = mutation_entry.MutationStart
     new_row['MutationEnd'] = mutation_entry.MutationEnd
@@ -113,8 +120,8 @@ def create_binding_result_row(
     new_row['EpitopeStart'] = pos
     new_row['EpitopeEnd'] = pos + len(epitope)
     new_row['Epitope'] = epitope
-    new_row['MHC_IC50'] = ic50
-    new_row['MHC_PercentileRank'] = rank
+    new_row[IC50_FIELD_NAME] = ic50
+    new_row[PERCENTILE_RANK_FIELD_NAME] = rank
     return new_row
 
 def parse_netmhc_stdout(contents, peptide_entries, mutation_window_size = None):
@@ -143,7 +150,7 @@ def parse_netmhc_stdout(contents, peptide_entries, mutation_window_size = None):
     """
     lines = contents.split("\n")
     lines = [l.strip() for l in lines]
-    # remove empty lines 
+    # remove empty lines
     lines = [l for l in lines if len(l) > 0]
     # remove comments
     lines = [l for l in lines if not l.startswith("#")]

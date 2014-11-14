@@ -17,9 +17,14 @@ from os import environ, listdir
 from os.path import exists, split, join
 
 from mhc_common import compact_hla_allele_name
+from peptide_binding_measure import IC50_FIELD_NAME
+
+
 DEFAULT_PEPTIDE_DIR = environ.get(
     "IMMUNO_THYMIC_PEPTIDES",
     join(split(__file__)[0], "thymic_peptides"))
+
+THYMIC_DELETION_FIELD_NAME = 'ThymicDeletion'
 
 def _load_allele_mapping_dict(path):
     """
@@ -133,7 +138,7 @@ class ImmunogenicityPredictor(object):
         # assume a peptide is non-immunogenic unless not in thymic sets
         # We do this in case some alleles are missing, resulting in all
         # their associated ligands being considered non-immunogenic
-        peptides_df["ThymicDeletion"] = True
+        peptides_df[THYMIC_DELETION_FIELD_NAME] = True
         for i in xrange(len(peptides_df)):
             row = peptides_df.ix[i]
             peptide = row.Epitope
@@ -143,12 +148,12 @@ class ImmunogenicityPredictor(object):
                 # match immunology nomenclature
                 substring = \
                     peptide[self.first_position - 1 : self.last_position]
-                peptides_df['ThymicDeletion'].ix[i] = \
+                peptides_df[THYMIC_DELETION_FIELD_NAME].ix[i] = \
                     substring in self.peptide_sets[allele]
 
         peptides_df["Immunogenic"] = \
-            ~peptides_df["ThymicDeletion"] & \
-            (peptides_df["MHC_IC50"] <= self.binding_threshold)
+            ~peptides_df[THYMIC_DELETION_FIELD_NAME] & \
+            (peptides_df[IC50_FIELD_NAME] <= self.binding_threshold)
 
         return peptides_df
 

@@ -21,64 +21,123 @@ import re
 import pandas as pd
 
 from mhc_common import normalize_hla_allele_name, seq_to_str, convert_str
+from peptide_binding_measure import (
+        IC50_FIELD_NAME, PERCENTILE_RANK_FIELD_NAME
+)
+
+"""
+A note about prediction methods, copied from the IEDB website:
+
+The prediction method list box allows choosing from a number of MHC class I
+binding prediction methods:
+- Artificial neural network (ANN),
+- Stabilized matrix method (SMM),
+- SMM with a Peptide:MHC Binding Energy Covariance matrix (SMMPMBEC),
+- Scoring Matrices  from Combinatorial Peptide Libraries (Comblib_Sidney2008),
+- Consensus,
+- NetMHCpan.
+
+IEDB recommended is the default prediction method selection.
+Based on availability of predictors and previously observed predictive
+performance, this selection tries to use the best possible method for a given
+MHC molecule. Currently for peptide:MHC-I binding prediction, for a given MHC
+molecule, IEDB Recommended uses the Consensus method consisting of ANN, SMM,
+and CombLib if any corresponding predictor is available for the molecule.
+Otherwise, NetMHCpan is used. This choice was motivated by the expected
+predictive performance of the methods in decreasing order:
+    Consensus > ANN > SMM > NetMHCpan > CombLib.
+"""
+
+VALID_IEDB_METHODS = [
+    'recommended',
+    'consensus',
+    'netmhcpan',
+    'ann',
+    'smmpmbec',
+    'smm',
+    'comblib_sidney2008'
+]
 
 
-class IEDBMHCBinding(object):
+def _parse_iedb_response(response):
+    """
+    Take the binding predictions returned by IEDB's web API
+    and parse them into a DataFrame
+    """
+    lines = response.split("\n")
+
+    # manually parsing since Pandas is insane
+    header_names = lines[0].split("\t")
+
+    d = {}
+    for col_name in header_names:
+        d[col_name] = []
+
+    for line in lines[1:]:
+        line = line.strip()
+        if len(line) > 0:
+            fields = line.split('\t')
+            for i, header_name in enumerate(header_names):
+                value = convert_str(fields[i] if len(fields) > i else None)
+                d[header_name].append(value)
+    return pd.DataFrame(d)
+
+
+def _query_iedb(request_values, url):
+    """
+    Call into IEDB's web API for MHC binding prediction using request dictionary
+    with fields:
+        - "method"
+        - "length"
+        - "sequence_text"
+        - "allele"
+
+    Parse the response into a DataFrame.
+    """
+    data = urllib.urlencode(request_values)
+    req = urllib2.Request(url, data)
+    response = urllib2.urlopen(req).read()
+    return _parse_iedb_response(response)
+
+
+class IEDB_MHC_Binding_Predictor(object):
 
   def __init__(
         self,
-        alleles=[],
-        name="IEDB-MHC-Binding",
-        method=['consensus'],
-        lengths = [9],
-        url='http://tools.iedb.org/tools_api/mhci/'):
-    self.name = name
-    self._method = method
-    self._lengths = lengths
-    self._url = url
+        alleles,
+        lengths,
+        method,
+        url):
+
+    assert isinstance(alleles, (list,tuple)), \
+        "Alleles must be a sequence, not: %s" % alleles
     self._alleles = alleles
 
-  def _get_iedb_request_params(self, sequence):
+    assert isinstance(lengths, (list,tuple)), \
+        "Peptide lengths must be a sequence, not: %s" % (lengths,)
+    assert all(isinstance(l, (int,long)) for l in lengths), \
+        "Not all integers: %s" % (lengths,)
+    self._lengths = lengths
+
+    assert method in VALID_IEDB_METHODS, \
+        "Invalid IEDB MHC binding prediction method: %s" % (method,)
+    self._method = method
+
+    self._url = url
+
+
+  def _get_iedb_request_params(self, sequence, allele=None):
+    # sometimes we can get joint predictions for all alleles
+    if allele is None:
+        allele = seq_to_str(self._alleles)
+
     params = {
         "method" : seq_to_str(self._method),
         "length" : seq_to_str(self._lengths),
         "sequence_text" : sequence,
-        "allele" : seq_to_str(self._alleles)
+        "allele" : allele,
     }
     return params
-
-  def query_iedb(self, sequence, gene_info):
-    request_values = self._get_iedb_request_params(sequence)
-    logging.info("Calling iedb with {} {}, {}".format(
-        gene_info, sequence, self._alleles))
-    try:
-        data = urllib.urlencode(request_values)
-        req = urllib2.Request(self._url, data)
-        response = urllib2.urlopen(req).read()
-        lines = response.split("\n")
-
-        # manually parsing since pandas is insane
-        header_names = lines[0].split("\t")
-        d = {}
-        for col_name in header_names:
-            d[col_name] = []
-
-        for line in lines[1:]:
-            line = line.strip()
-            if len(line) > 0:
-                fields = line.split('\t')
-                for i, header_name in enumerate(header_names):
-                    value = convert_str(fields[i] if len(fields) > i else None)
-
-                    d[header_name].append(value)
-        return pd.DataFrame(d)
-    except KeyboardInterrupt:
-        raise
-    except:
-        raise
-        logging.error(
-            "Connection error: Failed on sequence {}".format(sequence))
-        return pd.DataFrame()
 
 
   def predict(self, data):
@@ -92,24 +151,32 @@ class IEDBMHCBinding(object):
     # and general MHC binding scores for all k-mer substrings
     responses = {}
     for i, peptide in enumerate(data.SourceSequence):
-        if peptide not in responses:
-            response = self.query_iedb(peptide, data['GeneInfo'][i])
-            response.rename(
-                columns={
-                    'peptide': 'Epitope',
-                    'length' : 'EpitopeLength',
-                    'start' : 'EpitopeStart',
-                    'end' : 'EpitopeEnd',
-                    'allele' : 'Allele',
-                },
-                inplace=True)
-            response['EpitopeStart'] -= 1
-            response['EpitopeEnd'] -= 1
-            responses[peptide] = response
-        else:
-            logging.info(
-                "Skipping binding for peptide %s, already queried",
-                peptide)
+        for allele in self._alleles:
+            key = (peptide, allele)
+            if key not in responses:
+                request = self._get_iedb_request_params(peptide, allele)
+                logging.info(
+                    "Calling IEDB (%s) with request %s",
+                    self._url,
+                    request)
+                response_df = _query_iedb(request, self._url)
+                response_df.rename(
+                    columns={
+                        'peptide': 'Epitope',
+                        'length' : 'EpitopeLength',
+                        'start' : 'EpitopeStart',
+                        'end' : 'EpitopeEnd',
+                        'allele' : 'Allele',
+                    },
+                    inplace=True)
+                response_df['EpitopeStart'] -= 1
+                response_df['EpitopeEnd'] -= 1
+                responses[key] = response_df
+            else:
+                logging.info(
+                    "Already made predictions for peptide %s with allele %s",
+                    peptide,
+                    allele)
 
     # concatenating the responses makes a MultiIndex with two columns
     # - SourceSequence
@@ -127,10 +194,10 @@ class IEDBMHCBinding(object):
     responses['EpitopeEnd'] += 1
 
     assert 'ann_rank' in responses, responses.head()
-    responses['MHC_PercentileRank'] = responses['ann_rank']
+    responses[PERCENTILE_RANK_FIELD_NAME] = responses['ann_rank']
 
     assert 'ann_ic50' in responses, responses.head()
-    responses['MHC_IC50'] = responses['ann_ic50']
+    responses[IC50_FIELD_NAME] = responses['ann_ic50']
 
     # instead of just building up a new dataframe I'm expliciting
     # dropping fields here to document what other information is available
@@ -156,28 +223,32 @@ class IEDBMHCBinding(object):
 
     return result
 
-class IEDBMHC1Binding(IEDBMHCBinding):
+class IEDB_MHC1(IEDB_MHC_Binding_Predictor):
     def __init__(self,
-            name = 'IEDB-MHC1-Binding',
-            url='http://tools.iedb.org/tools_api/mhci/',
-            alleles=[]):
+        alleles,
+        lengths=[9],
+        method='recommended',
+        url='http://tools.iedb.org/tools_api/mhci/'):
 
-        super(IEDBMHC1Binding, self).__init__(
-            name = name,
-            url = url,
-            alleles = alleles)
+        IEDB_MHC_Binding_Predictor.__init__(
+            self,
+            alleles=alleles,
+            lengths=lengths,
+            method=method,
+            url=url)
 
-
-class IEDBMHC2Binding(IEDBMHCBinding):
+class IEDB_MHC2(IEDB_MHC_Binding_Predictor):
     def __init__(self,
-            name = 'IEDB-MHC2-Binding',
-            url='http://tools.iedb.org/tools_api/mhcii/',
-            alleles=[]):
+            alleles,
+            method='recommended',
+            url='http://tools.iedb.org/tools_api/mhcii/'):
 
-      super(IEDBMHC2Binding, self).__init__(
-        name = name,
-        url = url,
-        alleles = alleles)
+      IEDB_MHC_Binding_Predictor.__init__(
+        self,
+        alleles=alleles,
+        lengths=[15],
+        method=method,
+        url=url)
 
     def _get_iedb_request_params(self, sequence):
       params = {

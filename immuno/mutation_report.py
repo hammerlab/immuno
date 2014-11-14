@@ -23,15 +23,22 @@ from Bio import SeqIO
 import numpy as np
 
 from common import peptide_substrings, init_logging
-from ensembl.gene_names import transcript_id_to_transcript_name
-from mhc_iedb import IEDBMHCBinding, normalize_hla_allele_name
+from epitope_scoring import (
+        simple_ic50_epitope_scorer,
+        logistic_ic50_epitope_scorer,
+)
+
+from group_epitopes import group_epitopes_dataframe
+from immunogenicity import (ImmunogenicityPredictor, THYMIC_DELETION_FIELD_NAME)
+from load_file import load_file
+from mhc_common import normalize_hla_allele_name
+from mhc_iedb import IEDB_MHC1
 from mhc_netmhcpan import PanBindingPredictor
 from mhc_netmhccons import ConsensusBindingPredictor
 import mhc_random
-from load_file import load_file
+from peptide_binding_measure import IC50_FIELD_NAME, PERCENTILE_RANK_FIELD_NAME
 from strings import load_comma_string
-from immunogenicity import ImmunogenicityPredictor
-from vaccine_peptides import build_peptides_dataframe
+from vaccine_peptides import select_vaccine_peptides
 
 DEFAULT_ALLELE = 'HLA-A*02:01'
 
@@ -54,37 +61,41 @@ parser.add_argument("--quiet",
     help="Suppress verbose output"
 )
 
-parser.add_argument("--peptide-length",
-    default=31,
-    type=int,
-    help="Length of vaccine peptides (may contain multiple epitopes)")
-
-parser.add_argument("--min-peptide-padding",
-    default=0,
-    type=int,
-    help="Minimum number of wildtype residues before or after a mutation")
-
 parser.add_argument("--hla-file",
     help="File with one HLA allele per line")
 
-parser.add_argument(
-    "--hla",
+parser.add_argument("--hla",
     help="Comma separated list of allele (default HLA-A*02:01)")
 
-parser.add_argument("--random-mhc",
+
+###
+# MHC options
+###
+
+mhc_arg_parser = parser.add_argument_group(
+    title="MHC",
+    description="Which MHC binding predictor to use (default NetMHCpan)")
+
+mhc_arg_parser.add_argument("--random-mhc",
     default=False,
     action="store_true",
     help="Random values instead for MHC binding prediction")
 
-parser.add_argument("--iedb-mhc",
+mhc_arg_parser.add_argument("--iedb-mhc",
     default=False,
     action="store_true",
     help="Use IEDB's web API for MHC binding")
 
-parser.add_argument("--netmhc-cons",
+mhc_arg_parser.add_argument("--netmhc-cons",
     default=False,
     action="store_true",
     help="Use local NetMHCcons binding predictor")
+
+
+parser.add_argument("--skip-thymic-deletion",
+    default=False,
+    action="store_true",
+    help="Don't filter epitopes by thymically deleted self ligandome")
 
 parser.add_argument("--output-epitopes-file",
     help="Output CSV file for dataframe containing scored epitopes",
@@ -95,14 +106,45 @@ parser.add_argument("--print-epitopes",
     default=False,
     action="store_true")
 
-parser.add_argument("--print-peptides",
-    default=False,
-    help="Print dataframe with vaccine peptide scores",
-    action="store_true")
 
-parser.add_argument("--output-report-file",
-    default="report.html",
-    help="Path to HTML report containing scored vaccine peptides")
+###
+# Vaccine peptide options
+###
+
+vaccine_peptide_arg_parser = parser.add_argument_group(
+    title="Vaccine Peptides",
+    description="Options affecting selection and display of vaccine peptides")
+
+vaccine_peptide_arg_parser.add_argument("--vaccine-peptide-file",
+    default="vaccine-peptides.csv",
+    help="Path to CSV file containing predicted vaccine peptides")
+
+vaccine_peptide_arg_parser.add_argument("--vaccine-peptide-count",
+    default=None,
+    type=int,
+    help="How many vaccine peptides do we save? (default: all mutations)")
+
+vaccine_peptide_arg_parser.add_argument(
+    "--vaccine-peptide-logistic-epitope-scoring",
+    default=False,
+    action="store_true",
+    help="Use continuous score per epitope (instead of just IC50 <= 500nM)")
+
+
+vaccine_peptide_arg_parser.add_argument("--vaccine-peptide-length",
+    default=31,
+    type=int,
+    help="Length of vaccine peptides (may contain multiple epitopes)")
+
+vaccine_peptide_arg_parser.add_argument("--vaccine-peptide-padding",
+    default=5,
+    type=int,
+    help="Minimum number of wildtype residues before or after a mutation")
+
+vaccine_peptide_arg_parser.add_argument("--print-vaccine-peptides",
+    default=False,
+    help="Print vaccine peptides and scores",
+    action="store_true")
 
 def print_mutation_report(
         input_filename,
@@ -128,111 +170,56 @@ def print_mutation_report(
         len(transcripts_df.groupby(['chr', 'pos', 'ref', 'alt'])))
     logging.info("# transcripts: %d", len(transcripts_df))
 
-def group_epitopes(scored_epitopes, use_transcript_name = False):
-    """
-    Given a DataFrame with fields:
-        - chr
-        - pos
-        - ref
-        - alt
-        - TranscriptId
-        - SourceSequence
-        - MutationStart
-        - MutationEnd
-        - GeneMutationInfo
-        - PeptideMutationInfo
-        - Gene
-        - GeneInfo
-        - Epitope
-        - EpitopeStart
-        - EpitopeEnd
-        - MHC_IC50
-        - MHC_PercentileRank
+def print_epitopes(source_sequences):
+    print
+    print "Epitopes"
+    print "--------"
+    print
+    for record in sorted(source_sequences, key=lambda r: r['TranscriptId']):
+        mut_start = record['MutationStart']
+        mut_end = record['MutationEnd']
+        print ">Gene=%s, Transcript=%s, Mut=%s (%d:%d)" % (
+            record['Gene'],
+            record['TranscriptId'],
+            record['PeptideMutationInfo'],
+            mut_start,
+            mut_end,
+        )
+        print record['SourceSequence']
+        for epitope in sorted(
+                record['Epitopes'], key=lambda e: e['EpitopeStart']):
+            overlap_start = epitope['EpitopeStart'] < mut_end
+            overlap_end = epitope['EpitopeEnd'] > mut_start
+            mutant = overlap_start and overlap_end
+            print "\t", epitope['Epitope'], ("<-- MUTANT" if mutant else "")
+            for prediction in sorted(
+                    epitope["MHC_Allele_Scores"],
+                    key=lambda p: p['Allele']):
+                print "\t\t", "allele = %s, IC50=%0.4f" % (
+                    prediction['Allele'],
+                    prediction[IC50_FIELD_NAME],
+                )
 
-    Group epitopes under their originating transcript and
-    make nested lists of dictionaries to contain the binding scores
-    for MHC alleles.
 
-    Return a list of dictionaries for each mutated transcript with fields:
-        - chr
-        - pos
-        - ref
-        - alt
-        - TranscriptId
-        - SourceSequence
-        - MutationStart
-        - MutationEnd
-        - GeneMutationInfo
-        - PeptideMutationInfo
-        - Gene
-        - GeneInfo
-        - Epitopes : list of dictionaries
-
-    Each entry of the 'Epitopes' list contains the following fields:
-        - 'Epitope'
-        - 'EpitopeStart'
-        - 'EpitopeEnd'
-        - 'MHC_AlleleScores' : list of allele-specific entries
-
-    Each entry of 'MHC_AlleleScores' the following fields:
-        - 'Allele'
-        - 'MHC_PercentileRank'
-        - 'MHC_IC50'
-    """
-    peptides = []
-    for (transcript_id, seq), transcript_group in \
-            scored_epitopes.groupby(["TranscriptId", "SourceSequence"]):
-        peptide_entry = {}
-        peptide_entry["Peptide"] = seq
-        peptide_entry['TranscriptId'] = transcript_id_to_transcript_name(
-            transcript_id) if use_transcript_name else transcript_id
-        head = transcript_group.to_records()[0]
-        print "RECORD: %s" % head
-        peptide_entry['chr'] = head.chr
-        peptide_entry['pos'] = head.pos
-        peptide_entry['ref'] = head.ref
-        peptide_entry['alt'] = head.alt
-        peptide_entry["MutationStart"] = head.MutationStart
-        peptide_entry["MutationEnd"] = head.MutationEnd
-        peptide_entry["GeneMutationInfo"] = head.GeneMutationInfo
-        peptide_entry["PeptideMutationInfo"] = head.PeptideMutationInfo
-        peptide_entry["GeneInfo"] = head.GeneInfo
-        peptide_entry['Gene'] = head.Gene
-        peptide_entry['Epitopes'] = []
-        for (epitope, epitope_start, epitope_end), epitope_group in \
-                transcript_group.groupby(
-                    ['Epitope', 'EpitopeStart', 'EpitopeEnd']):
-            epitope_entry = {
-                'Epitope' : epitope,
-                'EpitopeStart' : epitope_start,
-                'EpitopeEnd' : epitope_end,
-                'MHC_Allele_Scores' : []
-            }
-            seen_alleles = set([])
-            for epitope_allele_row in epitope_group.to_records():
-                allele = epitope_allele_row['Allele']
-                if allele in seen_alleles:
-                    logging.warn("Repeated entry %s", epitope_allele_row)
-                    continue
-                seen_alleles.add(allele)
-                percentile_rank = epitope_allele_row['MHC_PercentileRank']
-                ic50 = epitope_allele_row['MHC_IC50']
-                allele_entry = {
-                    'Allele': allele,
-                    'MHC_PercentileRank' : percentile_rank,
-                    'MHC_IC50' : ic50,
-                }
-                epitope_entry['MHC_Allele_Scores'].append(allele_entry)
-            peptide_entry['Epitopes'].append(epitope_entry)
-        peptides.append(peptide_entry)
-    return peptides
+def mhc_binding_prediction(mutated_regions, alleles):
+    if args.random_mhc:
+        return mhc_random.generate_scored_epitopes(mutated_regions, alleles)
+    elif args.iedb_mhc:
+        mhc = IEDB_MHC1(alleles=alleles)
+        return mhc.predict(mutated_regions)
+    elif args.netmhc_cons:
+        predictor = ConsensusBindingPredictor(alleles)
+        return predictor.predict(mutated_regions)
+    else:
+        predictor = PanBindingPredictor(alleles)
+        return predictor.predict(mutated_regions)
 
 if __name__ == '__main__':
     args = parser.parse_args()
 
     init_logging(args.quiet)
 
-    peptide_length = int(args.peptide_length)
+    peptide_length = int(args.vaccine_peptide_length)
 
     # get rid of gene descriptions if they're in the dataframe
     if args.hla_file:
@@ -274,34 +261,64 @@ if __name__ == '__main__':
         sys.exit()
 
     mutated_regions = pd.concat(mutated_region_dfs)
+    scored_epitopes = mhc_binding_prediction(mutated_regions, alleles)
 
-    if args.random_mhc:
-        scored_epitopes = \
-            mhc_random.generate_scored_epitopes(mutated_regions, alleles)
-    elif args.iedb_mhc:
-        mhc = IEDBMHCBinding(name = 'mhc', alleles=alleles)
-        scored_epitopes = mhc.predict(mutated_regions)
-    elif args.netmhc_cons:
-        predictor = ConsensusBindingPredictor(alleles)
-        scored_epitopes = predictor.predict(mutated_regions)
+    if args.skip_thymic_deletion:
+        scored_epitopes[THYMIC_DELETION_FIELD_NAME] = False
     else:
-        predictor = PanBindingPredictor(alleles)
-        scored_epitopes = predictor.predict(mutated_regions)
+        imm = ImmunogenicityPredictor(alleles = alleles)
+        scored_epitopes = imm.predict(scored_epitopes)
 
-    imm = ImmunogenicityPredictor(alleles = alleles)
-    scored_epitopes = imm.predict(scored_epitopes)
-
-    if 'MHC_PercentileRank' in scored_epitopes:
-        scored_epitopes = scored_epitopes.sort(['MHC_PercentileRank'])
+    if PERCENTILE_RANK_FIELD_NAME in scored_epitopes:
+        scored_epitopes = scored_epitopes.sort([PERCENTILE_RANK_FIELD_NAME])
 
     if args.output_epitopes_file:
         scored_epitopes.to_csv(args.output_epitopes_file, index=False)
 
+
+    source_sequences = group_epitopes_dataframe(scored_epitopes)
+
     if args.print_epitopes:
-        print scored_epitopes.to_string()
+        print_epitopes(source_sequences)
 
-    peptides = group_epitopes(scored_epitopes)
+    if args.print_vaccine_peptides or args.vaccine_peptide_file:
+        padding = args.vaccine_peptide_padding
+        if args.vaccine_peptide_logistic_epitope_scoring:
+            epitope_scorer = logistic_ic50_epitope_scorer
+        else:
+            epitope_scorer = simple_ic50_epitope_scorer
 
-    if args.print_peptides:
-        for pep in peptides:
-            print pep
+        vaccine_peptide_records = select_vaccine_peptides(
+            source_sequences,
+            epitope_scorer=epitope_scorer,
+            vaccine_peptide_length=peptide_length,
+            padding=padding
+        )
+
+        if args.vaccine_peptide_count:
+            n = args.vaccine_peptide_count
+            vaccine_peptide_records = vaccine_peptide_records[:n]
+
+        string_lines = []
+        for i, record in enumerate(vaccine_peptide_records):
+            line = ">%d Gene=%s, Transcript=%s, Mut=%s (%d:%d), Score=%0.6f" % (
+                i,
+                record['Gene'],
+                record['TranscriptId'],
+                record['PeptideMutationInfo'],
+                record['VaccinePeptideMutationStart'],
+                record['VaccinePeptideMutationEnd'],
+                record['MutantEpitopeScore']
+            )
+            string_lines.append(line)
+            string_lines.append(record['VaccinePeptide'])
+
+        if args.print_vaccine_peptides:
+            for line in string_lines:
+                print line
+
+        if args.vaccine_peptide_file:
+            with open(args.vaccine_peptide_file, 'w') as f:
+                for line in string_lines:
+                    f.write(line)
+                    f.write("\n")
