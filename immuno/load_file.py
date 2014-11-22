@@ -139,8 +139,9 @@ def expand_transcripts(
 
         def success(row):
             new_rows.append(row)
-            msg = "SUCCESS: Gene = %s, Mutation = %s" % \
-                (row['Gene'], row['PeptideMutationInfo'])
+            msg = "SUCCESS: Gene = %s, Mutation = %s, SourceSequence = %s<%d>" \
+                % (row['Gene'], row['PeptideMutationInfo'],
+                    row['SourceSequence'], len(row['SourceSequence']))
             variant_report[key] = msg
 
         if chromosome.upper().startswith("M"):
@@ -163,8 +164,20 @@ def expand_transcripts(
         if not seq:
             error(annot)
         else:
-            if any(s.startswith(seq) for s in seen_source_sequences):
-                skip("Already seen sequence starting with %s", seq)
+            starts_with = [s for s in seen_source_sequences if s.startswith(
+                seq)]
+            if any(starts_with):
+                msg = "Already seen %d sequence(s) starting with %s<%d>" % (
+                    len(starts_with), seq, len(seq))
+                lengths = [("<%d>" % len(s)) for s in starts_with]
+                msg += " (" + ', '.join(lengths) + ")"
+                skip(msg)
+
+                # Log the actual seen sequences
+                for i, s in enumerate(starts_with):
+                    logging.info("Sequence #%d (already seen): %s<%d>" % (i + 1,
+                        s, len(s)))
+
                 continue
             else:
                 seen_source_sequences.add(seq)
