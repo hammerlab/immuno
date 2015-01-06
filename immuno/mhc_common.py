@@ -79,11 +79,14 @@ def normalize_hla_allele_name(hla):
         - A*03:02
         - A02:02
         - A:02:03
+        - A*02:01:01
+        - HLA-A*02:01:01G
     ...should all be normalized to:
         HLA-A*03:02
     """
     original = hla
     hla = hla.strip()
+
     if hla.startswith("HLA-"):
         hla = hla[4:]
 
@@ -109,8 +112,8 @@ def normalize_hla_allele_name(hla):
 
     allele, hla = _parse_numbers(hla)
 
-    assert len(hla) == 0, \
-        "Unexpected suffix %s in HLA type %s" % (hla, original)
+    #assert len(hla) == 0, \
+    #    "Unexpected suffix %s in HLA type %s" % (hla, original)
 
     if len(family) == 1:
         family = "0" + family

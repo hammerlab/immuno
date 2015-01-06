@@ -17,8 +17,6 @@ import logging
 import pandas as pd
 import numpy as np
 
-from ensembl import annotation, gene_names 
-from ensembl.transcript_variant import peptide_from_transcript_variant
 
 def load_vcf(input_filename, drop_low_quality = True):
     """
@@ -66,11 +64,11 @@ def load_vcf(input_filename, drop_low_quality = True):
             usecols=header,
             dtype={'pos' : np.int32, 'chr':str})
 
-    
+
     # drop variants marked as low quality
     if drop_low_quality:
         qual = df['qual']
         mask = (qual == 'PASS') | (qual == '.')
         df = df[mask]
 
-    return df 
+    return df

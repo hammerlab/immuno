@@ -44,7 +44,10 @@ DEFAULT_ALLELE = 'HLA-A*02:01'
 
 parser = argparse.ArgumentParser()
 # must supply either an input file or an amino acid string
-input_group = parser.add_argument_group()
+input_group = parser.add_argument_group(
+    title="Inputs",
+    description="Input files or peptide string",
+)
 
 input_group.add_argument("--input-file",
     action="append",
