@@ -20,6 +20,7 @@ import re
 
 import pandas as pd
 
+from mhc_base_predictor import MHCBasePredictor
 from mhc_common import normalize_hla_allele_name, seq_to_str, convert_str
 from peptide_binding_measure import (
         IC50_FIELD_NAME, PERCENTILE_RANK_FIELD_NAME
@@ -100,42 +101,39 @@ def _query_iedb(request_values, url):
     return _parse_iedb_response(response)
 
 
-class IEDB_MHC_Binding_Predictor(object):
+class IEDB_MHC_Binding_Predictor(MHCBasePredictor):
 
   def __init__(
         self,
-        alleles,
-        lengths,
+        hla_alleles,
+        epitope_lengths,
         method,
         url):
+    MHCBasePredictor.__init__(
+        self,
+        hla_alleles=hla_alleles,
+        epitope_lengths=epitope_lengths)
 
-    assert isinstance(alleles, (list,tuple)), \
-        "Alleles must be a sequence, not: %s" % alleles
-    self._alleles = alleles
+    if method not in VALID_IEDB_METHODS:
+        raise ValueError(
+            "Invalid IEDB MHC binding prediction method: %s" % (method,))
 
-    assert isinstance(lengths, (list,tuple)), \
-        "Peptide lengths must be a sequence, not: %s" % (lengths,)
-    assert all(isinstance(l, (int,long)) for l in lengths), \
-        "Not all integers: %s" % (lengths,)
-    self._lengths = lengths
+    self.method = method
 
-    assert method in VALID_IEDB_METHODS, \
-        "Invalid IEDB MHC binding prediction method: %s" % (method,)
-    self._method = method
-
-    self._url = url
+    if not isinstance(url, str):
+        raise TypeError("Expected URL to be string, not %s : %s" % (
+            url, type(url)))
+    self.url = url
 
 
-  def _get_iedb_request_params(self, sequence, allele=None):
-    # sometimes we can get joint predictions for all alleles
-    if allele is None:
-        allele = seq_to_str(self._alleles)
+  def _get_iedb_request_params(self, sequence, allele):
 
     params = {
-        "method" : seq_to_str(self._method),
-        "length" : seq_to_str(self._lengths),
+        "method" : seq_to_str(self.method),
+        "length" : seq_to_str(self.epitope_lengths),
         "sequence_text" : sequence,
-        "allele" : allele,
+        # have to repeat allele for each length
+        "allele" : ",".join([allele] * len(self.epitope_lengths)),
     }
     return params
 
@@ -151,7 +149,7 @@ class IEDB_MHC_Binding_Predictor(object):
     # and general MHC binding scores for all k-mer substrings
     responses = {}
     for i, peptide in enumerate(data.SourceSequence):
-        for allele in self._alleles:
+        for allele in self.alleles:
             key = (peptide, allele)
             if key not in responses:
                 request = self._get_iedb_request_params(peptide, allele)
@@ -226,14 +224,14 @@ class IEDB_MHC_Binding_Predictor(object):
 class IEDB_MHC1(IEDB_MHC_Binding_Predictor):
     def __init__(self,
         alleles,
-        lengths=[9],
+        epitope_lengths=[9],
         method='recommended',
-        url='http://tools.iedb.org/tools_api/mhci/'):
+        url='http://tools-api.iedb.org/tools_api/mhci/'):
 
         IEDB_MHC_Binding_Predictor.__init__(
             self,
             alleles=alleles,
-            lengths=lengths,
+            epitope_lengths=epitope_lengths,
             method=method,
             url=url)
 
@@ -241,19 +239,13 @@ class IEDB_MHC2(IEDB_MHC_Binding_Predictor):
     def __init__(self,
             alleles,
             method='recommended',
-            url='http://tools.iedb.org/tools_api/mhcii/'):
+            url='http://tools-api.iedb.org/tools_api/mhcii/'):
 
       IEDB_MHC_Binding_Predictor.__init__(
         self,
         alleles=alleles,
-        lengths=[15],
+        # only epitope lengths of 15 currently supported by IEDB's web API
+        epitope_lengths=[15],
         method=method,
         url=url)
 
-    def _get_iedb_request_params(self, sequence):
-      params = {
-        "method" : seq_to_str(self._method),
-        "sequence_text" : sequence,
-        "allele" : seq_to_str(self._alleles),
-      }
-      return params

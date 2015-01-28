@@ -22,7 +22,7 @@ import pandas as pd
 from Bio import SeqIO
 import numpy as np
 
-from common import peptide_substrings, init_logging
+from common import peptide_substrings, init_logging, parse_int_list
 from epitope_scoring import (
         simple_ic50_epitope_scorer,
         logistic_ic50_epitope_scorer,
@@ -43,32 +43,16 @@ from vaccine_peptides import select_vaccine_peptides
 DEFAULT_ALLELE = 'HLA-A*02:01'
 
 parser = argparse.ArgumentParser()
-# must supply either an input file or an amino acid string
-input_group = parser.add_argument_group(
-    title="Inputs",
-    description="Input files or peptide string",
-)
 
-input_group.add_argument("--input-file",
-    action="append",
-    default=[],
-    help="input file(s) (must be FASTA, MAF, TAB or VCF format)")
+parser.add_argument("--variants-file",
+    help="Input file with DNA variants (must be MAF, TAB or VCF format)")
 
-input_group.add_argument("--string",
-    default=None,
-    help="Literal amino acid string of mutated peptide")
 
 parser.add_argument("--quiet",
     default=False,
     action="store_true",
     help="Suppress verbose output"
 )
-
-parser.add_argument("--hla-file",
-    help="File with one HLA allele per line")
-
-parser.add_argument("--hla",
-    help="Comma separated list of allele (default HLA-A*02:01)")
 
 
 ###
@@ -78,6 +62,12 @@ parser.add_argument("--hla",
 mhc_arg_parser = parser.add_argument_group(
     title="MHC",
     description="Which MHC binding predictor to use (default NetMHCpan)")
+
+mhc_arg_parser.add_argument("--hla-file",
+    help="File with one HLA allele per line")
+
+mhc_arg_parser.add_argument("--hla",
+    help="Comma separated list of allele (default HLA-A*02:01)")
 
 mhc_arg_parser.add_argument("--random-mhc",
     default=False,
@@ -95,10 +85,23 @@ mhc_arg_parser.add_argument("--netmhc-cons",
     help="Use local NetMHCcons binding predictor")
 
 
-parser.add_argument("--skip-thymic-deletion",
+mhc_arg_parser.add_argument("--mhc-epitope-lengths",
+    default=[8,9,10,11],
+    type=parse_int_list,
+    help="Lengths of epitopes to consider for MHC binding prediction")
+
+parser.add_argument("--self-epitope-filter",
     default=False,
     action="store_true",
-    help="Don't filter epitopes by thymically deleted self ligandome")
+    help="Filter 'self' epitopes (predicted MHC binders from the proteome)")
+
+# TODO: Add a '--self-epitope-filter-path' option
+# for directory with following structure:
+# /dir/9/HLA-A0201
+# ...
+# /dir/11/HLA-C0801
+# ....
+# /dir/length/allele
 
 parser.add_argument("--output-epitopes-file",
     help="Output CSV file for dataframe containing scored epitopes",
@@ -109,6 +112,21 @@ parser.add_argument("--print-epitopes",
     default=False,
     action="store_true")
 
+
+###
+# RNA-Seq data
+###
+rna_group = parser.add_argument_group(
+    title="RNA-Seq",
+    description="Transcript and gene abundance quantification")
+
+rna_group.add_argument(
+    "--rna-gene-fpkm-file",
+    help="Tab separated mapping from Ensembl gene IDs to FPKM")
+
+rna_group.add_argument(
+    "--rna-transcript-fpkm-file",
+    help="Tab separated mapping from Ensembl transcript IDs to FPKM")
 
 ###
 # Vaccine peptide options
@@ -132,7 +150,6 @@ vaccine_peptide_arg_parser.add_argument(
     default=False,
     action="store_true",
     help="Use continuous score per epitope (instead of just IC50 <= 500nM)")
-
 
 vaccine_peptide_arg_parser.add_argument("--vaccine-peptide-length",
     default=31,

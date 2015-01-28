@@ -8,49 +8,24 @@ import numpy as np
 import pandas as pd
 
 from cleanup_context import CleanupFiles
-from process_helpers import run_command
-from mhc_common import normalize_hla_allele_name
+
 from mhc_formats import create_input_fasta_file, parse_xls_file
+from mhc_base_commandline_predictor import MHCBaseCommandlinePredictor
 
-
-class PanBindingPredictor(object):
+class PanBindingPredictor(MHCBaseCommandlinePredictor):
 
     def __init__(
             self,
             hla_alleles,
-            netmhc_command = "netMHCpan"):
-        self.netmhc_command = netmhc_command
-
-        try:
-            run_command([self.netmhc_command])
-        except:
-            assert False, "Failed to run %s" % self.netmhc_command
-
-        try:
-            valid_alleles_str = check_output([self.netmhc_command, "-listMHC"])
-            assert len(valid_alleles_str) > 0, \
-                "%s returned empty allele list" % self.self.netmhc_command
-            valid_alleles = set([])
-            for line in valid_alleles_str.split("\n"):
-                if not line.startswith("#"):
-                    valid_alleles.add(line)
-        except:
-            logging.warning("Failed to run %s -listMHC", self.netmhc_command)
-            valid_alleles = None
-
-        self.alleles = []
-        for allele in hla_alleles:
-            allele = normalize_hla_allele_name(allele.strip().upper())
-            # for some reason netMHCpan drop the "*" in names
-            # such as "HLA-A*03:01" becomes "HLA-A03:01"
-            if valid_alleles and allele.replace("*", "") not in valid_alleles:
-                print "Skipping %s (not available in NetMHCpan)" % allele
-            else:
-                self.alleles.append(allele)
-        # don't run the MHC predictor twice for homozygous alleles,
-        # only run it for unique alleles
-        self.alleles = set(self.alleles)
-
+            netmhc_command="netMHCpan",
+            epitope_lengths=[9]):
+        MHCBaseCommandlinePredictor.__init__(
+            self,
+            name="NetMHCpan",
+            command=netmhc_command,
+            hla_alleles=hla_alleles,
+            command=netmhc_command,
+            epitope_lengths=epitope_lengths)
 
     def predict(self, df, mutation_window_size = None):
         """
@@ -82,13 +57,13 @@ class PanBindingPredictor(object):
                 prefix="netMHCpan_output",
                 delete=False)
         command = [
-            self.netmhc_command,
+            self.command,
                 "-xls",
                 "-xlsfile", output_file.name,
-                 "-l", "9",
-                  "-f", input_filename,
-                  "-a", alleles_str]
-        print " ".join(command)
+                "-l", "9",
+                "-f", input_filename,
+                "-a", alleles_str]
+        logging.info(" ".join(command))
 
         with CleanupFiles(
                 filenames = [input_filename],
@@ -99,5 +74,6 @@ class PanBindingPredictor(object):
                 peptide_entries,
                 mutation_window_size=mutation_window_size)
 
-        assert len(results) > 0, "No epitopes from netMHCpan"
+        if len(results) == 0:
+            raise ValueError("No epitopes from netMHCpan")
         return pd.DataFrame.from_records(results)

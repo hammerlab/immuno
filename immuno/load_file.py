@@ -68,7 +68,10 @@ def tab_to_vcf(tab_df):
     })
 
 def expand_transcripts(
-        vcf_df, patient_id, min_peptide_length=9, max_peptide_length=31):
+        variants,
+        patient_id,
+        min_peptide_length=9,
+        max_peptide_length=31):
     """
     Applies genomic variants to all possible transcripts.
 
@@ -86,7 +89,10 @@ def expand_transcripts(
     """
 
     assert len(vcf_df)  > 0, "No mutation entries for %s" % patient_id
-    logging.info("Expanding transcripts from %d variants for %s", len(vcf_df), patient_id)
+    logging.info(
+        "Expanding transcripts from %d variants for %s",
+        len(vcf_df),
+        patient_id)
     vcf_df['chr'] = vcf_df.chr.map(normalize_chromosome_name)
 
     # annotate genomic mutations into all the possible
@@ -264,10 +270,13 @@ def load_variants(input_filename):
         assert False, "Unrecognized file type %s" % input_filename
     return vcf_df
 
-def load_file(input_filename, min_peptide_length=9, max_peptide_length=31):
+def load_file(
+        input_filename,
+        min_peptide_length=9,
+        max_peptide_length=31):
     """
-    Load mutatated peptides from FASTA, VCF, or MAF file.
-    For the latter two formats, expand their variants across all
+    Load mutatated peptides from FASTA, VCF, MAF, or TAB file.
+    For the latter three formats, expand their variants across all
     annotated transcripts.
 
     Parameters
@@ -297,11 +306,7 @@ def load_file(input_filename, min_peptide_length=9, max_peptide_length=31):
             or input_filename.endswith(".fa"):
         return load_fasta(input_filename)
 
-    vcf_df = load_variants(input_filename)
-    vcf_df = vcf_df.drop_duplicates()
-
     return expand_transcripts(
-        vcf_df,
-        input_filename,
+        variants,
         min_peptide_length = min_peptide_length,
         max_peptide_length = max_peptide_length)

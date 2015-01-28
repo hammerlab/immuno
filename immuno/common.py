@@ -100,6 +100,15 @@ def find_paths(filename_string = "", directory_string = "", extensions = None):
         ]
     return paths
 
+def parse_int_list(string):
+    if "-" in string:
+        left, right = string.split("-")
+        left_val = int(left.strip())
+        right_val = int(right.strip())
+        return range(left_val, right_val+1)
+    substrings = string.split(",")
+    return [int(substring.strip()) for substring in substrings]
+
 def str2bool(value):
     return value.lower() in ('yes', 'true', 't', '1')
 
