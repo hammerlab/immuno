@@ -21,13 +21,13 @@ import sys
 import pandas as pd
 from Bio import SeqIO
 import numpy as np
+from varcode import VariantCollection
 
 from common import peptide_substrings, init_logging, parse_int_list
 from epitope_scoring import (
         simple_ic50_epitope_scorer,
         logistic_ic50_epitope_scorer,
 )
-
 from group_epitopes import group_epitopes_dataframe
 from immunogenicity import (ImmunogenicityPredictor, THYMIC_DELETION_FIELD_NAME)
 from load_file import load_file
@@ -166,29 +166,36 @@ vaccine_peptide_arg_parser.add_argument("--print-vaccine-peptides",
     help="Print vaccine peptides and scores",
     action="store_true")
 
-def print_mutation_report(
-        input_filename,
-        variant_report,
-        raw_genomic_mutation_df,
-        transcripts_df):
-    print
-    print "MUTATION REPORT FOR", input_filename
-    print
-    last_mutation = None
-    for (mut_description, transcript_id), msg in variant_report.iteritems():
-        if mut_description != last_mutation:
-            print mut_description
-            last_mutation = mut_description
-        print "--", transcript_id, ":", msg
+def load_variants_file(filename):
+    variants = VariantCollection(args.variants_file)
+    if len(variants) == 0:
+        raise ValueError("No variants found in %s" % (filename,))
 
-    logging.info("---")
-    logging.info("FILE LOADING SUMMARY FOR %s", input_filename)
-    logging.info("---")
-    logging.info("# original mutations: %d", len(raw_genomic_mutation_df))
-    logging.info(
-        "# mutations with annotations: %d",
-        len(transcripts_df.groupby(['chr', 'pos', 'ref', 'alt'])))
-    logging.info("# transcripts: %d", len(transcripts_df))
+    logging.info("Loaded variants file %s" % (filename,))
+
+    for variant in variants:
+        logging.info(variant)
+    return variants
+
+def load_expression_levels(filename, key_field):
+    df = pd.read_csv(filename, sep='\t')
+    return df[[key_field, 'FPKM']]
+
+def create_vaccine_fasta_lines(vaccine_peptide_records):
+    fasta_lines = []
+    for i, record in enumerate(vaccine_peptide_records):
+        line = ">%d Gene=%s, Transcript=%s, Mut=%s (%d:%d), Score=%0.6f" % (
+            i,
+            record['Gene'],
+            record['TranscriptId'],
+            record['PeptideMutationInfo'],
+            record['VaccinePeptideMutationStart'],
+            record['VaccinePeptideMutationEnd'],
+            record['MutantEpitopeScore']
+        )
+        fasta_lines.append(line)
+        fasta_lines.append(record['VaccinePeptide'])
+    return fasta_lines
 
 def print_epitopes(source_sequences):
     print
@@ -220,7 +227,6 @@ def print_epitopes(source_sequences):
                     prediction[IC50_FIELD_NAME],
                 )
 
-
 def mhc_binding_prediction(mutated_regions, alleles):
     if args.random_mhc:
         return mhc_random.generate_scored_epitopes(mutated_regions, alleles)
@@ -236,10 +242,9 @@ def mhc_binding_prediction(mutated_regions, alleles):
 
 if __name__ == '__main__':
     args = parser.parse_args()
-
     init_logging(args.quiet)
 
-    peptide_length = int(args.vaccine_peptide_length)
+    vaccine_peptide_length = int(args.vaccine_peptide_length)
 
     # get rid of gene descriptions if they're in the dataframe
     if args.hla_file:
@@ -249,52 +254,39 @@ if __name__ == '__main__':
     else:
         alleles = [normalize_hla_allele_name(DEFAULT_ALLELE)]
 
-    # stack up the dataframes and later concatenate in case we
-    # want both commandline strings (for weird mutations like translocations)
-    # and files
-    mutated_region_dfs = []
 
-    if args.string:
-        df = load_comma_string(args.string)
-        mutated_region_dfs.append(df)
+    variants = load_variants_file(args.variants_file)
+    gene_levels = load_expression_levels(args.rna_gene_fpkm_file)
+    transcript_levels = load_expression_levels(args.rna_transcript_fpkm_file)
 
-    # loop over all the input files and
-    # load each one into a dataframe
+    # dictionary mapping each variant to coding effect
+    # some variants may be dropped if they affect insufficiently
+    # transcribed genes or have no coding effects
+    variant_transcript_effects = select_transcript_effects(
+        variants,
+        gene_levels,
+        transcript_levels,
+        gene_fpkm_cutoff=1.0)
 
-    for input_filename in args.input_file:
-        transcripts_df, raw_genomic_mutation_df, variant_report = \
-            load_file(input_filename, max_peptide_length = peptide_length)
-        mutated_region_dfs.append(transcripts_df)
+    mutated_regions = mutant_amino_acid_sequences(
+        variant_transcript_effects,
+        vaccine_peptide_length)
 
-        # print each genetic mutation applied to each possible transcript
-        # and either why it failed or what protein mutation resulted
-        if not args.quiet:
-            print_mutation_report(
-                input_filename,
-                variant_report,
-                raw_genomic_mutation_df,
-                transcripts_df)
-
-    if len(mutated_region_dfs) == 0:
-        parser.print_help()
-        print "\nERROR: Must supply at least --string or --input-file"
-        sys.exit()
-
-    mutated_regions = pd.concat(mutated_region_dfs)
+    # TODO: generate mutated_regions
+    # mutated_regions = pd.concat(mutated_region_dfs)
     scored_epitopes = mhc_binding_prediction(mutated_regions, alleles)
 
-    if args.skip_thymic_deletion:
-        scored_epitopes[THYMIC_DELETION_FIELD_NAME] = False
-    else:
+    if args.self_epitope_filter:
         imm = ImmunogenicityPredictor(alleles = alleles)
         scored_epitopes = imm.predict(scored_epitopes)
+    else:
+        scored_epitopes[THYMIC_DELETION_FIELD_NAME] = False
 
     if PERCENTILE_RANK_FIELD_NAME in scored_epitopes:
         scored_epitopes = scored_epitopes.sort([PERCENTILE_RANK_FIELD_NAME])
 
     if args.output_epitopes_file:
         scored_epitopes.to_csv(args.output_epitopes_file, index=False)
-
 
     source_sequences = group_epitopes_dataframe(scored_epitopes)
 
@@ -312,33 +304,20 @@ if __name__ == '__main__':
             source_sequences,
             epitope_scorer=epitope_scorer,
             vaccine_peptide_length=peptide_length,
-            padding=padding
-        )
+            padding=padding)
 
         if args.vaccine_peptide_count:
             n = args.vaccine_peptide_count
             vaccine_peptide_records = vaccine_peptide_records[:n]
 
-        string_lines = []
-        for i, record in enumerate(vaccine_peptide_records):
-            line = ">%d Gene=%s, Transcript=%s, Mut=%s (%d:%d), Score=%0.6f" % (
-                i,
-                record['Gene'],
-                record['TranscriptId'],
-                record['PeptideMutationInfo'],
-                record['VaccinePeptideMutationStart'],
-                record['VaccinePeptideMutationEnd'],
-                record['MutantEpitopeScore']
-            )
-            string_lines.append(line)
-            string_lines.append(record['VaccinePeptide'])
+        fasta_lines = create_vaccine_fasta_lines(vaccine_peptide_records)
 
         if args.print_vaccine_peptides:
-            for line in string_lines:
+            for line in fasta_lines:
                 print line
 
         if args.vaccine_peptide_file:
             with open(args.vaccine_peptide_file, 'w') as f:
-                for line in string_lines:
+                for line in fasta_lines:
                     f.write(line)
                     f.write("\n")
