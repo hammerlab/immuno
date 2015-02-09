@@ -30,22 +30,21 @@ from epitope_scoring import (
 )
 from group_epitopes import group_epitopes_dataframe
 from immunogenicity import (ImmunogenicityPredictor, THYMIC_DELETION_FIELD_NAME)
-from load_file import load_file
 from mhc_common import normalize_hla_allele_name
 from mhc_iedb import IEDB_MHC1
 from mhc_netmhcpan import PanBindingPredictor
 from mhc_netmhccons import ConsensusBindingPredictor
 import mhc_random
 from peptide_binding_measure import IC50_FIELD_NAME, PERCENTILE_RANK_FIELD_NAME
+from rna import choose_principal_transcripts, load_cufflinks_tracking_file
 from strings import load_comma_string
 from vaccine_peptides import select_vaccine_peptides
-
-DEFAULT_ALLELE = 'HLA-A*02:01'
 
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--variants-file",
-    help="Input file with DNA variants (must be MAF, TAB or VCF format)")
+    help="Input file with DNA variants (must be MAF, TAB or VCF format)",
+    required=True)
 
 
 parser.add_argument("--quiet",
@@ -53,7 +52,6 @@ parser.add_argument("--quiet",
     action="store_true",
     help="Suppress verbose output"
 )
-
 
 ###
 # MHC options
@@ -122,11 +120,19 @@ rna_group = parser.add_argument_group(
 
 rna_group.add_argument(
     "--rna-gene-fpkm-file",
-    help="Tab separated mapping from Ensembl gene IDs to FPKM")
+    help="Cufflinks tracking file (FPKM measurements for Ensembl genes)",
+    required=True)
+
+rna_group.add_argument(
+    "--rna-gene-expression-threshold",
+    help="Minimum log2(FPKM) for gene expression levels",
+    default=2.0)
 
 rna_group.add_argument(
     "--rna-transcript-fpkm-file",
-    help="Tab separated mapping from Ensembl transcript IDs to FPKM")
+    help="Cufflinks tracking file (FPKM measurements for Ensembl transcripts)",
+    required=True)
+
 
 ###
 # Vaccine peptide options
@@ -166,6 +172,22 @@ vaccine_peptide_arg_parser.add_argument("--print-vaccine-peptides",
     help="Print vaccine peptides and scores",
     action="store_true")
 
+def parse_hla_alleles(hla_file, hla_string):
+    alleles = []
+
+    if hla_file:
+        alleles.extend([
+            normalize_hla_allele_name(l) for l in open(hla_file)
+        ])
+    if hla_string:
+        alleles.extend([
+            normalize_hla_allele_name(l) for l in hla_string.split(",")
+        ])
+
+    if len(alleles) == 0:
+        raise ValueError("No HLA alleles specified")
+    return alleles
+
 def load_variants_file(filename):
     variants = VariantCollection(args.variants_file)
     if len(variants) == 0:
@@ -177,9 +199,7 @@ def load_variants_file(filename):
         logging.info(variant)
     return variants
 
-def load_expression_levels(filename, key_field):
-    df = pd.read_csv(filename, sep='\t')
-    return df[[key_field, 'FPKM']]
+
 
 def create_vaccine_fasta_lines(vaccine_peptide_records):
     fasta_lines = []
@@ -245,28 +265,34 @@ if __name__ == '__main__':
     init_logging(args.quiet)
 
     vaccine_peptide_length = int(args.vaccine_peptide_length)
-
-    # get rid of gene descriptions if they're in the dataframe
-    if args.hla_file:
-        alleles = [normalize_hla_allele_name(l) for l in open(args.hla_file)]
-    elif args.hla:
-        alleles = [normalize_hla_allele_name(l) for l in args.hla.split(",")]
-    else:
-        alleles = [normalize_hla_allele_name(DEFAULT_ALLELE)]
-
+    alleles = parse_hla_allels(args.hla_file, args.hla)
 
     variants = load_variants_file(args.variants_file)
-    gene_levels = load_expression_levels(args.rna_gene_fpkm_file)
-    transcript_levels = load_expression_levels(args.rna_transcript_fpkm_file)
 
-    # dictionary mapping each variant to coding effect
-    # some variants may be dropped if they affect insufficiently
-    # transcribed genes or have no coding effects
-    variant_transcript_effects = select_transcript_effects(
-        variants,
-        gene_levels,
-        transcript_levels,
-        gene_fpkm_cutoff=1.0)
+    # Create a dictionary from Ensembl gene ID to the Ensembl transcript ID
+    # of the most abundant annotated transcript for each gene.
+    # If a gene is missing from this dictionary then either its overall
+    # expression level fell below the user-supplied threhold or all of its
+    # quantified transcripts were novel.
+    #
+    # TODO:
+    #   - Make use of Cufflinks novel transcripts (though beware of many
+    #     false positives)
+    #   - Quantify allele-specific expression, only use transcripts
+    #     with variant nucleotides
+    #   - (eventually) Use long-read RNA sequencing to confidently assemble a
+    #     transcriptome for each patient.
+    gene_fpkm_df = load_cufflinks_tracking_file(args.rna_gene_fpkm_filename)
+    gene_fpkm_df = load_cufflinks_tracking_file(
+        args.rna_transcript_fpkm_file)
+
+    # list of coding transcript effects after expression filtering of
+    # genes and choosing most abundant transcript for each variant
+    transcript_effects = choose_principal_transcripts(
+        gene_fpkm_df,
+        args.rna_gene_expression_threshold,
+        gene_fpkm_df,
+        variants)
 
     mutated_regions = mutant_amino_acid_sequences(
         variant_transcript_effects,

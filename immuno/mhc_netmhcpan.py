@@ -24,7 +24,6 @@ class PanBindingPredictor(MHCBaseCommandlinePredictor):
             name="NetMHCpan",
             command=netmhc_command,
             hla_alleles=hla_alleles,
-            command=netmhc_command,
             epitope_lengths=epitope_lengths)
 
     def predict(self, df, mutation_window_size = None):

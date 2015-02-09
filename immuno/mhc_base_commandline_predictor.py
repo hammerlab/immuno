@@ -1,4 +1,4 @@
-from mhc_base_predictor MHCBasePredictor
+from mhc_base_predictor import MHCBasePredictor
 from process_helpers import run_command
 
 class MHCBaseCommandlinePredictor(MHCBasePredictor):
