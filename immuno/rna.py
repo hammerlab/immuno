@@ -1,5 +1,9 @@
+import logging
+
+import numpy as np
 import pandas as pd
 from varcode import CodingSequenceMutation
+
 
 # default column names from cufflinks tracking files
 # for gene and isoform expression levels
@@ -11,15 +15,15 @@ GENE_NAMES_COLUMN = "gene_short_name"
 
 def load_cufflinks_tracking_file(
         filename,
-        id_column=ID_COLUMN_NAME,
-        fpkm_column=FPKM_COLUMN_NAME,
-        status_column=STATUS_COLUMN_NAME,
-        locus_column=LOCUS_COLUMN_NAME,
-        gene_names_column=GENE_NAMES_COLUMN_NAME,
-        drop_failed_fpkm=True,
-        drop_lowdata_fpkm=True,
-        drop_hidata_fpkm=True,
-        drop_nonchromosomal_loci=True
+        id_column=ID_COLUMN,
+        fpkm_column=FPKM_COLUMN,
+        status_column=STATUS_COLUMN,
+        locus_column=LOCUS_COLUMN,
+        gene_names_column=GENE_NAMES_COLUMN,
+        drop_failed=True,
+        drop_lowdata=True,
+        drop_hidata=True,
+        drop_nonchromosomal_loci=True,
         drop_novel=False):
     """
     Loads a Cufflinks tracking file, which contains expression levels
@@ -72,21 +76,29 @@ def load_cufflinks_tracking_file(
         end : int
         gene_names : str list
     """
-    df = pd.read_csv(filename, sep='\t')
+    df = pd.read_csv(filename, sep="\s+")
+    status = df[status_column]
 
-    if drop_failed:
-        status = df[status_column]
-        fail_mask = status == "FAIL"
-        logging.info("Dropping %d/%d failed entries from %s" % (
-            fail_mask.sum(), len(df), filename))
-        df = df[~fail_mask]
+    for flag, status_value in [
+            (drop_failed, "FAIL"),
+            (drop_lowdata, "LOWDATA"),
+            (drop_hidata, "HIDATA")]:
+        if flag:
+            mask = status == status_value
+            n_dropped = mask.sum()
+            if n_dropped > 0:
+                logging.info("Dropping %d/%d entries from %s with status=%s",
+                    n_dropped, len(df), filename, status_value)
+                df = df[~mask]
 
     if drop_nonchromosomal_loci:
         loci = df[locus_column]
         chromosomal_loci = loci.str.startswith("chr")
-        logging.info("Dropping %d/%d non-chromosomal loci from %s" % (
-            (~chromosomal_loci).sum(), len(df), filename))
-        df = df[chromosomal_loci]
+        n_dropped = (~chromosomal_loci).sum()
+        if n_dropped > 0:
+            logging.info("Dropping %d/%d non-chromosomal loci from %s" % (
+                n_dropped, len(df), filename))
+            df = df[chromosomal_loci]
 
     if len(df) == 0:
         raise ValueError("Empty FPKM tracking file: %s" % filename)
@@ -95,6 +107,14 @@ def load_cufflinks_tracking_file(
     known = ids.str.startswith("ENS")
     if known.sum() == 0:
         raise ValueError("No Ensembl IDs found in %s" % filename)
+
+    if drop_novel:
+        n_dropped = (~known).sum()
+        if n_dropped > 0:
+            logging.info("Dropping %d/%d novel entries from %s",
+                n_dropped, len(df), filename)
+            df = df[known]
+            known = np.ones(len(df), dtype='bool')
 
     loci = df[locus_column]
     # capture all characters after 'chr' but before ':'
@@ -114,9 +134,9 @@ def load_cufflinks_tracking_file(
     gene_names_lists = gene_names_strings.str.split(",")
 
     return pd.DataFrame({
-        'id' : df[id_column_name],
+        'id' : df[id_column],
         'novel' : ~known,
-        'fpkm' : df[fpkm_column_name],
+        'fpkm' : df[fpkm_column],
         'chr' : chromosomes,
         'start' : starts,
         'end' : ends,
@@ -171,7 +191,7 @@ def aggregate_gene_expression_levels(gene_fpkm_df, ensembl):
     result_dict = dict(zip(known_df.id, fpkm))
 
     novel_df = gene_fpkm_df[~mask]
-    for _, novel_row in novel_df.iterrows()
+    for _, novel_row in novel_df.iterrows():
         # find genes overlapping the chromosomal positions spanned
         # by the novel gene constructed by Cufflinks
         overlapping_genes = ensembl.genes_at_locus(
@@ -193,15 +213,12 @@ def aggregate_gene_expression_levels(gene_fpkm_df, ensembl):
             # expression and don't want to inflate loci that span lots of
             # genes
             result_dict[gene.id] = old_fpkm + novel_row.fpkm / n_matching_genes
-
     return result_dict
 
 def expressed_gene_ids(
         gene_fpkm_filename,
         gene_expression_threshold,
         ensembl):
-
-
     # gene IDs with sufficiently high expression level to be considered
     # for inclusion in the vaccine
     return {
@@ -211,15 +228,15 @@ def expressed_gene_ids(
     }
 
 def choose_principal_transcripts(
-        variant_collection
+        variant_collection,
         gene_fpkm_df,
         gene_expression_threshold,
-        transcript_fpkm_df):
+        transcript_fpkm_df,
+        transcript_expression_threshold=0.0):
 
     # dictionary whose keys are Ensembl gene IDs and values are FPKM values
     gene_fpkm_dict = aggregate_ensembl_gene_expression_levels(
-        gene_fpkms_df
-        ensembl=ensembl)
+        gene_fpkms_df, ensembl=ensembl)
 
     transcript_fpkm_dict = dict(
         zip(transcript_fpkm_df.id, transcript_fpkm_df.fpkm))
@@ -247,7 +264,7 @@ def choose_principal_transcripts(
                 transcript_fpkm = transcript_fpkm_dict.get(
                     transcript_id, 0.0)
 
-                if transcript_fpkm <= 0:
+                if transcript_fpkm <= transcript_expression_threshold:
                     continue
 
                 fpkm_pair = (gene_fpkm, transcript_fpkm)
