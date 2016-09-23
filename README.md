@@ -1,3 +1,5 @@
+# RETIRED: See [vaxrank](https://github.com/hammerlab/vaxrank) and [epidisco](https://github.com/hammerlab/epidisco) instead
+
 ## Immunotherapy Pipeline
 
 ### Status
